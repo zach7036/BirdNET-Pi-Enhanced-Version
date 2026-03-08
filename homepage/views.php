@@ -175,7 +175,8 @@ elseif ($config["LONGITUDE"] == "0.000") {
     <button type="submit" name="view" value="Spectrogram" form="views">📊 <span>Spectrogram</span></button>
     <button type="submit" name="view" value="Analytics" form="views">📈 <span>Analytics</span></button>
     <button type="submit" name="view" value="Species" form="views">🐧 <span>Species</span></button>
-    <button type="submit" name="view" value="Weekly Report" form="views">📰 <span>Report</span></button>
+    <button type="submit" name="view" value="Report" form="views">📰 <span>Report</span></button>
+    <button type="submit" name="view" value="Insights" form="views">🧬 <span>Insights</span></button>
     <button type="submit" name="view" value="Recordings" form="views">🎵 <span>Recordings</span></button>
     <button type="submit" name="view" value="View Log" form="views">📝 <span>Log</span></button>
     <button type="submit" name="view" value="Tools" form="views">⚙️ <span>Tools</span><?php if(isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 50 && ($config['SILENCE_UPDATE_INDICATOR'] != 1)){ $updatediv = ' <div class="updatenumber">'.$_SESSION["behind"].'</div>'; } else { $updatediv = ""; } echo $updatediv; ?></button>
@@ -416,7 +417,8 @@ if(isset($_GET['view'])){
   if($_GET['view'] == "Todays Detections"){include('todays_detections.php');}
   if($_GET['view'] == "Kiosk"){$kiosk = true;include('todays_detections.php');}
   if($_GET['view'] == "Species Stats"){include('stats.php');}
-  if($_GET['view'] == "Weekly Report"){include('weekly_report.php');}
+  if($_GET['view'] == "Weekly Report" || $_GET['view'] == "Report"){include('weekly_report.php');}
+  if($_GET['view'] == "Insights"){include('insights.php');}
   if($_GET['view'] == "Analytics"){include('scripts/analytics.php');}
   if($_GET['view'] == "Species"){include('scripts/species.php');}
   if($_GET['view'] == "Daily Charts"){include('history.php');}
