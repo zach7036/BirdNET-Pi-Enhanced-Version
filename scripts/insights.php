@@ -75,7 +75,7 @@ if ($subview == 'dashboard') {
 }
 
 if ($subview == 'behavior') {
-    $dawn_chorus = []; $dawn_res = $db->query("SELECT Com_Name, AVG(CAST(substr(Time, 1, 2) AS REAL) * 60 + CAST(substr(Time, 4, 2) AS REAL)) as avg_minutes, COUNT(*) as cnt FROM detections WHERE CAST(substr(Time, 1, 2) AS INTEGER) BETWEEN 4 AND 10 GROUP BY Sci_Name HAVING cnt >= 3 ORDER BY avg_minutes ASC");
+    $dawn_chorus = []; $dawn_res = $db->query("SELECT Com_Name, AVG(first_minutes) as avg_minutes, COUNT(*) as cnt FROM (SELECT Com_Name, Sci_Name, MIN(CAST(substr(Time, 1, 2) AS REAL) * 60 + CAST(substr(Time, 4, 2) AS REAL)) as first_minutes FROM detections WHERE CAST(substr(Time, 1, 2) AS INTEGER) BETWEEN 4 AND 10 GROUP BY Sci_Name, Date) GROUP BY Sci_Name HAVING cnt >= 3 ORDER BY avg_minutes ASC");
     while($row = $dawn_res->fetchArray(SQLITE3_ASSOC)) { $hrs = intval($row['avg_minutes'] / 60); $mins = intval($row['avg_minutes']) % 60; $row['avg_time'] = sprintf('%d:%02d AM', $hrs, $mins); $dawn_chorus[] = $row; }
     $hourly_activity = array_fill(0, 24, 0); $hourly_res = $db->query("SELECT CAST(substr(Time, 1, 2) AS INTEGER) as hour, COUNT(*) as cnt FROM detections GROUP BY hour ORDER BY hour ASC");
     while($row = $hourly_res->fetchArray(SQLITE3_ASSOC)) { $hourly_activity[$row['hour']] = $row['cnt']; }
@@ -495,7 +495,7 @@ $db->close();
     <div class="insights-sections-grid">
         <!-- Dawn Chorus Order -->
         <section class="insights-section">
-            <div class="insights-section-title">🌅 Dawn Chorus Order (4 AM – 10 AM) <span class="info-btn">ⓘ<span class="info-tooltip">Species are ranked by their average detection time between 4 AM and 10 AM. At least 3 detections are required for a species to be ranked in the morning sequence.</span></span></div>
+            <div class="insights-section-title">🌅 Dawn Chorus Order (4 AM – 10 AM) <span class="info-btn">ⓘ<span class="info-tooltip">Species are ranked by their average "wake up" time (the first time they are heard each day between 4 AM and 10 AM). At least 3 days of dawn data are required for a bird to be ranked.</span></span></div>
             <div class="insights-stats-list">
                 <?php if(empty($dawn_chorus)): ?>
                 <div class="insights-stats-item">
