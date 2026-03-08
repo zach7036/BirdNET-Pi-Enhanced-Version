@@ -69,6 +69,110 @@ if ($top_spec_day) {
     $milestones[] = ["title" => "Single Day Record", "val" => $top_spec_day['cnt'] . " " . $top_spec_day['Com_Name'] . " on " . date('M j, Y', strtotime($top_spec_day['Date']))];
 }
 
+// =============================================
+// PHASE 2: Daily Behavior Patterns
+// =============================================
+
+// 6. Dawn Chorus Order — Top 10 earliest average detection times
+$dawn_chorus = [];
+$dawn_res = $db->query("
+    SELECT Com_Name,
+           AVG(CAST(substr(Time, 1, 2) AS REAL) * 60 + CAST(substr(Time, 4, 2) AS REAL)) as avg_minutes,
+           COUNT(*) as cnt
+    FROM detections
+    WHERE CAST(substr(Time, 1, 2) AS INTEGER) BETWEEN 4 AND 10
+    GROUP BY Sci_Name
+    HAVING cnt >= 3
+    ORDER BY avg_minutes ASC
+    LIMIT 10
+");
+if ($dawn_res) {
+    while($row = $dawn_res->fetchArray(SQLITE3_ASSOC)) {
+        $hrs = floor($row['avg_minutes'] / 60);
+        $mins = round($row['avg_minutes'] % 60);
+        $row['avg_time'] = sprintf('%d:%02d AM', $hrs, $mins);
+        $dawn_chorus[] = $row;
+    }
+}
+
+// 7. Peak Activity Hours — Busiest hours across all species
+$hourly_activity = array_fill(0, 24, 0);
+$hourly_res = $db->query("
+    SELECT CAST(substr(Time, 1, 2) AS INTEGER) as hour, COUNT(*) as cnt
+    FROM detections
+    GROUP BY hour
+    ORDER BY hour ASC
+");
+if ($hourly_res) {
+    while($row = $hourly_res->fetchArray(SQLITE3_ASSOC)) {
+        $hourly_activity[$row['hour']] = $row['cnt'];
+    }
+}
+$hourly_labels_json = json_encode(array_map(function($h) {
+    if ($h == 0) return '12 AM';
+    if ($h < 12) return $h . ' AM';
+    if ($h == 12) return '12 PM';
+    return ($h - 12) . ' PM';
+}, range(0, 23)));
+$hourly_values_json = json_encode(array_values($hourly_activity));
+
+// Find peak hour
+$peak_hour_idx = array_search(max($hourly_activity), $hourly_activity);
+$peak_hour_label = ($peak_hour_idx == 0) ? '12 AM' : (($peak_hour_idx < 12) ? $peak_hour_idx . ' AM' : (($peak_hour_idx == 12) ? '12 PM' : ($peak_hour_idx - 12) . ' PM'));
+$peak_hour_count = max($hourly_activity);
+
+// 8. Nocturnal Detections (10 PM - 4 AM)
+$nocturnal = [];
+$noct_res = $db->query("
+    SELECT Com_Name, COUNT(*) as cnt,
+           AVG(CAST(substr(Time, 1, 2) AS REAL) * 60 + CAST(substr(Time, 4, 2) AS REAL)) as avg_minutes
+    FROM detections
+    WHERE CAST(substr(Time, 1, 2) AS INTEGER) >= 22 OR CAST(substr(Time, 1, 2) AS INTEGER) < 4
+    GROUP BY Sci_Name
+    HAVING cnt >= 2
+    ORDER BY cnt DESC
+    LIMIT 8
+");
+if ($noct_res) {
+    while($row = $noct_res->fetchArray(SQLITE3_ASSOC)) {
+        $m = $row['avg_minutes'];
+        $hrs = floor($m / 60);
+        $mins = round($m % 60);
+        if ($hrs >= 12) {
+            $row['avg_time'] = sprintf('%d:%02d PM', $hrs == 12 ? 12 : $hrs - 12, $mins);
+        } else {
+            $row['avg_time'] = sprintf('%d:%02d AM', $hrs == 0 ? 12 : $hrs, $mins);
+        }
+        $nocturnal[] = $row;
+    }
+}
+
+// 9. Activity Window Per Species — earliest to latest detection time (top 10 most active)
+$activity_windows = [];
+$window_res = $db->query("
+    SELECT Com_Name,
+           MIN(Time) as earliest,
+           MAX(Time) as latest,
+           COUNT(*) as cnt
+    FROM detections
+    GROUP BY Sci_Name
+    HAVING cnt >= 5
+    ORDER BY cnt DESC
+    LIMIT 10
+");
+if ($window_res) {
+    while($row = $window_res->fetchArray(SQLITE3_ASSOC)) {
+        // Convert to readable format
+        $e_h = intval(substr($row['earliest'], 0, 2));
+        $e_m = substr($row['earliest'], 3, 2);
+        $l_h = intval(substr($row['latest'], 0, 2));
+        $l_m = substr($row['latest'], 3, 2);
+        $row['earliest_fmt'] = sprintf('%d:%s %s', $e_h % 12 ?: 12, $e_m, $e_h < 12 ? 'AM' : 'PM');
+        $row['latest_fmt'] = sprintf('%d:%s %s', $l_h % 12 ?: 12, $l_m, $l_h < 12 ? 'AM' : 'PM');
+        $activity_windows[] = $row;
+    }
+}
+
 $db->close();
 ?>
 
@@ -218,4 +322,139 @@ $db->close();
             </div>
         </section>
     </div>
+
+    <!-- ====== PHASE 2: Daily Behavior Patterns ====== -->
+    <h2 style="margin: 40px 0 20px; font-size: 1.5em; color: var(--text-heading);">🕐 Daily Behavior Patterns</h2>
+
+    <!-- Hourly Activity Chart -->
+    <section class="insights-section" style="margin-bottom: 30px;">
+        <div class="insights-section-title">📊 Hourly Activity Distribution <span style="margin-left: auto; font-weight: normal; font-size: 0.85em; color: var(--text-muted);">Peak: <?php echo $peak_hour_label; ?> (<?php echo number_format($peak_hour_count); ?> detections)</span></div>
+        <div style="padding: 20px;">
+            <canvas id="hourlyActivityChart" height="100"></canvas>
+        </div>
+    </section>
+
+    <div class="insights-sections-grid">
+        <!-- Dawn Chorus Order -->
+        <section class="insights-section">
+            <div class="insights-section-title">🌅 Dawn Chorus Order</div>
+            <div class="insights-stats-list">
+                <?php if(empty($dawn_chorus)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">Not enough dawn data yet</span>
+                    <span class="insights-stats-count">—</span>
+                </div>
+                <?php else: ?>
+                <?php $rank = 1; foreach($dawn_chorus as $d): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name" style="margin-bottom: 2px;">
+                            <span style="color: var(--accent); font-weight: 800; margin-right: 6px;">#<?php echo $rank; ?></span>
+                            <?php echo $d['Com_Name']; ?>
+                        </div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo $d['cnt']; ?> morning detections</div>
+                    </div>
+                    <span class="insights-stats-count">~<?php echo $d['avg_time']; ?></span>
+                </div>
+                <?php $rank++; endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+
+        <!-- Nocturnal Detections -->
+        <section class="insights-section">
+            <div class="insights-section-title">🦉 Nocturnal Activity (10 PM – 4 AM)</div>
+            <div class="insights-stats-list">
+                <?php if(empty($nocturnal)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">No regular night-time visitors yet</span>
+                    <span class="insights-stats-count">—</span>
+                </div>
+                <?php else: ?>
+                <?php foreach($nocturnal as $n): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $n['Com_Name']; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Avg time: <?php echo $n['avg_time']; ?></div>
+                    </div>
+                    <span class="insights-stats-count"><?php echo $n['cnt']; ?>x</span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+    </div>
+
+    <!-- Activity Windows -->
+    <section class="insights-section" style="margin-top: 30px;">
+        <div class="insights-section-title">⏱️ Activity Windows (Top Species)</div>
+        <div class="insights-stats-list">
+            <?php if(empty($activity_windows)): ?>
+            <div class="insights-stats-item">
+                <span class="insights-stats-name">Not enough data yet</span>
+                <span class="insights-stats-count">—</span>
+            </div>
+            <?php else: ?>
+            <?php foreach($activity_windows as $w): ?>
+            <div class="insights-stats-item">
+                <div>
+                    <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $w['Com_Name']; ?></div>
+                    <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo number_format($w['cnt']); ?> total detections</div>
+                </div>
+                <span class="insights-stats-count" style="font-size: 0.9em;"><?php echo $w['earliest_fmt']; ?> → <?php echo $w['latest_fmt']; ?></span>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </section>
 </div>
+
+<!-- Chart.js for Hourly Activity -->
+<script src="static/Chart.bundle.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('hourlyActivityChart');
+    if (ctx) {
+        var isDark = document.documentElement.classList.contains('dark') ||
+                     window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var fontColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || (isDark ? '#e0e0e0' : '#444');
+        var accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6366f1';
+
+        var data = <?php echo $hourly_values_json; ?>;
+        var maxVal = Math.max(...data);
+        var colors = data.map(function(v) {
+            var opacity = 0.3 + (v / maxVal) * 0.7;
+            return 'rgba(99, 102, 241, ' + opacity + ')';
+        });
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo $hourly_labels_json; ?>,
+                datasets: [{
+                    label: 'Detections',
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: accentColor,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                legend: { display: false },
+                scales: {
+                    yAxes: [{ ticks: { beginAtZero: true, fontColor: fontColor } }],
+                    xAxes: [{ ticks: { fontColor: fontColor, maxRotation: 45, minRotation: 0 } }]
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem) {
+                            return tooltipItem.yLabel.toLocaleString() + ' detections';
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
