@@ -170,15 +170,15 @@ elseif ($config["LONGITUDE"] == "0.000") {
     <button type="button" class="sidebar-toggle" onclick="myFunction()">«</button>
   </div>
   <div class="sidebar-nav">
-    <button type="submit" name="view" value="Overview" form="views">🏠 Overview</button>
+    <button type="submit" name="view" value="Overview" form="views">🏠 <span>Overview</span></button>
 
-    <button type="submit" name="view" value="Spectrogram" form="views">📊 Spectrogram</button>
-    <button type="submit" name="view" value="Analytics" form="views">📈 Analytics</button>
-    <button type="submit" name="view" value="Species" form="views">🐧 Species</button>
-    <button type="submit" name="view" value="Weekly Report" form="views">📰 Report</button>
-    <button type="submit" name="view" value="Recordings" form="views">🎵 Recordings</button>
-    <button type="submit" name="view" value="View Log" form="views">📝 Log</button>
-    <button type="submit" name="view" value="Tools" form="views">⚙️ Tools<?php if(isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 50 && ($config['SILENCE_UPDATE_INDICATOR'] != 1)){ $updatediv = ' <div class="updatenumber">'.$_SESSION["behind"].'</div>'; } else { $updatediv = ""; } echo $updatediv; ?></button>
+    <button type="submit" name="view" value="Spectrogram" form="views">📊 <span>Spectrogram</span></button>
+    <button type="submit" name="view" value="Analytics" form="views">📈 <span>Analytics</span></button>
+    <button type="submit" name="view" value="Species" form="views">🐧 <span>Species</span></button>
+    <button type="submit" name="view" value="Weekly Report" form="views">📰 <span>Report</span></button>
+    <button type="submit" name="view" value="Recordings" form="views">🎵 <span>Recordings</span></button>
+    <button type="submit" name="view" value="View Log" form="views">📝 <span>Log</span></button>
+    <button type="submit" name="view" value="Tools" form="views">⚙️ <span>Tools</span><?php if(isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 50 && ($config['SILENCE_UPDATE_INDICATOR'] != 1)){ $updatediv = ' <div class="updatenumber">'.$_SESSION["behind"].'</div>'; } else { $updatediv = ""; } echo $updatediv; ?></button>
   </div>
 
   <style>
@@ -627,11 +627,18 @@ if(isset($_GET['view'])){
 ?>
 <script>
 function myFunction() {
-  var x = document.getElementById("mySidebar");
-  if (x.className === "sidebar") {
-    x.className += " responsive";
+  var sidebar = document.getElementById("mySidebar");
+  var content = document.querySelector(".views");
+  
+  if (window.innerWidth <= 1000) {
+    // Mobile: Toggle drawer
+    sidebar.classList.toggle("responsive");
   } else {
-    x.className = "sidebar";
+    // Desktop: Toggle collapse
+    sidebar.classList.toggle("collapsed");
+    if (content) {
+      content.classList.toggle("expanded");
+    }
   }
 }
 function setLiveStreamVolume(vol) {
