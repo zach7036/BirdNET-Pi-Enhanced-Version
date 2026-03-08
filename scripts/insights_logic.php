@@ -1,7 +1,9 @@
-require_once 'scripts/common.php';
-$db = new SQLite3('./scripts/birds.db', SQLITE3_OPEN_READONLY);
+<?php
+require_once __DIR__ . '/common.php';
+$db_path = __ROOT__ . '/scripts/birds.db';
+$db = new SQLite3($db_path, SQLITE3_OPEN_READONLY);
 if (!$db) {
-    echo "<!-- ERROR: Could not open database -->";
+    echo "<!-- ERROR: Could not open database at $db_path -->";
     $lifetime_species = 0;
     $best_day_count = 0;
     $max_streak = 0;
@@ -29,7 +31,6 @@ if ($streak_res) {
 }
 
 $max_streak = 0;
-// ... (the rest remains similar but safe)
 $current_streak = 0;
 $prev_date = null;
 

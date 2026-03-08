@@ -2,10 +2,9 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-// DEBUG
-// echo "<!-- DEBUG: insights.php is loaded -->";
-require_once 'scripts/common.php';
-require_once 'scripts/insights_logic.php';
+
+require_once __DIR__ . '/common.php';
+require_once __DIR__ . '/insights_logic.php';
 $config = get_config();
 ?>
 
