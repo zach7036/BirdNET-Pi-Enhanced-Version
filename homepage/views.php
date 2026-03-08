@@ -172,7 +172,6 @@ elseif ($config["LONGITUDE"] == "0.000") {
   </div>
   <div class="sidebar-nav">
     <button type="submit" name="view" value="Overview" form="views" onclick="document.getElementById('sidebar_subview').value='';">🏠 <span>Overview</span></button>
-    <button type="submit" name="view" value="Spectrogram" form="views" onclick="document.getElementById('sidebar_subview').value='';">📊 <span>Spectrogram</span></button>
     <button type="submit" name="view" value="Analytics" form="views" onclick="document.getElementById('sidebar_subview').value='';">📈 <span>Analytics</span></button>
     <button type="submit" name="view" value="Species" form="views" onclick="document.getElementById('sidebar_subview').value='';">🐧 <span>Species</span></button>
     <div class="sidebar-dropdown">
@@ -187,6 +186,7 @@ elseif ($config["LONGITUDE"] == "0.000") {
       </div>
     </div>
     <button type="submit" name="view" value="Recordings" form="views" onclick="document.getElementById('sidebar_subview').value='';">🎵 <span>Recordings</span></button>
+    <button type="submit" name="view" value="Spectrogram" form="views" onclick="document.getElementById('sidebar_subview').value='';">📊 <span>Spectrogram</span></button>
     <button type="submit" name="view" value="View Log" form="views" onclick="document.getElementById('sidebar_subview').value='';">📝 <span>Log</span></button>
     <button type="submit" name="view" value="Tools" form="views" onclick="document.getElementById('sidebar_subview').value='';">⚙️ <span>Tools</span><?php if(isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 50 && ($config['SILENCE_UPDATE_INDICATOR'] != 1)){ $updatediv = ' <div class="updatenumber">'.$_SESSION["behind"].'</div>'; } else { $updatediv = ""; } echo $updatediv; ?></button>
     <script>
