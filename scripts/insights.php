@@ -173,6 +173,123 @@ if ($window_res) {
     }
 }
 
+// =============================================
+// PHASE 3: Migration & Seasonal Patterns
+// =============================================
+
+$today = date('Y-m-d');
+$two_weeks_ago = date('Y-m-d', strtotime('-14 days'));
+$one_month_ago = date('Y-m-d', strtotime('-30 days'));
+$current_year = date('Y');
+$last_year = $current_year - 1;
+
+// 10. New Arrivals — Species first detected in the last 14 days
+$new_arrivals = [];
+$arrival_res = $db->query("
+    SELECT d.Com_Name, d.Sci_Name, MIN(d.Date) as first_seen, COUNT(*) as cnt
+    FROM detections d
+    WHERE d.Sci_Name NOT IN (
+        SELECT DISTINCT Sci_Name FROM detections WHERE Date < '$two_weeks_ago'
+    )
+    AND d.Date >= '$two_weeks_ago'
+    GROUP BY d.Sci_Name
+    ORDER BY first_seen DESC
+    LIMIT 10
+");
+if ($arrival_res) {
+    while($row = $arrival_res->fetchArray(SQLITE3_ASSOC)) {
+        $new_arrivals[] = $row;
+    }
+}
+
+// 11. Gone Quiet — Species detected 5+ times before but NOT in the last 14 days
+$gone_quiet = [];
+$quiet_res = $db->query("
+    SELECT Com_Name, Sci_Name, COUNT(*) as total_cnt, MAX(Date) as last_seen
+    FROM detections
+    WHERE Sci_Name NOT IN (
+        SELECT DISTINCT Sci_Name FROM detections WHERE Date >= '$two_weeks_ago'
+    )
+    GROUP BY Sci_Name
+    HAVING total_cnt >= 5
+    ORDER BY last_seen DESC
+    LIMIT 10
+");
+if ($quiet_res) {
+    while($row = $quiet_res->fetchArray(SQLITE3_ASSOC)) {
+        $days_ago = intval((strtotime($today) - strtotime($row['last_seen'])) / 86400);
+        $row['days_ago'] = $days_ago;
+        $gone_quiet[] = $row;
+    }
+}
+
+// 12. Year-over-Year First Detection Comparison
+$yoy_comparison = [];
+$yoy_res = $db->query("
+    SELECT
+        a.Com_Name,
+        a.Sci_Name,
+        a.first_this_year,
+        b.first_last_year,
+        CAST(julianday(a.first_this_year) - julianday(b.first_last_year_adjusted) AS INTEGER) as day_diff
+    FROM (
+        SELECT Com_Name, Sci_Name, MIN(Date) as first_this_year
+        FROM detections
+        WHERE strftime('%Y', Date) = '$current_year'
+        GROUP BY Sci_Name
+    ) a
+    INNER JOIN (
+        SELECT Sci_Name,
+               MIN(Date) as first_last_year,
+               '$current_year' || substr(MIN(Date), 5) as first_last_year_adjusted
+        FROM detections
+        WHERE strftime('%Y', Date) = '$last_year'
+        GROUP BY Sci_Name
+    ) b ON a.Sci_Name = b.Sci_Name
+    WHERE day_diff != 0
+    ORDER BY ABS(day_diff) DESC
+    LIMIT 10
+");
+if ($yoy_res) {
+    while($row = $yoy_res->fetchArray(SQLITE3_ASSOC)) {
+        $yoy_comparison[] = $row;
+    }
+}
+
+// 13. Seasonal Presence — Month-by-month detection counts for top species (for a mini chart)
+$seasonal_top = [];
+$seasonal_res = $db->query("
+    SELECT Com_Name, Sci_Name,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 1 THEN 1 ELSE 0 END) as m1,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 2 THEN 1 ELSE 0 END) as m2,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 3 THEN 1 ELSE 0 END) as m3,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 4 THEN 1 ELSE 0 END) as m4,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 5 THEN 1 ELSE 0 END) as m5,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 6 THEN 1 ELSE 0 END) as m6,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 7 THEN 1 ELSE 0 END) as m7,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 8 THEN 1 ELSE 0 END) as m8,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 9 THEN 1 ELSE 0 END) as m9,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 10 THEN 1 ELSE 0 END) as m10,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 11 THEN 1 ELSE 0 END) as m11,
+           SUM(CASE WHEN CAST(strftime('%m', Date) AS INTEGER) = 12 THEN 1 ELSE 0 END) as m12,
+           COUNT(*) as total
+    FROM detections
+    GROUP BY Sci_Name
+    ORDER BY total DESC
+    LIMIT 8
+");
+if ($seasonal_res) {
+    while($row = $seasonal_res->fetchArray(SQLITE3_ASSOC)) {
+        $months_active = 0;
+        for ($i = 1; $i <= 12; $i++) {
+            if ($row['m'.$i] > 0) $months_active++;
+        }
+        $row['months_active'] = $months_active;
+        $row['status'] = $months_active >= 10 ? 'Year-round' : ($months_active >= 5 ? 'Seasonal' : 'Transient');
+        $seasonal_top[] = $row;
+    }
+}
+
 $db->close();
 ?>
 
@@ -402,6 +519,132 @@ $db->close();
                     <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo number_format($w['cnt']); ?> total detections</div>
                 </div>
                 <span class="insights-stats-count" style="font-size: 0.9em;"><?php echo $w['earliest_fmt']; ?> → <?php echo $w['latest_fmt']; ?></span>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <!-- ====== PHASE 3: Migration & Seasonal Patterns ====== -->
+    <h2 style="margin: 40px 0 20px; font-size: 1.5em; color: var(--text-heading);">🦅 Migration & Seasonal Patterns</h2>
+
+    <div class="insights-sections-grid">
+        <!-- New Arrivals -->
+        <section class="insights-section">
+            <div class="insights-section-title">🆕 New Arrivals (Last 14 Days)</div>
+            <div class="insights-stats-list">
+                <?php if(empty($new_arrivals)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">No brand-new species in the last 2 weeks</span>
+                    <span class="insights-stats-count">—</span>
+                </div>
+                <?php else: ?>
+                <?php foreach($new_arrivals as $a): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $a['Com_Name']; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);">First seen: <?php echo date('M j', strtotime($a['first_seen'])); ?></div>
+                    </div>
+                    <span class="insights-stats-count" style="color: #10b981;"><?php echo $a['cnt']; ?> detections</span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+
+        <!-- Gone Quiet -->
+        <section class="insights-section">
+            <div class="insights-section-title">🔇 Gone Quiet</div>
+            <div class="insights-stats-list">
+                <?php if(empty($gone_quiet)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">All regular species still active!</span>
+                    <span class="insights-stats-count">✓</span>
+                </div>
+                <?php else: ?>
+                <?php foreach($gone_quiet as $q): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $q['Com_Name']; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo $q['total_cnt']; ?> total · Last: <?php echo date('M j', strtotime($q['last_seen'])); ?></div>
+                    </div>
+                    <span class="insights-stats-count" style="color: #ef4444;"><?php echo $q['days_ago']; ?>d ago</span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+    </div>
+
+    <!-- Year-over-Year Comparison -->
+    <section class="insights-section" style="margin-top: 30px;">
+        <div class="insights-section-title">📅 Year-over-Year Arrival Comparison (<?php echo $last_year; ?> vs <?php echo $current_year; ?>)</div>
+        <div class="insights-stats-list">
+            <?php if(empty($yoy_comparison)): ?>
+            <div class="insights-stats-item">
+                <span class="insights-stats-name">Not enough multi-year data yet</span>
+                <span class="insights-stats-count">—</span>
+            </div>
+            <?php else: ?>
+            <?php foreach($yoy_comparison as $y): ?>
+            <div class="insights-stats-item">
+                <div>
+                    <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $y['Com_Name']; ?></div>
+                    <div style="font-size: 0.8em; color: var(--text-muted);">
+                        <?php echo $current_year; ?>: <?php echo date('M j', strtotime($y['first_this_year'])); ?>
+                        · <?php echo $last_year; ?>: <?php echo date('M j', strtotime($y['first_last_year'])); ?>
+                    </div>
+                </div>
+                <?php
+                    $diff = $y['day_diff'];
+                    if ($diff < 0) {
+                        $color = '#10b981';
+                        $label = abs($diff) . 'd earlier';
+                    } else {
+                        $color = '#ef4444';
+                        $label = $diff . 'd later';
+                    }
+                ?>
+                <span class="insights-stats-count" style="color: <?php echo $color; ?>;"><?php echo $label; ?></span>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <!-- Seasonal Presence -->
+    <section class="insights-section" style="margin-top: 30px;">
+        <div class="insights-section-title">🗓️ Seasonal Presence (Top Species)</div>
+        <div class="insights-stats-list">
+            <?php if(empty($seasonal_top)): ?>
+            <div class="insights-stats-item">
+                <span class="insights-stats-name">Not enough data yet</span>
+                <span class="insights-stats-count">—</span>
+            </div>
+            <?php else: ?>
+            <?php
+                $status_colors = ['Year-round' => '#10b981', 'Seasonal' => '#f59e0b', 'Transient' => '#ef4444'];
+                $months_short = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+            ?>
+            <?php foreach($seasonal_top as $s): ?>
+            <div class="insights-stats-item" style="flex-wrap: wrap; gap: 8px;">
+                <div style="flex: 1 1 200px;">
+                    <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $s['Com_Name']; ?></div>
+                    <div style="font-size: 0.8em; color: var(--text-muted);">
+                        <?php echo $s['months_active']; ?>/12 months ·
+                        <span style="color: <?php echo $status_colors[$s['status']]; ?>; font-weight: 700;"><?php echo $s['status']; ?></span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 2px; align-items: center;">
+                    <?php for ($i = 1; $i <= 12; $i++): ?>
+                    <div title="<?php echo date('F', mktime(0,0,0,$i,1)); ?>: <?php echo $s['m'.$i]; ?>" style="
+                        width: 18px; height: 24px; border-radius: 3px; text-align: center; line-height: 24px; font-size: 0.65em; font-weight: 600;
+                        background: <?php echo $s['m'.$i] > 0 ? 'var(--accent)' : 'var(--bg-primary)'; ?>;
+                        color: <?php echo $s['m'.$i] > 0 ? '#fff' : 'var(--text-muted)'; ?>;
+                        border: 1px solid <?php echo $s['m'.$i] > 0 ? 'transparent' : 'var(--border-light)'; ?>;
+                    "><?php echo $months_short[$i-1]; ?></div>
+                    <?php endfor; ?>
+                </div>
             </div>
             <?php endforeach; ?>
             <?php endif; ?>
