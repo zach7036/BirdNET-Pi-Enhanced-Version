@@ -290,6 +290,121 @@ if ($seasonal_res) {
     }
 }
 
+// =============================================
+// PHASE 4: Weather Correlations
+// =============================================
+
+// WMO Weather Code descriptions
+$wmo_codes = [
+    0 => 'Clear sky', 1 => 'Mostly clear', 2 => 'Partly cloudy', 3 => 'Overcast',
+    45 => 'Fog', 48 => 'Rime fog',
+    51 => 'Light drizzle', 53 => 'Moderate drizzle', 55 => 'Dense drizzle',
+    61 => 'Slight rain', 63 => 'Moderate rain', 65 => 'Heavy rain',
+    71 => 'Slight snow', 73 => 'Moderate snow', 75 => 'Heavy snow',
+    80 => 'Slight showers', 81 => 'Moderate showers', 82 => 'Violent showers',
+    95 => 'Thunderstorm', 96 => 'Thunderstorm + hail', 99 => 'Thunderstorm + heavy hail'
+];
+
+// Check if weather table exists and has data
+$has_weather = false;
+$weather_check = $db->querySingle("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'");
+if ($weather_check > 0) {
+    $weather_count = $db->querySingle("SELECT COUNT(*) FROM weather");
+    $has_weather = ($weather_count > 0);
+}
+
+$temp_brackets = [];
+$condition_impact = [];
+$species_ideal = [];
+$temp_vs_detections = [];
+
+if ($has_weather) {
+    // 14. Detections by Temperature Bracket
+    $temp_res = $db->query("
+        SELECT
+            CASE
+                WHEN w.Temp < 32 THEN 'Below 32°F'
+                WHEN w.Temp BETWEEN 32 AND 45 THEN '32–45°F'
+                WHEN w.Temp BETWEEN 46 AND 55 THEN '46–55°F'
+                WHEN w.Temp BETWEEN 56 AND 65 THEN '56–65°F'
+                WHEN w.Temp BETWEEN 66 AND 75 THEN '66–75°F'
+                WHEN w.Temp BETWEEN 76 AND 85 THEN '76–85°F'
+                ELSE 'Above 85°F'
+            END as bracket,
+            COUNT(*) as det_count,
+            COUNT(DISTINCT d.Sci_Name) as species_count,
+            ROUND(AVG(w.Temp), 1) as avg_temp
+        FROM detections d
+        INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
+        GROUP BY bracket
+        ORDER BY MIN(w.Temp) ASC
+    ");
+    if ($temp_res) {
+        while($row = $temp_res->fetchArray(SQLITE3_ASSOC)) {
+            $temp_brackets[] = $row;
+        }
+    }
+
+    // 15. Detections by Weather Condition
+    $cond_res = $db->query("
+        SELECT w.ConditionCode, COUNT(*) as det_count,
+               COUNT(DISTINCT d.Sci_Name) as species_count
+        FROM detections d
+        INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
+        GROUP BY w.ConditionCode
+        ORDER BY det_count DESC
+        LIMIT 8
+    ");
+    if ($cond_res) {
+        while($row = $cond_res->fetchArray(SQLITE3_ASSOC)) {
+            $code = $row['ConditionCode'];
+            $row['description'] = isset($wmo_codes[$code]) ? $wmo_codes[$code] : "Code $code";
+            $condition_impact[] = $row;
+        }
+    }
+
+    // 16. Ideal Conditions Per Species (top 8 species)
+    $ideal_res = $db->query("
+        SELECT d.Com_Name,
+               ROUND(AVG(w.Temp), 1) as avg_temp,
+               ROUND(MIN(w.Temp), 1) as min_temp,
+               ROUND(MAX(w.Temp), 1) as max_temp,
+               COUNT(*) as cnt
+        FROM detections d
+        INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
+        GROUP BY d.Sci_Name
+        HAVING cnt >= 5
+        ORDER BY cnt DESC
+        LIMIT 8
+    ");
+    if ($ideal_res) {
+        while($row = $ideal_res->fetchArray(SQLITE3_ASSOC)) {
+            $species_ideal[] = $row;
+        }
+    }
+
+    // 17. Daily temp vs detection count for chart (last 30 days)
+    $trend_res = $db->query("
+        SELECT d.Date,
+               COUNT(*) as det_count,
+               ROUND(AVG(w.Temp), 1) as avg_temp
+        FROM detections d
+        LEFT JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
+        WHERE d.Date >= '$one_month_ago'
+        GROUP BY d.Date
+        ORDER BY d.Date ASC
+    ");
+    if ($trend_res) {
+        while($row = $trend_res->fetchArray(SQLITE3_ASSOC)) {
+            $temp_vs_detections[] = $row;
+        }
+    }
+}
+
+$temp_trend_labels = json_encode(array_map(function($r) { return date('M j', strtotime($r['Date'])); }, $temp_vs_detections));
+$temp_trend_temps = json_encode(array_map(function($r) { return $r['avg_temp']; }, $temp_vs_detections));
+$temp_trend_dets = json_encode(array_map(function($r) { return $r['det_count']; }, $temp_vs_detections));
+
 $db->close();
 ?>
 
@@ -652,6 +767,94 @@ $db->close();
     </section>
 </div>
 
+<?php if ($has_weather): ?>
+<!-- ====== PHASE 4: Weather Correlations ====== -->
+<div class="insights-container">
+    <h2 style="margin: 40px 0 20px; font-size: 1.5em; color: var(--text-heading);">🌤️ Weather Correlations</h2>
+
+    <!-- Temp vs Detections Chart -->
+    <?php if(!empty($temp_vs_detections)): ?>
+    <section class="insights-section" style="margin-bottom: 30px;">
+        <div class="insights-section-title">📈 Temperature vs Detections (Last 30 Days)</div>
+        <div style="padding: 20px;">
+            <canvas id="tempVsDetChart" height="120"></canvas>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <div class="insights-sections-grid">
+        <!-- Temperature Brackets -->
+        <section class="insights-section">
+            <div class="insights-section-title">🌡️ Detections by Temperature</div>
+            <div class="insights-stats-list">
+                <?php if(empty($temp_brackets)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">Not enough weather-matched data yet</span>
+                    <span class="insights-stats-count">—</span>
+                </div>
+                <?php else: ?>
+                <?php foreach($temp_brackets as $t): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $t['bracket']; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo $t['species_count']; ?> species active</div>
+                    </div>
+                    <span class="insights-stats-count"><?php echo number_format($t['det_count']); ?></span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+
+        <!-- Weather Conditions -->
+        <section class="insights-section">
+            <div class="insights-section-title">☁️ Detections by Weather Condition</div>
+            <div class="insights-stats-list">
+                <?php if(empty($condition_impact)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">Not enough weather data yet</span>
+                    <span class="insights-stats-count">—</span>
+                </div>
+                <?php else: ?>
+                <?php foreach($condition_impact as $c): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $c['description']; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo $c['species_count']; ?> species active</div>
+                    </div>
+                    <span class="insights-stats-count"><?php echo number_format($c['det_count']); ?></span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+    </div>
+
+    <!-- Ideal Conditions Per Species -->
+    <section class="insights-section" style="margin-top: 30px;">
+        <div class="insights-section-title">🎯 Preferred Temperature per Species</div>
+        <div class="insights-stats-list">
+            <?php if(empty($species_ideal)): ?>
+            <div class="insights-stats-item">
+                <span class="insights-stats-name">Not enough weather-matched data yet</span>
+                <span class="insights-stats-count">—</span>
+            </div>
+            <?php else: ?>
+            <?php foreach($species_ideal as $sp): ?>
+            <div class="insights-stats-item">
+                <div>
+                    <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $sp['Com_Name']; ?></div>
+                    <div style="font-size: 0.8em; color: var(--text-muted);">Range: <?php echo $sp['min_temp']; ?>°F – <?php echo $sp['max_temp']; ?>°F · <?php echo number_format($sp['cnt']); ?> detections</div>
+                </div>
+                <span class="insights-stats-count">~<?php echo $sp['avg_temp']; ?>°F</span>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </section>
+</div>
+<?php endif; ?>
+
 <!-- Chart.js for Hourly Activity -->
 <script src="static/Chart.bundle.js"></script>
 <script>
@@ -695,6 +898,47 @@ document.addEventListener('DOMContentLoaded', function() {
                             return tooltipItem.yLabel.toLocaleString() + ' detections';
                         }
                     }
+                }
+            }
+        });
+    }
+
+    // Phase 4: Temp vs Detections dual-axis chart
+    var tempCtx = document.getElementById('tempVsDetChart');
+    if (tempCtx) {
+        new Chart(tempCtx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo $temp_trend_labels; ?>,
+                datasets: [{
+                    label: 'Detections',
+                    type: 'bar',
+                    data: <?php echo $temp_trend_dets; ?>,
+                    backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y-dets'
+                }, {
+                    label: 'Avg Temp (°F)',
+                    type: 'line',
+                    data: <?php echo $temp_trend_temps; ?>,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    fill: false,
+                    yAxisID: 'y-temp'
+                }]
+            },
+            options: {
+                responsive: true,
+                legend: { labels: { fontColor: fontColor } },
+                scales: {
+                    yAxes: [
+                        { id: 'y-dets', position: 'left', ticks: { beginAtZero: true, fontColor: fontColor }, scaleLabel: { display: true, labelString: 'Detections', fontColor: fontColor } },
+                        { id: 'y-temp', position: 'right', ticks: { fontColor: '#f59e0b' }, scaleLabel: { display: true, labelString: 'Temp (°F)', fontColor: '#f59e0b' }, gridLines: { drawOnChartArea: false } }
+                    ],
+                    xAxes: [{ ticks: { fontColor: fontColor, maxRotation: 45, minRotation: 0 } }]
                 }
             }
         });
