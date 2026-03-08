@@ -347,6 +347,23 @@ $db->close();
         .insights-section { break-inside: avoid; border: 1px solid #eee !important; box-shadow: none !important; }
         body { background: white !important; color: black !important; }
     }
+    .hidden-item { display: none !important; }
+    .show-list-btn {
+        width: 100%;
+        padding: 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-bottom-left-radius: 20px;
+        border-bottom-right-radius: 20px;
+        color: var(--accent);
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .show-list-btn:hover { background: var(--accent-subtle); color: var(--accent); }
 </style>
 
 <div class="insights-container">
@@ -479,7 +496,7 @@ $db->close();
         <!-- Dawn Chorus Order -->
         <section class="insights-section">
             <div class="insights-section-title">🌅 Dawn Chorus Order (4 AM – 10 AM) <span class="info-btn">ⓘ<span class="info-tooltip">Species ranked by their earliest typical detection time (4 AM – 10 AM). This shows which birds are the early risers in your area.</span></span></div>
-            <div class="insights-stats-list" style="max-height: 480px; overflow-y: auto;">
+            <div class="insights-stats-list">
                 <?php if(empty($dawn_chorus)): ?>
                 <div class="insights-stats-item">
                     <span class="insights-stats-name">Not enough dawn data yet</span>
@@ -487,7 +504,7 @@ $db->close();
                 </div>
                 <?php else: ?>
                 <?php $rank = 1; foreach($dawn_chorus as $d): ?>
-                <div class="insights-stats-item">
+                <div class="insights-stats-item <?php echo $rank > 10 ? 'hidden-item' : ''; ?>">
                     <div>
                         <div class="insights-stats-name" style="margin-bottom: 2px;">
                             <span style="color: var(--accent); font-weight: 800; margin-right: 6px;">#<?php echo $rank; ?></span>
@@ -500,29 +517,35 @@ $db->close();
                 <?php $rank++; endforeach; ?>
                 <?php endif; ?>
             </div>
+            <?php if(count($dawn_chorus) > 10): ?>
+            <button class="show-list-btn" onclick="showAllItems(this)">Show all <?php echo count($dawn_chorus); ?> species ↓</button>
+            <?php endif; ?>
         </section>
 
         <!-- Nocturnal Detections -->
         <section class="insights-section">
             <div class="insights-section-title">🦉 Nocturnal Activity (10 PM – 4 AM) <span class="info-btn">ⓘ<span class="info-tooltip">Bird activity detected during night hours. Includes owls, nightjars, and some late-night or early-morning songsters.</span></span></div>
-            <div class="insights-stats-list" style="max-height: 480px; overflow-y: auto;">
+            <div class="insights-stats-list">
                 <?php if(empty($nocturnal)): ?>
                 <div class="insights-stats-item">
                     <span class="insights-stats-name">No regular night-time visitors yet</span>
                     <span class="insights-stats-count">—</span>
                 </div>
                 <?php else: ?>
-                <?php foreach($nocturnal as $n): ?>
-                <div class="insights-stats-item">
+                <?php $rank_n = 1; foreach($nocturnal as $n): ?>
+                <div class="insights-stats-item <?php echo $rank_n > 10 ? 'hidden-item' : ''; ?>">
                     <div>
                         <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $n['Com_Name']; ?></div>
                         <div style="font-size: 0.8em; color: var(--text-muted);">Avg time: <?php echo $n['avg_time']; ?></div>
                     </div>
                     <span class="insights-stats-count"><?php echo $n['cnt']; ?>x</span>
                 </div>
-                <?php endforeach; ?>
+                <?php $rank_n++; endforeach; ?>
                 <?php endif; ?>
             </div>
+            <?php if(count($nocturnal) > 10): ?>
+            <button class="show-list-btn" onclick="showAllItems(this)">Show all <?php echo count($nocturnal); ?> species ↓</button>
+            <?php endif; ?>
         </section>
     </div>
 
@@ -976,6 +999,13 @@ $db->close();
 <script src="static/Chart.bundle.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    window.showAllItems = function(btn) {
+        const section = btn.closest('.insights-section');
+        const hiddenLines = section.querySelectorAll('.hidden-item');
+        hiddenLines.forEach(el => el.classList.remove('hidden-item'));
+        btn.style.display = 'none';
+    };
+
     <?php if ($subview == 'behavior'): ?>
     var ctx = document.getElementById('hourlyActivityChart');
     if (ctx) {
