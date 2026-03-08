@@ -70,6 +70,24 @@ $stmt_ps->bindValue(':pstart', date("Y-m-d", $startdate - (7 * 86400)));
 $stmt_ps->bindValue(':pend', date("Y-m-d", $enddate - (7 * 86400)));
 $prior_species = $stmt_ps->execute()->fetchArray(SQLITE3_ASSOC)['cnt'];
 
+// 4. Fetch additional KPIs
+$daily_avg = round($total_detections / 7);
+
+// Busiest Day
+$stmt_bd = $db->prepare('SELECT Date, COUNT(*) as cnt FROM detections WHERE Date BETWEEN :start AND :end GROUP BY Date ORDER BY cnt DESC LIMIT 1');
+$stmt_bd->bindValue(':start', date("Y-m-d", $startdate));
+$stmt_bd->bindValue(':end', date("Y-m-d", $enddate));
+$bd_res = $stmt_bd->execute()->fetchArray(SQLITE3_ASSOC);
+$busiest_day_name = $bd_res ? date('l', strtotime($bd_res['Date'])) : 'N/A';
+$busiest_day_count = $bd_res ? $bd_res['cnt'] : 0;
+
+// Peak Hour
+$stmt_ph = $db->prepare('SELECT strftime("%H", Time) as hr, COUNT(*) as cnt FROM detections WHERE Date BETWEEN :start AND :end GROUP BY hr ORDER BY cnt DESC LIMIT 1');
+$stmt_ph->bindValue(':start', date("Y-m-d", $startdate));
+$stmt_ph->bindValue(':end', date("Y-m-d", $enddate));
+$ph_res = $stmt_ph->execute()->fetchArray(SQLITE3_ASSOC);
+$peak_time = $ph_res ? $ph_res['hr'] . ":00" : 'N/A';
+
 function get_trend_html($current, $prior) {
     if ($prior == 0) return $current > 0 ? '<span class="trend up">NEW</span>' : '';
     $diff = (($current - $prior) / $prior) * 100;
@@ -137,8 +155,8 @@ if (isset($_GET['ascii'])) {
         transition: transform 0.2s;
     }
     .kpi-card:hover { transform: translateY(-5px); }
-    .kpi-val { font-size: 2.5em; font-weight: 800; display: block; margin-bottom: 4px; }
-    .kpi-label { font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .kpi-val { font-size: 2.1em; font-weight: 800; display: block; margin-bottom: 4px; white-space: nowrap; }
+    .kpi-label { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
     
     .trend { font-size: 0.7em; padding: 2px 8px; border-radius: 10px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
     .trend.up { background: #dcfce7; color: #166534; }
@@ -196,8 +214,20 @@ if (isset($_GET['ascii'])) {
             <span class="kpi-label">Total Detections <?php echo get_trend_html($total_detections, $prior_total); ?></span>
         </div>
         <div class="kpi-card">
+            <span class="kpi-val"><?php echo number_format($daily_avg); ?></span>
+            <span class="kpi-label">Daily Average</span>
+        </div>
+        <div class="kpi-card">
             <span class="kpi-val"><?php echo number_format($unique_species); ?></span>
             <span class="kpi-label">Unique Species <?php echo get_trend_html($unique_species, $prior_species); ?></span>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-val"><?php echo $busiest_day_name; ?></span>
+            <span class="kpi-label">Busiest Day (<?php echo number_format($busiest_day_count); ?>)</span>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-val"><?php echo $peak_time; ?></span>
+            <span class="kpi-label">Peak Activity Hour</span>
         </div>
     </div>
 
