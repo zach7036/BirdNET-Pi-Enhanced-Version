@@ -394,7 +394,7 @@ $db->close();
 
             <!-- Recommendations -->
             <div style="flex: 1 1 300px;">
-                <h3 style="margin: 0 0 15px; font-size: 1.3em; color: var(--text-heading);">🏡 Habitat Insights & Recommendations</h3>
+                <h3 style="margin: 0 0 15px; font-size: 1.3em; color: var(--text-heading);">🏡 Habitat Insights & Recommendations <span class="info-btn">ⓘ<span class="info-tooltip" style="width: 300px;"><strong>Diagnostic Scan Results:</strong><br><br>• <strong>Diversity</strong>: Shannon Index (Variety & Evenness)<br>• <strong>Stability</strong>: Active vs Quiet days (last 30d)<br>• <strong>Quality</strong>: High vs Low confidence detections<br>• <strong>Activity</strong>: Current vs Recent history trends<br><br>Yard Health is a weighted average of these 4 pillars.</span></span></h3>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <?php foreach($recommendations as $rec): ?>
                     <div style="display: flex; gap: 15px; align-items: center; background: var(--bg-card); padding: 12px 18px; border-radius: 12px; border: 1px solid var(--border-light); box-shadow: var(--shadow-sm);">
