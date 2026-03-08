@@ -675,8 +675,8 @@ $db->close();
             <?php endforeach; ?>
             <?php endif; ?>
         </div>
+    </section>
     <?php endif; ?>
-</div>
 
     <?php if ($subview == 'environmental'): ?>
     <?php if (!$has_weather): ?>
@@ -871,7 +871,7 @@ $db->close();
                 <?php endif; ?>
             </div>
         </section>
-    <?php endif; ?>
+    </div>
 
     <!-- ====== PHASE 7: Long-term Trends & Diversity ====== -->
     <h2 style="margin: 50px 0 20px; font-size: 1.5em; color: var(--text-heading);">📈 Long-term Trends & Diversity</h2>
@@ -964,6 +964,7 @@ $db->close();
                 <?php endforeach; ?>
             </div>
         </section>
+    </div>
     <?php endif; ?>
     
     <?php if ($subview == 'report'): ?>
