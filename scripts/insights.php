@@ -495,7 +495,7 @@ $db->close();
     <div class="insights-sections-grid">
         <!-- Dawn Chorus Order -->
         <section class="insights-section">
-            <div class="insights-section-title">🌅 Dawn Chorus Order (4 AM – 10 AM) <span class="info-btn">ⓘ<span class="info-tooltip">Species ranked by their earliest typical detection time (4 AM – 10 AM). This shows which birds are the early risers in your area.</span></span></div>
+            <div class="insights-section-title">🌅 Dawn Chorus Order (4 AM – 10 AM) <span class="info-btn">ⓘ<span class="info-tooltip">Species are ranked by their average detection time between 4 AM and 10 AM. At least 3 detections are required for a species to be ranked in the morning sequence.</span></span></div>
             <div class="insights-stats-list">
                 <?php if(empty($dawn_chorus)): ?>
                 <div class="insights-stats-item">
