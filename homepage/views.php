@@ -182,6 +182,7 @@ elseif ($config["LONGITUDE"] == "0.000") {
         <button type="submit" name="view" value="Insights" data-subview="migration" onclick="document.getElementById('sidebar_subview').value='migration';">🦅 <span>Migration</span></button>
         <button type="submit" name="view" value="Insights" data-subview="environmental" onclick="document.getElementById('sidebar_subview').value='environmental';">🌤️ <span>Weather</span></button>
         <button type="submit" name="view" value="Insights" data-subview="health" onclick="document.getElementById('sidebar_subview').value='health';">🔍 <span>Health</span></button>
+        <button type="submit" name="view" value="Insights" data-subview="forecasting" onclick="document.getElementById('sidebar_subview').value='forecasting';">🔮 <span>Trends & Forecasting</span></button>
         <button type="submit" name="view" value="Insights" data-subview="report" onclick="document.getElementById('sidebar_subview').value='report';">📰 <span>Weekly Report</span></button>
       </div>
     </div>

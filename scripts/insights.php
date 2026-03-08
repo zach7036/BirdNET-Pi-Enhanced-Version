@@ -155,6 +155,32 @@ if ($subview == 'health') {
     while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $top_5_species[] = $row; }
 }
 
+if ($subview == 'forecasting') {
+    $monthly_res = $db->query("SELECT strftime('%Y-%m', Date) as month, COUNT(DISTINCT Sci_Name) as diversity, COUNT(*) as detections FROM detections GROUP BY month ORDER BY month ASC LIMIT 24");
+    while($row = $monthly_res->fetchArray(SQLITE3_ASSOC)) { $monthly_stats[] = $row; }
+    $month_labels = json_encode(array_map(function($r) { return $r['month']; }, $monthly_stats));
+    $month_div = json_encode(array_map(function($r) { return $r['diversity']; }, $monthly_stats));
+    $month_det = json_encode(array_map(function($r) { return $r['detections']; }, $monthly_stats));
+    
+    $s_counts = $db->query("SELECT COUNT(*) as cnt FROM detections WHERE Date >= '$one_month_ago' GROUP BY Sci_Name");
+    $t_30d = $db->querySingle("SELECT COUNT(*) FROM detections WHERE Date >= '$one_month_ago'") ?: 0;
+    while($r = $s_counts->fetchArray(SQLITE3_ASSOC)) { $pi = $r['cnt'] / $t_30d; $shannon_index -= $pi * log($pi); }
+    $shannon_index = round($shannon_index, 3);
+    $diversity_score_text = ($shannon_index > 2.5) ? "Very High" : (($shannon_index > 1.8) ? "High" : (($shannon_index > 1.2) ? "Moderate" : "Low"));
+    
+    $this_month_diversity = $db->querySingle("SELECT COUNT(DISTINCT Sci_Name) FROM detections WHERE strftime('%m', Date) = strftime('%m', 'now') AND strftime('%Y', Date) = strftime('%Y', 'now')") ?: 0;
+    $last_year_diversity = $db->querySingle("SELECT COUNT(DISTINCT Sci_Name) FROM detections WHERE strftime('%m', Date) = strftime('%m', 'now') AND strftime('%Y', Date) = strftime('%Y', 'now', '-1 year')") ?: 0;
+    $yoy_diversity_diff = $this_month_diversity - $last_year_diversity;
+    $current_month_name = date('F');
+    $yoy_diversity_pct = $last_year_diversity > 0 ? round(($yoy_diversity_diff / $last_year_diversity) * 100) : 0;
+
+    $exp_res = $db->query("SELECT Com_Name, Sci_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present FROM detections WHERE strftime('%j', Date) BETWEEN strftime('%j', 'now', '-3 days') AND strftime('%j', 'now', '+3 days') AND strftime('%Y', Date) < strftime('%Y', 'now') GROUP BY Sci_Name ORDER BY years_present DESC");
+    while($row = $exp_res->fetchArray(SQLITE3_ASSOC)) { $expected_today[] = $row; }
+    
+    $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC LIMIT 5");
+    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $top_5_species[] = $row; }
+}
+
 $db->close();
 ?>
 
@@ -373,6 +399,7 @@ $db->close();
                 if ($subview == 'dashboard') echo 'Dashboard';
                 elseif ($subview == 'environmental') echo 'Weather Impacts';
                 elseif ($subview == 'report') echo 'Weekly Report';
+                elseif ($subview == 'forecasting') echo 'Trends & Forecasting';
                 else echo ucfirst($subview); 
             ?></h1>
             <div class="insights-subtitle">
@@ -381,7 +408,8 @@ $db->close();
                     case 'behavior': echo 'Daily activity patterns and behavioral analysis.'; break;
                     case 'migration': echo 'Seasonal trends and migration tracking.'; break;
                     case 'environmental': echo 'Correlations between weather and bird activity.'; break;
-                    case 'health': echo 'Forecasting, data quality, and system health.'; break;
+                    case 'health': echo 'Data quality and system health.'; break;
+                    case 'forecasting': echo 'Long-term biodiversity trends and historical predictions.'; break;
                     case 'report': echo 'Comprehensive summary of last week\'s activity.'; break;
                     default: echo 'Deep behavioral analysis and seasonal trends for your station.'; break;
                 }
@@ -971,6 +999,9 @@ $db->close();
         </section>
     </div>
 
+    <?php endif; ?>
+
+    <?php if ($subview == 'forecasting'): ?>
     <!-- ====== PHASE 7: Long-term Trends & Diversity ====== -->
     <h2 style="margin: 50px 0 20px; font-size: 1.5em; color: var(--text-heading);">📈 Long-term Trends & Diversity</h2>
 
@@ -1009,9 +1040,7 @@ $db->close();
             <canvas id="monthlyTrendsChart" height="100"></canvas>
         </div>
     </section>
-    <?php endif; ?>
 
-    <?php if ($subview == 'health'): ?>
     <!-- ====== PHASE 8: Forecasting & Predictions ====== -->
     <h2 style="margin: 40px 0 20px; font-size: 1.5em; color: var(--text-heading);">🔮 Forecasting & Predictions</h2>
 
@@ -1232,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     <?php endif; ?>
 
-    <?php if ($subview == 'migration'): ?>
+    <?php if ($subview == 'forecasting'): ?>
     var monthCtx = document.getElementById('monthlyTrendsChart');
     if (monthCtx) {
         new Chart(monthCtx, {
