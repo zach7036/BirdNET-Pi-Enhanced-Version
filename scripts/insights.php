@@ -550,6 +550,50 @@ $last_year_diversity = $db->querySingle("
 $yoy_diversity_diff = $this_month_diversity - $last_year_diversity;
 $yoy_diversity_pct = ($last_year_diversity > 0) ? round(($yoy_diversity_diff / $last_year_diversity) * 100, 1) : 100;
 
+// =============================================
+// PHASE 8: Forecasting & Predictions
+// =============================================
+
+// 29. Expected Today (Historical Consistency)
+$expected_today = [];
+$exp_res = $db->query("
+    SELECT Com_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present
+    FROM detections
+    WHERE strftime('%j', Date) BETWEEN strftime('%j', 'now', '-3 days') AND strftime('%j', 'now', '+3 days')
+      AND strftime('%Y', Date) < strftime('%Y', 'now')
+    GROUP BY Sci_Name
+    ORDER BY years_present DESC
+    LIMIT 10
+");
+if ($exp_res) {
+    while($row = $exp_res->fetchArray(SQLITE3_ASSOC)) {
+        $expected_today[] = $row;
+    }
+}
+
+// 30. Historical Peak Weeks for Top Species
+// Get the top 5 most common species overall
+$top_5_species = [];
+$top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC LIMIT 5");
+if ($top_5_res) {
+    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) {
+        // For each, find their peak week (1-52)
+        $peak_week_data = $db->querySingle("
+            SELECT strftime('%W', Date) as week
+            FROM detections
+            WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "'
+            GROUP BY week
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        ");
+        $row['peak_week'] = $peak_week_data ?: '??';
+        $top_5_species[] = $row;
+    }
+}
+
+// Current Week
+$current_week = date('W');
+
 $db->close();
 ?>
 
@@ -1140,6 +1184,60 @@ $db->close();
             <canvas id="monthlyTrendsChart" height="100"></canvas>
         </div>
     </section>
+</div>
+
+<!-- ====== PHASE 8: Forecasting & Predictions ====== -->
+<div class="insights-container">
+    <h2 style="margin: 40px 0 20px; font-size: 1.5em; color: var(--text-heading);">🔮 Forecasting & Predictions</h2>
+
+    <div class="insights-sections-grid">
+        <!-- Expect Today -->
+        <section class="insights-section">
+            <div class="insights-section-title">📅 Expected Today (Historical Consistency)</div>
+            <div class="insights-stats-list">
+                <?php if(empty($expected_today)): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name">Not enough historical data for this date</span>
+                    <span class="insights-stats-count">—</span>
+                </div>
+                <?php else: ?>
+                <?php foreach($expected_today as $exp): ?>
+                <div class="insights-stats-item">
+                    <span class="insights-stats-name"><?php echo $exp['Com_Name']; ?></span>
+                    <span class="insights-stats-count">Present in <?php echo $exp['years_present']; ?> past years</span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <div style="padding: 10px 15px; font-size: 0.8em; color: var(--text-muted); border-top: 1px solid var(--border-light);">
+                Based on species detected within +/- 3 days of today in previous years.
+            </div>
+        </section>
+
+        <!-- Peak Weeks -->
+        <section class="insights-section">
+            <div class="insights-section-title">📍 Historical Peak Weeks</div>
+            <div class="insights-stats-list">
+                <?php foreach($top_5_species as $s): ?>
+                <div class="insights-stats-item">
+                    <div>
+                        <div class="insights-stats-name"><?php echo $s['Com_Name']; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Current week: <?php echo $current_week; ?></div>
+                    </div>
+                    <?php
+                        $is_peak = ($s['peak_week'] == $current_week);
+                        $peak_color = $is_peak ? '#10b981' : 'var(--text-muted)';
+                        $peak_weight = $is_peak ? '800' : '400';
+                    ?>
+                    <div style="text-align: right;">
+                        <span class="insights-stats-count" style="color: <?php echo $peak_color; ?>; font-weight: <?php echo $peak_weight; ?>;">Week <?php echo $s['peak_week']; ?></span>
+                        <?php if($is_peak): ?><div style="font-size: 0.7em; color: #10b981; font-weight: 700;">PEAK NOW</div><?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+    </div>
 </div>
 
 <!-- Chart.js for Hourly Activity -->
