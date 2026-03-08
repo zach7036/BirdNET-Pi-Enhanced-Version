@@ -91,7 +91,7 @@ if ($subview == 'behavior') {
 }
 
 if ($subview == 'migration') {
-    $new_arrivals = []; $arrival_res = $db->query("SELECT d.Com_Name, d.Sci_Name, MIN(d.Date) as first_seen, COUNT(*) as cnt FROM detections d WHERE d.Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date < '$two_weeks_ago') AND d.Date >= '$two_weeks_ago' GROUP BY d.Sci_Name ORDER BY first_seen DESC LIMIT 10");
+    $new_arrivals = []; $arrival_res = $db->query("SELECT d.Com_Name, d.Sci_Name, MIN(d.Date) as first_seen, COUNT(*) as cnt FROM detections d WHERE d.Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date < '$two_weeks_ago') AND d.Date >= '$two_weeks_ago' GROUP BY d.Sci_Name ORDER BY first_seen DESC");
     while($row = $arrival_res->fetchArray(SQLITE3_ASSOC)) { $new_arrivals[] = $row; }
     $gone_quiet = []; $quiet_res = $db->query("SELECT Com_Name, Sci_Name, COUNT(*) as total_cnt, MAX(Date) as last_seen FROM detections WHERE Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date >= '$two_weeks_ago') GROUP BY Sci_Name HAVING total_cnt >= 5 ORDER BY last_seen DESC LIMIT 10");
     while($row = $quiet_res->fetchArray(SQLITE3_ASSOC)) { $row['days_ago'] = intval((time() - strtotime($row['last_seen'])) / 86400); $gone_quiet[] = $row; }
@@ -591,17 +591,20 @@ $db->close();
                     <span class="insights-stats-count">—</span>
                 </div>
                 <?php else: ?>
-                <?php foreach($new_arrivals as $a): ?>
-                <div class="insights-stats-item">
+                <?php $rank_na = 1; foreach($new_arrivals as $a): ?>
+                <div class="insights-stats-item <?php echo $rank_na > 10 ? 'hidden-item' : ''; ?>">
                     <div>
                         <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $a['Com_Name']; ?></div>
                         <div style="font-size: 0.8em; color: var(--text-muted);">First seen: <?php echo date('M j', strtotime($a['first_seen'])); ?></div>
                     </div>
                     <span class="insights-stats-count" style="color: #10b981;"><?php echo $a['cnt']; ?> detections</span>
                 </div>
-                <?php endforeach; ?>
+                <?php $rank_na++; endforeach; ?>
                 <?php endif; ?>
             </div>
+            <?php if(count($new_arrivals) > 10): ?>
+            <button class="show-list-btn" onclick="showAllItems(this)">Show all <?php echo count($new_arrivals); ?> new arrivals ↓</button>
+            <?php endif; ?>
         </section>
 
         <!-- Gone Quiet -->
