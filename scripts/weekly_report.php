@@ -284,6 +284,28 @@ if (isset($_GET['ascii'])) {
         opacity: 1;
         bottom: 140%;
     }
+
+    /* KPI Card specific tooltip adjustments to prevent clipping */
+    .kpi-card .info-tooltip {
+        bottom: auto;
+        top: 140%;
+    }
+    .kpi-card .info-tooltip::after {
+        top: auto;
+        bottom: 100%;
+        border-color: transparent transparent #1e293b transparent;
+    }
+
+    /* Prevent the first card's tooltip from going off-screen to the left */
+    .kpi-cards .kpi-card:first-child .info-tooltip {
+        left: 0;
+        transform: translateX(0);
+        width: 250px; /* Give it a bit more room since it's now aligned left */
+    }
+    .kpi-cards .kpi-card:first-child .info-tooltip::after {
+        left: 10px;
+        transform: none;
+    }
 </style>
 
 <div class="report-container">
