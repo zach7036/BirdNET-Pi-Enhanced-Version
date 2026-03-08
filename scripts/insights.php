@@ -946,7 +946,7 @@ $db->close();
     <div class="insights-sections-grid">
         <!-- Phantom Species -->
         <section class="insights-section">
-            <div class="insights-section-title">👻 Phantom Suspects (Lowest Confidence) <span class="info-btn">ⓘ<span class="info-tooltip">Species with many detections but very low average confidence. These are likely false positives/misidentifications.</span></span></div>
+            <div class="insights-section-title">👻 Phantom Suspects (Lowest Confidence) <span class="info-btn">ⓘ<span class="info-tooltip">Species with many detections but very low average confidence. These are possibly false positives/misidentifications.</span></span></div>
             <div class="insights-stats-list">
                 <?php if(empty($phantom_species)): ?>
                 <div class="insights-stats-item">
