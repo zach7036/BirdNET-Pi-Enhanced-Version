@@ -1,13 +1,10 @@
 <?php
+error_reporting(E_ERROR);
 ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 require_once 'scripts/common.php';
 
 $db = new SQLite3('./scripts/birds.db', SQLITE3_OPEN_READONLY);
-$db->busyTimeout(5000);
-$db->exec('PRAGMA journal_mode = WAL');
-$db->exec('PRAGMA cache_size = -2000');
+$db->busyTimeout(1000);
 
 // 1. Lifetime Species
 $lifetime_species = $db->querySingle('SELECT COUNT(DISTINCT(Sci_Name)) FROM detections') ?: 0;
