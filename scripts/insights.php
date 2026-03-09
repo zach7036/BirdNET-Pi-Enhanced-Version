@@ -767,7 +767,7 @@ $db->close();
 
     <!-- Seasonal Presence -->
     <section class="insights-section" style="margin-top: 30px;">
-        <div class="insights-section-title">🗓️ Seasonal Presence (Top Species)</div>
+        <div class="insights-section-title">🗓️ Seasonal Presence (Top Species) <span class="info-btn">ⓘ<span class="info-tooltip" style="width: 280px;">Analysis of monthly activity to classify species. <strong>Note:</strong> Classifications may be inaccurate if your station has been active for less than a full year.<br><br>• <strong>Year-round</strong>: Seen most months.<br>• <strong>Seasonal</strong>: Migratory visitors.<br>• <strong>Transient</strong>: Passing through briefly.</span></span></div>
         <div class="insights-stats-list">
             <?php if(empty($seasonal_top)): ?>
             <div class="insights-stats-item">
