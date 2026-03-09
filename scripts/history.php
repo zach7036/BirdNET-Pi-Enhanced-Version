@@ -216,13 +216,6 @@ if (get_included_files()[0] === __FILE__) {
   <p style="display:none" id="filename"></p>
   <div class="ebird-dialog-header">📋 eBird Checklist Export</div>
   <div class="ebird-dialog-body">
-    <div class="ebird-info-box" style="background: var(--bg-secondary, #f1f5f9); padding: 12px; border-radius: 8px; font-size: 0.85em; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
-      <strong>What gets exported?</strong><br>
-      A CSV file containing all detections for the selected date with <strong>&gt;75% confidence</strong>. To comply with eBird guidelines, data is aggregated to a maximum of <strong>1 entry per species per hour</strong>.<br><br>
-      <strong>Next Steps:</strong><br>
-      After downloading, go to <a href="https://ebird.org/import" target="_blank" style="color: var(--accent); font-weight: bold; text-decoration: underline;">eBird's Data Import page</a> and select "eBird Record Format (Extended)".
-    </div>
-    
     <div class="ebird-row">
       <div class="ebird-field">
         <label>Export Date</label>
@@ -302,7 +295,13 @@ function submitID() {
 
 </script>  
 
-<div style="text-align: center; margin: 20px 0;">
+<div style="text-align: center; margin: 20px auto; max-width: 600px;">
+    <div class="ebird-info-box" style="background: var(--bg-secondary, #f1f5f9); padding: 16px; border-radius: 12px; font-size: 0.9em; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; text-align: left; box-shadow: var(--shadow-sm);">
+      <strong style="color: var(--text-heading); font-size: 1.1em;">What gets exported?</strong><br>
+      A CSV file containing all detections for the selected date with <strong>&gt;75% confidence</strong>. To comply with eBird guidelines, data is aggregated to a maximum of <strong>1 entry per species per hour</strong>.<br><br>
+      <strong style="color: var(--text-heading); font-size: 1.1em;">Next Steps:</strong><br>
+      After downloading, go to <a href="https://ebird.org/import" target="_blank" style="color: var(--accent); font-weight: bold; text-decoration: underline;">eBird's Data Import page</a> and select "eBird Record Format (Extended)".
+    </div>
     <button type="button" class="ebird-export-trigger" onclick="showDialog()">📥 Export as CSV for eBird</button>
 </div>
 
