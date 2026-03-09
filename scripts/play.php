@@ -477,6 +477,7 @@ if(!isset($_GET['species']) && !isset($_GET['filename'])){
        border-radius: 8px;
        background: var(--accent-subtle);
        color: var(--accent);
+   }
    .date-grid {
        display: grid;
        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
