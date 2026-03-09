@@ -621,41 +621,43 @@ if(!isset($_GET['species']) && !isset($_GET['filename'])){
   } elseif($view == "date") {
     $birds = array();
     $values = array();
-while($results=$result->fetchArray(SQLITE3_ASSOC))
-{
-  $dir_name = str_replace("'", '', $results['Com_Name']);
-  if(realpath($home."/BirdSongs/Extracted/By_Date/".$date."/".str_replace(" ", "_", $dir_name)) !== false){
-    $birds[] = $results['Sci_Name'];
-    $values[] = get_label($results, $_GET['sort'], $_GET['date']);
-  }
-}
-
-if(count($birds) > 45) {
-  $num_cols = 3;
-} else {
-  $num_cols = 1;
-}
-$num_rows = ceil(count($birds) / $num_cols);
-
-for ($row = 0; $row < $num_rows; $row++) {
-  echo "<tr>";
-
-  for ($col = 0; $col < $num_cols; $col++) {
-    $index = $row + $col * $num_rows;
-
-    if ($index < count($birds)) {
-      ?>
-      <td class="spec">
-          <button type="submit" name="species" value="<?php echo $birds[$index];?>"><?php echo $values[$index];?></button>
-      </td>
-      <?php
-    } else {
-      echo "<td></td>";
+    while($results=$result->fetchArray(SQLITE3_ASSOC))
+    {
+      $dir_name = str_replace("'", '', $results['Com_Name']);
+      if(realpath($home."/BirdSongs/Extracted/By_Date/".$date."/".str_replace(" ", "_", $dir_name)) !== false){
+        $birds[] = $results['Sci_Name'];
+        $values[] = get_label($results, $_GET['sort'], $_GET['date']);
+      }
     }
-  }
 
-  echo "</tr>";
-}
+    echo "<div class='species-grid'>";
+    for ($index = 0; $index < count($birds); $index++) {
+        // Build GET parameters retaining current page state
+        $query_args = array(
+            'view' => 'Recordings',
+            'species' => $birds[$index]
+        );
+        if(isset($_GET['sort'])) { $query_args['sort'] = $_GET['sort']; }
+        $destination = "views.php?" . http_build_query($query_args);
+
+        // Separate the species name and the numeric value/label
+        $split_val = explode("<br>", $values[$index]);
+        $main_name = strip_tags($split_val[0] ?: $values[$index]);
+        $metric = strip_tags($split_val[1] ?: '');
+        
+        ?>
+        <a href="<?php echo htmlspecialchars($destination); ?>" class="species-card">
+            <span class="species-card-name"><?php echo htmlspecialchars($main_name); ?></span>
+            <?php if (!empty($metric)): ?>
+            <span class="species-card-metric"><?php echo htmlspecialchars($metric); ?></span>
+            <?php endif; ?>
+        </a>
+        <?php
+    }
+    echo "</div>";
+    
+    // Resume arbitrary tag structure to prevent breaking the final if condition
+    if ($view != "choose") { echo "<table>"; }
 
     #Choose Dashboard
   } else {
