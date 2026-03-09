@@ -48,10 +48,13 @@ if (get_included_files()[0] === __FILE__) {
        justify-content: space-between;
        align-items: center;
        text-decoration: none;
+       text-align: left;
+       font-family: inherit;
        color: var(--text-heading);
        transition: all 0.15s ease;
        box-shadow: var(--shadow-sm);
        cursor: pointer;
+       width: 100%;
    }
    .species-card-s:hover {
        transform: translateX(4px);
@@ -159,28 +162,27 @@ if (get_included_files()[0] === __FILE__) {
   }
 ?>
 
+<form action="views.php" method="GET">
+<input type="hidden" name="view" value="Species Stats">
+<?php if(isset($_GET['sort'])): ?>
+<input type="hidden" name="sort" value="<?php echo $_GET['sort']; ?>">
+<?php endif; ?>
 <div class="species-grid-stats">
 <?php
   for ($index = 0; $index < count($birds); $index++) {
-      $query_args = array(
-          'view' => 'Species Stats',
-          'species' => $birds[$index]
-      );
-      if(isset($_GET['sort'])) { $query_args['sort'] = $_GET['sort']; }
-      $destination = "views.php?" . http_build_query($query_args);
-
       $split_val = explode("<br>", $values[$index]);
       $main_name = strip_tags($split_val[0] ?: $values[$index]);
       $metric = strip_tags($split_val[1] ?: '');
-  ?>
-  <a href="<?php echo htmlspecialchars($destination); ?>" target="_parent" class="species-card-s">
+?>
+  <button type="submit" name="species" value="<?php echo htmlspecialchars($birds[$index]); ?>" class="species-card-s">
       <span class="species-card-s-name"><?php echo htmlspecialchars($main_name); ?></span>
       <?php if (!empty($metric)): ?>
       <span class="species-card-s-metric"><?php echo htmlspecialchars($metric); ?></span>
       <?php endif; ?>
-  </a>
-  <?php } ?>
+  </button>
+<?php } ?>
 </div>
+</form>
 </div>
 <dialog style="margin-top: 5px;max-height: 95vh;
   overflow-y: auto;overscroll-behavior:contain" id="attribution-dialog">
