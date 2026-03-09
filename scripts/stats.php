@@ -30,31 +30,122 @@ if (get_included_files()[0] === __FILE__) {
 
 <div class="stats">
 <div class="column">
-<div style="width: auto;
-   text-align: center">
-   <form action="views.php" method="GET">
-    <input type="hidden" name="sort" value="<?php if(isset($_GET['sort'])){echo $_GET['sort'];}?>">
+<style>
+   .species-grid-stats {
+       display: flex;
+       flex-direction: column;
+       gap: 6px;
+       padding-bottom: 30px;
+       max-width: 800px;
+       margin: 0 auto;
+   }
+   .species-card-s {
+       background: var(--bg-card);
+       border: 1px solid var(--border);
+       border-radius: 8px;
+       padding: 10px 16px;
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       text-decoration: none;
+       color: var(--text-heading);
+       transition: all 0.15s ease;
+       box-shadow: var(--shadow-sm);
+       cursor: pointer;
+   }
+   .species-card-s:hover {
+       transform: translateX(4px);
+       box-shadow: var(--shadow-md);
+       border-color: var(--accent);
+       background: var(--bg-hover, var(--bg-card));
+   }
+   .species-card-s-name {
+       font-weight: 700;
+       font-size: 1.05em;
+   }
+   .species-card-s-metric {
+       font-size: 0.8em;
+       font-weight: 800;
+       padding: 4px 8px;
+       border-radius: 8px;
+       background: var(--accent-subtle);
+       color: var(--accent);
+   }
+   .sticky-sort-bar-stats {
+       position: sticky;
+       top: 0;
+       background: var(--bg-primary);
+       padding: 15px 0 20px 0;
+       z-index: 100;
+       margin-bottom: 15px;
+       border-bottom: 1px solid var(--border-light);
+       box-shadow: 0 4px 15px -10px rgba(0,0,0,0.1);
+       max-width: 800px;
+       margin-left: auto;
+       margin-right: auto;
+   }
+   .sort-options-stats {
+       display: flex;
+       justify-content: center;
+       gap: 12px;
+       flex-wrap: wrap;
+   }
+   .sort-btn-s {
+       display: inline-flex;
+       align-items: center;
+       gap: 8px;
+       padding: 8px 16px;
+       border-radius: 20px;
+       background: var(--bg-card);
+       border: 1px solid var(--border);
+       color: var(--text-secondary);
+       font-size: 0.9em;
+       font-weight: 600;
+       cursor: pointer;
+       transition: all 0.2s ease;
+       text-decoration: none;
+       box-shadow: var(--shadow-sm);
+   }
+   .sort-btn-s img {
+       width: 16px;
+       height: 16px;
+       opacity: 0.7;
+   }
+   .sort-btn-s.active {
+       background: var(--accent);
+       border-color: var(--accent);
+       color: white;
+       box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+   }
+   .sort-btn-s.active img {
+       opacity: 1;
+       filter: brightness(0) invert(1);
+   }
+   .sort-btn-s:hover:not(.active) {
+       background: var(--bg-hover);
+       border-color: var(--border-light);
+   }
+</style>
+
+<div class="sticky-sort-bar-stats">
+   <form action="views.php" method="GET" class="sort-options-stats">
       <input type="hidden" name="view" value="Species Stats">
-      <button <?php if(!isset($_GET['sort']) || $_GET['sort'] == "alphabetical"){ echo "class='sortbutton active'";} else { echo "class='sortbutton'"; }?> type="submit" name="sort" value="alphabetical">
-         <img src="images/sort_abc.svg" title="Sort by alphabetical" alt="Sort by alphabetical">
+      <button class="sort-btn-s <?php echo (!isset($_GET['sort']) || $_GET['sort'] == 'alphabetical') ? 'active' : ''; ?>" type="submit" name="sort" value="alphabetical">
+         <img src="images/sort_abc.svg" alt="A-Z"> A-Z
       </button>
-      <button <?php if(isset($_GET['sort']) && $_GET['sort'] == "occurrences"){ echo "class='sortbutton active'";} else { echo "class='sortbutton'"; }?> type="submit" name="sort" value="occurrences">
-         <img src="images/sort_occ.svg" title="Sort by occurrences" alt="Sort by occurrences">
+      <button class="sort-btn-s <?php echo (isset($_GET['sort']) && $_GET['sort'] == 'occurrences') ? 'active' : ''; ?>" type="submit" name="sort" value="occurrences">
+         <img src="images/sort_occ.svg" alt="Count"> Frequency
       </button>
-      <button <?php if(isset($_GET['sort']) && $_GET['sort'] == "confidence"){ echo "class='sortbutton active'";} else { echo "class='sortbutton'"; }?> type="submit" name="sort" value="confidence">
-         <img src="images/sort_conf.svg" title="Sort by confidence" alt="Sort by confidence">
+      <button class="sort-btn-s <?php echo (isset($_GET['sort']) && $_GET['sort'] == 'confidence') ? 'active' : ''; ?>" type="submit" name="sort" value="confidence">
+         <img src="images/sort_conf.svg" alt="Confidence"> Confidence
       </button>
-      <button <?php if(isset($_GET['sort']) && $_GET['sort'] == "date"){ echo "class='sortbutton active'";} else { echo "class='sortbutton'"; }?> type="submit" name="sort" value="date">
-         <img src="images/sort_date.svg" title="Sort by date" alt="Sort by date">
+      <button class="sort-btn-s <?php echo (isset($_GET['sort']) && $_GET['sort'] == 'date') ? 'active' : ''; ?>" type="submit" name="sort" value="date">
+         <img src="images/sort_date.svg" alt="Date"> Most Recent
       </button>
    </form>
 </div>
-<br>
-<form action="views.php" method="GET">
-<input type="hidden" name="sort" value="<?php if(isset($_GET['sort'])){echo $_GET['sort'];}?>">
-<input type="hidden" name="view" value="Species Stats">
-<table>
-  <?php
+
+<?php
   $birds = array();
   $values = array();
 
@@ -66,36 +157,30 @@ if (get_included_files()[0] === __FILE__) {
     $birds[] = $results['Com_Name'];
     $values[] = get_label($results, $_GET['sort']);
   }
+?>
 
-  if(count($birds) > 45) {
-    $num_cols = 3;
-  } else {
-    $num_cols = 1;
-  }
-  $num_rows = ceil(count($birds) / $num_cols);
+<div class="species-grid-stats">
+<?php
+  for ($index = 0; $index < count($birds); $index++) {
+      $query_args = array(
+          'view' => 'Species Stats',
+          'species' => $birds[$index]
+      );
+      if(isset($_GET['sort'])) { $query_args['sort'] = $_GET['sort']; }
+      $destination = "views.php?" . http_build_query($query_args);
 
-  for ($row = 0; $row < $num_rows; $row++) {
-    echo "<tr>";
-
-    for ($col = 0; $col < $num_cols; $col++) {
-      $index = $row + $col * $num_rows;
-
-      if ($index < count($birds)) {
-        ?>
-        <td>
-            <button type="submit" name="species" value="<?php echo $birds[$index];?>"><?php echo $values[$index];?></button>
-        </td>
-        <?php
-      } else {
-        echo "<td></td>";
-      }
-    }
-
-    echo "</tr>";
-  }
+      $split_val = explode("<br>", $values[$index]);
+      $main_name = strip_tags($split_val[0] ?: $values[$index]);
+      $metric = strip_tags($split_val[1] ?: '');
   ?>
-</table>
-</form>
+  <a href="<?php echo htmlspecialchars($destination); ?>" class="species-card-s">
+      <span class="species-card-s-name"><?php echo htmlspecialchars($main_name); ?></span>
+      <?php if (!empty($metric)): ?>
+      <span class="species-card-s-metric"><?php echo htmlspecialchars($metric); ?></span>
+      <?php endif; ?>
+  </a>
+  <?php } ?>
+</div>
 </div>
 <dialog style="margin-top: 5px;max-height: 95vh;
   overflow-y: auto;overscroll-behavior:contain" id="attribution-dialog">

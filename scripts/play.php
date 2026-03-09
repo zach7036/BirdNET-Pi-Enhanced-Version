@@ -442,29 +442,32 @@ if(!isset($_GET['species']) && !isset($_GET['filename'])){
    }
    
    .species-grid {
-       display: grid;
-       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-       gap: 15px;
-       padding-bottom: 40px;
+       display: flex;
+       flex-direction: column;
+       gap: 6px;
+       padding-bottom: 30px;
+       max-width: 800px;
+       margin: 0 auto;
    }
    .species-card {
        background: var(--bg-card);
        border: 1px solid var(--border);
-       border-radius: 12px;
-       padding: 15px 20px;
+       border-radius: 8px;
+       padding: 10px 16px;
        display: flex;
        justify-content: space-between;
        align-items: center;
        text-decoration: none;
        color: var(--text-heading);
-       transition: all 0.2s ease;
+       transition: all 0.15s ease;
        box-shadow: var(--shadow-sm);
        cursor: pointer;
    }
    .species-card:hover {
-       transform: translateY(-3px);
+       transform: translateX(4px);
        box-shadow: var(--shadow-md);
        border-color: var(--accent);
+       background: var(--bg-hover, var(--bg-card));
    }
    .species-card-name {
        font-weight: 700;
