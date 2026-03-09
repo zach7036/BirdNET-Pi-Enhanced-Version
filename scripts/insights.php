@@ -446,7 +446,6 @@ $db->close();
         left: 0;
         width: 100%;
         background: var(--accent);
-        height: 6px; /* Slightly taller for visibility */
         border-radius: 1px;
         opacity: 0;
         transition: opacity 0.2s ease;
@@ -913,7 +912,7 @@ $db->close();
                             ?>
                             <div class="seasonal-bar-wrap" title="<?php echo $tooltip; ?>">
                                 <div class="seasonal-bar-expected" style="height: <?php echo max(5, $expected * 30); ?>%;"></div>
-                                <div class="seasonal-bar-actual <?php echo $actual > 0 ? 'detected' : ''; ?>"></div>
+                                <div class="seasonal-bar-actual <?php echo $actual > 0 ? 'detected' : ''; ?>" style="height: <?php echo max(5, $expected * 30); ?>%;"></div>
                             </div>
                         <?php endfor; ?>
                     </div>
