@@ -554,7 +554,7 @@ if(!isset($_GET['species']) && !isset($_GET['filename'])){
 <?php } ?>
 <?php
   #By Date
-  if($view == "bydate") {
+  if($view == "date") {
     
     echo "<div class='date-grid'>";
     while($results=$result->fetchArray(SQLITE3_ASSOC)){
