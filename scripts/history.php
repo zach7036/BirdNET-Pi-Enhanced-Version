@@ -229,11 +229,11 @@ if (get_included_files()[0] === __FILE__) {
     <div class="ebird-row">
       <div class="ebird-field">
         <label>State Code <span style="font-weight: normal; font-size: 0.85em; color: var(--text-muted);">(1-3 letters, e.g., OH)</span></label>
-        <input type="text" maxlength="3" pattern="[A-Za-z]{1,3}" style="text-transform: uppercase;" placeholder="OH" id="state" oninput="this.value = this.value.toUpperCase()">
+        <input type="text" maxlength="3" pattern="[A-Za-z]{1,3}" style="text-transform: uppercase;" placeholder="e.g. OH" id="state" oninput="this.value = this.value.toUpperCase()">
       </div>
       <div class="ebird-field">
         <label>Country Code <span style="font-weight: normal; font-size: 0.85em; color: var(--text-muted);">(Exactly 2 letters, e.g., US)</span></label>
-        <input type="text" maxlength="2" minlength="2" pattern="[A-Za-z]{2}" style="text-transform: uppercase;" placeholder="US" id="country" oninput="this.value = this.value.toUpperCase()">
+        <input type="text" maxlength="2" minlength="2" pattern="[A-Za-z]{2}" style="text-transform: uppercase;" placeholder="e.g. US" id="country" oninput="this.value = this.value.toUpperCase()">
       </div>
     </div>
     <div class="ebird-row">
