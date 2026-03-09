@@ -354,8 +354,12 @@ while($results=$result3->fetchArray(SQLITE3_ASSOC)){
 }
 ?>
 <?php if(isset($_GET['species'])){?>
-<br><br>
-<div class="brbanner">Best Recordings for Other Species:</div><br>
+<br>
+<button onclick="var s=document.getElementById('other-species-section');s.style.display=s.style.display==='none'?'block':'none';this.querySelector('.toggle-arrow').textContent=s.style.display==='none'?'\u25B6':'\u25BC';" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;color:var(--text-heading);font-size:1em;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s ease;box-shadow:var(--shadow-sm);">
+    <span class="toggle-arrow" style="font-size:0.8em;color:var(--accent);">&#9654;</span>
+    Show Best Recordings for Other Species
+</button>
+<div id="other-species-section" style="display:none;">
 <?php } else {?>
 <hr><br>
 <?php } ?>
@@ -389,6 +393,9 @@ file_put_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", "##start".
     </table>
   </form>
 </div>
+<?php if(isset($_GET['species'])): ?>
+</div>
+<?php endif; ?>
 </div>
 <?php
 if (get_included_files()[0] === __FILE__) {
