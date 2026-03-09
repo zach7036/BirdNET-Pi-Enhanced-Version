@@ -491,6 +491,7 @@ if(isset($_GET['view'])){
                 <button type=\"submit\" name=\"view\" value=\"File\" form=\"views\">File Manager</button>
                 <button type=\"submit\" name=\"view\" value=\"Adminer\" form=\"views\">Database Maintenance</button>
                 <button type=\"submit\" name=\"view\" value=\"Webterm\" form=\"views\">Web Terminal</button>
+                <button type=\"submit\" name=\"view\" value=\"eBird Export\" form=\"views\">📥 eBird Export</button>
               </div>
               <div class=\"tools-group\">
                 <h3>🦜 Species Control</h3>
@@ -503,6 +504,7 @@ if(isset($_GET['view'])){
           </form>
           </div>";
   }
+  if($_GET['view'] == "eBird Export"){include('scripts/history.php');}
   if($_GET['view'] == "Recordings"){include('play.php');}
   if($_GET['view'] == "Settings"){include('scripts/config.php');} 
   if($_GET['view'] == "Advanced"){include('scripts/advanced.php');}
