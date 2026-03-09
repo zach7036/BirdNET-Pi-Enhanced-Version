@@ -490,13 +490,6 @@ for ($row = 0; $row < $num_rows; $row++) {
 
     #Choose Dashboard
   } else {
-    // Fetch 10 most recent detections for the "Recent Activity" preview
-    $recent_limit = 10;
-    $statement_recent = $db->prepare('SELECT * FROM detections ORDER BY Date DESC, Time DESC LIMIT :limit');
-    if ($statement_recent) {
-        $statement_recent->bindValue(':limit', $recent_limit, SQLITE3_INTEGER);
-        $recent_results = $statement_recent->execute();
-    }
     ?>
 
     <style>
@@ -533,7 +526,7 @@ for ($row = 0; $row < $num_rows; $row++) {
         
         .nav-cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 40px;
         }
@@ -655,86 +648,6 @@ for ($row = 0; $row < $num_rows; $row++) {
             </button>
         </form>
 
-        <?php if (isset($recent_results)): ?>
-        <div class="recent-section-title">⚡ Recent Activity Feed <span style="font-size: 0.6em; font-weight: normal; color: var(--text-muted); padding: 4px 10px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-light);">Latest 10 Detections</span></div>
-        <div class="recent-table-wrap">
-            <table style="background: transparent;">
-            <?php
-            // Setup disk check array for the recent feed loop
-            $fp_recent = @fopen($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", 'r');
-            if ($fp_recent) {
-              $disk_check_exclude_arr_recent = explode("\n", fread($fp_recent, filesize($home."/BirdNET-Pi/scripts/disk_check_exclude.txt")));
-            } else {
-              $disk_check_exclude_arr_recent = [];
-            }
-            
-            $recent_count = 0;
-            while($rec_row = $recent_results->fetchArray(SQLITE3_ASSOC)) {
-                $comname = preg_replace('/ /', '_', $rec_row['Com_Name']);
-                $comname = preg_replace('/\'/', '', $comname);
-                $date = $rec_row['Date'];
-                $filename = "/By_Date/".$date."/".$comname."/".$rec_row['File_Name'];
-                $filename_shifted = "/By_Date/shifted/".$date."/".$comname."/".$rec_row['File_Name'];
-                $filename_png = $filename . ".png";
-                $sci_name = $rec_row['Sci_Name'];
-                $time = $rec_row['Time'];
-                $conf_val = round((float)round($rec_row['Confidence'],2) * 100 ) . '%';
-                $filename_formatted = $date."/".$comname."/".$rec_row['File_Name'];
-
-                if(!file_exists($home."/BirdSongs/Extracted/".$filename)) { continue; }
-                
-                $recent_count++;
-                
-                if(!in_array($filename_formatted, $disk_check_exclude_arr_recent)) {
-                    $imageicon = "images/unlock.svg";
-                    $title = "This file will be deleted when disk space needs to be freed (>95% usage).";
-                    $type = "add";
-                } else {
-                    $imageicon = "images/lock.svg";
-                    $title = "This file is excluded from being purged.";
-                    $type = "del";
-                }
-                
-                if(file_exists($shifted_path.$filename_formatted)) {
-                    $shiftImageIcon = "images/unshift.svg";
-                    $shiftTitle = "This file has been shifted down in frequency."; 
-                    $shiftAction = "unshift";
-                    $filename = $filename_shifted;
-                } else {
-                    $shiftImageIcon = "images/shift.svg";
-                    $shiftTitle = "This file is not shifted in frequency.";
-                    $shiftAction = "shift";
-                }
-
-                echo "<tr><td class=\"relative\" style=\"display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px;\">";
-                echo "<div style=\"flex: 1 1 200px; min-width: 200px;\">";
-                echo "<div style=\"font-size: 1.1em; font-weight: 800; color: var(--text-heading); margin-bottom: 2px;\">{$rec_row['Com_Name']}</div>";
-                echo "<div style=\"font-size: 0.9em; font-style: italic; color: var(--text-muted); margin-bottom: 8px;\">{$sci_name}</div>";
-                
-                $conf_color = (float)$rec_row['Confidence'] >= 0.8 ? '#10b981' : ((float)$rec_row['Confidence'] >= 0.5 ? '#f59e0b' : '#ef4444');
-                echo "<div style=\"display: flex; gap: 10px; font-size: 0.85em; color: var(--text-secondary); align-items: center;\">";
-                echo "<span><img src=\"images/date.svg\" width=\"12\" style=\"vertical-align: middle; margin-right: 4px; opacity: 0.6;\"> $date $time</span>";
-                echo "<span style=\"background: {$conf_color}22; color: {$conf_color}; padding: 2px 8px; border-radius: 12px; font-weight: 700;\">$conf_val</span>";
-                echo "</div></div>";
-
-                echo "<div style=\"flex: 2 1 400px; display: flex; flex-direction: column; align-items: flex-end;\">";
-                echo "<div style=\"position: absolute; top: 15px; right: 15px; display: flex; gap: 12px;\">";
-                echo "<img style='cursor:pointer' src='images/delete.svg' onclick='deleteDetection(\"".$filename_formatted."\")' class=\"copyimage\" width=20 title='Delete Detection'>";
-                echo "<img style='cursor:pointer' src='images/bird.svg' onclick='changeDetection(\"".$filename_formatted."\")' class=\"copyimage\" width=20 title='Change Detection'>";
-                echo "<img style='cursor:pointer' onclick='toggleLock(\"".$filename_formatted."\",\"".$type."\", this)' class=\"copyimage\" width=20 title=\"".$title."\" src=\"".$imageicon."\">";
-                echo "<img style='cursor:pointer' onclick='toggleShiftFreq(\"".$filename_formatted."\",\"".$shiftAction."\", this)' class=\"copyimage\" width=20 title=\"".$shiftTitle."\" src=\"".$shiftImageIcon."\">";
-                echo "</div>";
-                
-                echo "<div style=\"width: 100%; margin-top: 15px;\"><div class='custom-audio-player' data-audio-src=\"$filename\" data-image-src=\"$filename_png\"></div></div>";
-                echo "</div></td></tr>";
-            }
-            if ($recent_count == 0) {
-                echo "<tr><td style=\"text-align: center; color: var(--text-muted);\">No recent recordings found.</td></tr>";
-            }
-            ?>
-            </table>
-        </div>
-        <?php endif; ?>
     </div>
     <?php
   }
