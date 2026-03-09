@@ -738,6 +738,15 @@ function refreshDetection() {
         isPlaying = true;
       }
     });
+    // Also check for any playing audio in the 5 Most Recent Detections table
+    if (!isPlaying) {
+      const tableAudios = document.querySelectorAll("#detections_table audio");
+      tableAudios.forEach((audioEl) => {
+        if (audioEl && audioEl.currentTime > 0 && !audioEl.paused && !audioEl.ended && audioEl.readyState > 2) {
+          isPlaying = true;
+        }
+      });
+    }
     // If none are playing, refresh detections
     if (!isPlaying) {
       const currentIdentifier = audioPlayers[0]?.dataset.audioSrc || undefined;
