@@ -267,38 +267,106 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
           animation-timing-function: ease-in;
           animation-duration: 1s;
         }
-
         @keyframes fadeInOpacity {
-          0% {
-            opacity: 0;
-          }
-          100% {
-            opacity: 1;
-          }
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
+        .mrd-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: var(--shadow-sm);
+          max-width: 600px;
+          margin: 0 auto;
+        }
+        .mrd-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 14px;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .mrd-datetime { font-size: 0.85em; color: var(--text-secondary); font-weight: 500; }
+        .mrd-open-link {
+          display: inline-flex; align-items: center; gap: 4px;
+          padding: 4px 10px; border-radius: 8px;
+          background: var(--accent-subtle, rgba(99,102,241,0.1));
+          color: var(--accent, #6366f1);
+          text-decoration: none; font-size: 0.75em; font-weight: 600;
+          transition: all 0.2s ease;
+        }
+        .mrd-open-link:hover { background: var(--accent); color: white; }
+        .mrd-open-link img { width: 14px; height: 14px; }
+        .mrd-bird-img {
+          width: 100%; max-height: 200px; object-fit: contain;
+          background: var(--bg-primary, #f8fafc); border-radius: 10px;
+          margin-bottom: 14px; cursor: pointer;
+        }
+        .mrd-species { text-align: center; margin-bottom: 12px; }
+        .mrd-species-name { font-size: 1.3em; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 2px; }
+        .mrd-species-name button {
+          background: none; border: none; color: var(--text-heading);
+          font: inherit; cursor: pointer; padding: 0;
+        }
+        .mrd-species-name button:hover { color: var(--accent); }
+        .mrd-sci { font-style: italic; color: var(--text-secondary); font-size: 0.9em; display: block; margin-bottom: 8px; }
+        .mrd-links { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .mrd-link-pill {
+          display: inline-flex; align-items: center; gap: 4px;
+          padding: 3px 10px; border-radius: 8px;
+          background: var(--accent-subtle, rgba(99,102,241,0.1));
+          color: var(--accent, #6366f1);
+          text-decoration: none; font-size: 0.75em; font-weight: 600;
+          transition: all 0.2s ease; border: none; cursor: pointer; font-family: inherit;
+        }
+        .mrd-link-pill:hover { background: var(--accent); color: white; }
+        .mrd-link-pill img { width: 12px; height: 12px; }
+        .mrd-conf {
+          display: inline-block; padding: 3px 12px; border-radius: 12px;
+          font-size: 0.8em; font-weight: 700; margin-bottom: 12px;
+        }
+        .mrd-conf-high { background: #dcfce7; color: #166534; }
+        .mrd-conf-med { background: #fef9c3; color: #854d0e; }
+        .mrd-conf-low { background: #fee2e2; color: #991b1b; }
         </style>
-        <table class="<?php echo ($_GET['previous_detection_identifier'] == 'undefined') ? '' : 'fade-in';  ?>">
-          <h3>Most Recent Detection: <span style="font-weight: normal;"><?php echo $mostrecent['Date']." ".$mostrecent['Time'];?></span></h3>
-          <tr>
-            <td class="relative"><a target="_blank" href="index.php?filename=<?php echo $mostrecent['File_Name']; ?>"><img class="copyimage" title="Open in new tab" width="25" height="25" src="images/copy.png"></a>
-            <div class="centered_image_container" style="margin-bottom: 0px !important;">
-              <?php if(!empty($config["IMAGE_PROVIDER"]) && !empty($image[1])) { ?>
-                <img style="object-fit: contain; background: #f8fafc; border-radius: 8px;" onerror="this.style.display='none'" onclick='setModalText(<?php echo $iterations; ?>,"<?php echo urlencode($image[2]); ?>", "<?php echo $image[3]; ?>", "<?php echo $image[4]; ?>", "<?php echo $image[1]; ?>", "<?php echo $image[5]; ?>")' src="<?php echo $image[1]; ?>" class="img1">
-              <?php } ?>
-              <form action="" method="GET">
-                  <input type="hidden" name="view" value="Species Stats">
-                  <button type="submit" name="species" value="<?php echo $mostrecent['Com_Name'];?>"><?php echo $mostrecent['Com_Name'];?></button>
-                  <br>
-                  <i><?php echo $mostrecent['Sci_Name'];?></i>
-                  <a href="<?php $info_url = get_info_url($mostrecent['Sci_Name']); $url = $info_url['URL']; echo $url ?>" target="_blank">
-                  <img style="width: unset !important; display: inline; height: 1em; cursor: pointer;" title="Info" src="images/info.png" width="25"></a>
-                  <a href="https://wikipedia.org/wiki/<?php echo $sciname;?>" target="_blank"><img style="width: unset !important; display: inline; height: 1em; cursor: pointer;" title="Wikipedia" src="images/wiki.png" width="25"></a>
-                  <img style="width: unset !important;display: inline;height: 1em;cursor:pointer" title="View species stats" onclick="generateMiniGraph(this, '<?php echo $comnamegraph; ?>')" width=25 src="images/chart.svg">
-                  <br>Confidence: <?php echo $percent = round((float)round($mostrecent['Confidence'],2) * 100 ) . '%';?><br></div><br>
-                  <div class='custom-audio-player' data-audio-src="<?php echo $filename; ?>" data-image-src="<?php echo $filename.".png";?>"></div>
-                  </td></form>
-          </tr>
-        </table> <?php break;
+        <?php
+          $conf_raw = (float)round($mostrecent['Confidence'], 2);
+          $conf_pct = round($conf_raw * 100) . '%';
+          $conf_class = $conf_raw >= 0.8 ? 'mrd-conf-high' : ($conf_raw >= 0.5 ? 'mrd-conf-med' : 'mrd-conf-low');
+          $display_date = date('M. j, Y', strtotime($mostrecent['Date']));
+          $info_url = get_info_url($mostrecent['Sci_Name']);
+          $url = $info_url['URL'];
+        ?>
+        <div class="mrd-card <?php echo ($_GET['previous_detection_identifier'] == 'undefined') ? '' : 'fade-in'; ?>">
+          <div class="mrd-header">
+            <span class="mrd-datetime"><?php echo $display_date . ' ' . $mostrecent['Time']; ?></span>
+            <a class="mrd-open-link" target="_blank" href="index.php?filename=<?php echo $mostrecent['File_Name']; ?>">
+              <img src="images/copy.png"> Open
+            </a>
+          </div>
+          <?php if(!empty($config["IMAGE_PROVIDER"]) && !empty($image[1])) { ?>
+            <img class="mrd-bird-img" onerror="this.style.display='none'" onclick='setModalText(<?php echo $iterations; ?>,"<?php echo urlencode($image[2]); ?>", "<?php echo $image[3]; ?>", "<?php echo $image[4]; ?>", "<?php echo $image[1]; ?>", "<?php echo $image[5]; ?>")' src="<?php echo $image[1]; ?>">
+          <?php } ?>
+          <div class="mrd-species">
+            <span class="mrd-species-name">
+              <form action="" method="GET" style="display:inline">
+                <input type="hidden" name="view" value="Species Stats">
+                <button type="submit" name="species" value="<?php echo $mostrecent['Com_Name'];?>"><?php echo $mostrecent['Com_Name'];?></button>
+              </form>
+            </span>
+            <span class="mrd-sci"><?php echo $mostrecent['Sci_Name'];?></span>
+            <div class="mrd-links">
+              <a href="<?php echo $url; ?>" target="_blank" class="mrd-link-pill"><img src="images/info.png"> Info</a>
+              <a href="https://wikipedia.org/wiki/<?php echo $sciname; ?>" target="_blank" class="mrd-link-pill"><img src="images/wiki.png"> Wikipedia</a>
+              <button class="mrd-link-pill" onclick="generateMiniGraph(this, '<?php echo $comnamegraph; ?>')"><img src="images/chart.svg"> Stats</button>
+            </div>
+            <span class="mrd-conf <?php echo $conf_class; ?>"><?php echo $conf_pct; ?></span>
+          </div>
+          <div class='custom-audio-player' data-audio-src="<?php echo $filename; ?>" data-image-src="<?php echo $filename.".png";?>"></div>
+        </div>
+        <?php break;
       }
   }
   if($iterations == 0) {

@@ -67,39 +67,197 @@ if (get_included_files()[0] === __FILE__) {
 	echo '<!DOCTYPE html>
 <html lang="en">
 <head>
-
-<style>
-#attribution-dialog p {
-	display:inline;
-}
-#attribution-dialog {
-	text-align: left;
-}
-</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>';
 	}
 ?>
+<style>
+#attribution-dialog {
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+  max-width: 480px;
+  width: 90%;
+  overflow: hidden;
+  background: var(--bg-card, #fff);
+}
+#attribution-dialog::backdrop {
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+}
+.ebird-dialog-header {
+  background: linear-gradient(135deg, var(--accent, #6366f1) 0%, #818cf8 100%);
+  color: white;
+  padding: 20px 24px;
+  font-size: 1.2em;
+  font-weight: 700;
+  margin: 0;
+}
+.ebird-dialog-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ebird-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ebird-field label {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.ebird-field input,
+.ebird-field select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg-input, #fff);
+  color: var(--text-primary, #1e293b);
+  font-size: 0.95em;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ebird-field input:focus,
+.ebird-field select:focus {
+  border-color: var(--accent, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+.ebird-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ebird-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.ebird-btn-submit {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent, #6366f1);
+  color: white;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+.ebird-btn-submit:hover { background: #4f46e5; transform: translateY(-1px); }
+.ebird-btn-cancel {
+  padding: 12px 20px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+.ebird-btn-cancel:hover { background: var(--bg-hover, #f8fafc); }
+.ebird-success {
+  padding: 24px;
+  text-align: center;
+}
+.ebird-success h3 {
+  color: #166534;
+  font-size: 1.4em;
+  margin: 0 0 12px 0;
+}
+.ebird-success p {
+  color: var(--text-secondary, #64748b);
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+}
+.ebird-success .note {
+  font-size: 0.85em;
+  padding: 12px;
+  background: #fef9c3;
+  border-radius: 10px;
+  color: #854d0e;
+  margin-bottom: 16px;
+}
+.ebird-export-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent, #6366f1);
+  color: white;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(99,102,241,0.3);
+}
+.ebird-export-trigger:hover { background: #4f46e5; transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(99,102,241,0.4); }
+</style>
+
 <script src="static/dialog-polyfill.js"></script>
 <div class="history centered">
 
 <dialog id="attribution-dialog">
   <p style="display:none" id="filename"></p>
-  <h1 id="modalHeading">Enter Checklist Information</h1>
-  <p id="modalText">Location Name:</p> <input placeholder="My house" id="blocation"><br><br>
-  <p id="modalText">State (2 letter code):</p> <input maxlength="3" id="state"><br><br>
-  <p id="modalText">Country (2 letter code):</p> <input maxlength="2" id="country"><br><br>
-  <p id="modalText">Protocol:</p> <select id="protocol">
-  <option value="casual">casual</option>
-  <option value="stationary">stationary</option>
-  <option value="traveling">traveling</option>
-  <option value="area">area</option>
-</select>
-<br><br>
-  <p id="modalText">Number of observers:</p> <input type="number" id="num_observers"><br><br>
-  <p id="modalText">Distance traveled (miles):</p> <input type="number" id="dist_traveled"><br><br>
-  <p id="modalText">Notes:</p> <input id="notes"><br><br>
-  <button onclick="submitID()">Submit</button>
+  <div class="ebird-dialog-header">📋 eBird Checklist Export</div>
+  <div class="ebird-dialog-body">
+    <div class="ebird-field">
+      <label>Location Name</label>
+      <input placeholder="e.g. My backyard" id="blocation">
+    </div>
+    <div class="ebird-row">
+      <div class="ebird-field">
+        <label>State Code</label>
+        <input maxlength="3" placeholder="e.g. CA" id="state">
+      </div>
+      <div class="ebird-field">
+        <label>Country Code</label>
+        <input maxlength="2" placeholder="e.g. US" id="country">
+      </div>
+    </div>
+    <div class="ebird-row">
+      <div class="ebird-field">
+        <label>Protocol</label>
+        <select id="protocol">
+          <option value="casual">Casual</option>
+          <option value="stationary">Stationary</option>
+          <option value="traveling">Traveling</option>
+          <option value="area">Area</option>
+        </select>
+      </div>
+      <div class="ebird-field">
+        <label>Observers</label>
+        <input type="number" placeholder="1" id="num_observers">
+      </div>
+    </div>
+    <div class="ebird-field">
+      <label>Distance Traveled (miles)</label>
+      <input type="number" placeholder="0" id="dist_traveled">
+    </div>
+    <div class="ebird-field">
+      <label>Notes</label>
+      <input placeholder="Optional notes..." id="notes">
+    </div>
+    <div class="ebird-actions">
+      <button class="ebird-btn-cancel" onclick="closeDialog()">Cancel</button>
+      <button class="ebird-btn-submit" onclick="submitID()">Export Checklist</button>
+    </div>
+  </div>
 </dialog>
 <script>
 var dialog = document.querySelector('dialog');
@@ -124,14 +282,14 @@ function submitID() {
 
   window.open("history.php?blocation="+blocation+"&state="+state+"&country="+country+"&protocol="+protocol+"&num_observers="+num_observers+"&dist_traveled="+dist_traveled+"&notes="+notes+"&date="+"<?php echo $theDate; ?>");
 
-  document.getElementById('attribution-dialog').innerHTML = "<h3>Success!</h3><p>Your checklist will start downloading momentarily.<br><br>Refer to <a target='_blank' href='https://ebird.org/content/eBirdCommon/docs/ebird_import_data_process.pdf'>this guide</a> for information on how to import it in eBird. The checklist file format is: 'eBird Record Format (Extended)'.<br><br><span style='font-size:small'>Note: Only detections with a confidence > 0.75 were included, and entries have been limited to 1 detection per hour per species, to comply with eBird's data quality guidelines.<br>It's always good practice to manually verify your checklist before submitting, especially for nocturnal hours.</span></p><br><br><button onclick=\"closeDialog()\">Close</button>";
+  document.getElementById('attribution-dialog').innerHTML = "<div class='ebird-dialog-header'>✅ Export Complete</div><div class='ebird-success'><h3>Success!</h3><p>Your checklist will start downloading momentarily.</p><p>Refer to <a target='_blank' href='https://ebird.org/content/eBirdCommon/docs/ebird_import_data_process.pdf'>this guide</a> for information on how to import it in eBird.<br>The checklist file format is: 'eBird Record Format (Extended)'.</p><div class='note'>Only detections with confidence &gt; 75% were included. Entries are limited to 1 per hour per species to comply with eBird guidelines. Always verify your checklist before submitting.</div><button class='ebird-btn-submit' onclick='closeDialog()'>Close</button></div>";
 
 }
 
 </script>  
 
 <div style="text-align: center; margin: 20px 0;">
-    <button type="button" id="ebird-export-btn" class="btn-apply" onclick="showDialog()">Export as CSV for eBird</button>
+    <button type="button" class="ebird-export-trigger" onclick="showDialog()">📥 Export as CSV for eBird</button>
 </div>
 
 <?php
