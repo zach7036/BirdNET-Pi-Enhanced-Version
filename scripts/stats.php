@@ -173,7 +173,7 @@ if (get_included_files()[0] === __FILE__) {
       $main_name = strip_tags($split_val[0] ?: $values[$index]);
       $metric = strip_tags($split_val[1] ?: '');
   ?>
-  <a href="<?php echo htmlspecialchars($destination); ?>" class="species-card-s">
+  <a href="<?php echo htmlspecialchars($destination); ?>" target="_parent" class="species-card-s">
       <span class="species-card-s-name"><?php echo htmlspecialchars($main_name); ?></span>
       <?php if (!empty($metric)): ?>
       <span class="species-card-s-metric"><?php echo htmlspecialchars($metric); ?></span>
