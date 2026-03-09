@@ -554,7 +554,7 @@ if(!isset($_GET['species']) && !isset($_GET['filename'])){
 <?php } ?>
 <?php
   #By Date
-  if($view == "date") {
+  if($view == "bydate") {
     
     echo "<div class='date-grid'>";
     while($results=$result->fetchArray(SQLITE3_ASSOC)){
@@ -798,27 +798,26 @@ for ($row = 0; $row < $num_rows; $row++) {
             </div>
         </header>
 
-        <form action="views.php" method="GET" class="nav-cards-grid">
-            <input type="hidden" name="view" value="Recordings">
+        <div class="nav-cards-grid">
             
-            <button type="submit" name="byspecies" value="byspecies" class="nav-card">
+            <a href="views.php?view=Recordings&byspecies=byspecies" class="nav-card">
                 <div class="nav-card-icon">🦆</div>
                 <div class="nav-card-title">Browse by Species</div>
                 <div class="nav-card-desc">View an alphabetical grid of all identified birds to find specific recordings.</div>
-            </button>
+            </a>
             
-            <button type="submit" name="bydate" value="bydate" class="nav-card">
+            <a href="views.php?view=Recordings&bydate=bydate" class="nav-card">
                 <div class="nav-card-icon">📅</div>
                 <div class="nav-card-title">Browse by Date</div>
                 <div class="nav-card-desc">Scroll through an archive of detections organized historically by day.</div>
-            </button>
+            </a>
             
-            <button type="button" onclick="window.parent.location.href='views.php?view=Species+Stats'" class="nav-card">
+            <a href="views.php?view=Species+Stats" target="_parent" class="nav-card">
                 <div class="nav-card-icon">⭐</div>
                 <div class="nav-card-title">Best Recordings</div>
                 <div class="nav-card-desc">Listen to the absolute highest-confidence captures for each species.</div>
-            </button>
-        </form>
+            </a>
+        </div>
 
     </div>
     <?php
