@@ -565,7 +565,7 @@ if(!isset($_GET['species']) && !isset($_GET['filename'])){
       $date = $results['Date'];
       if(realpath($home."/BirdSongs/Extracted/By_Date/".$date) !== false){
         $is_today = ($date == date('Y-m-d'));
-        $display_text = $is_today ? "Today" : $date;
+        $display_text = $is_today ? "Today" : date('M. j, Y', strtotime($date));
         $card_class = $is_today ? "date-card today" : "date-card";
         
         echo "<a href=\"views.php?view=Recordings&date={$date}\" class=\"{$card_class}\">";
