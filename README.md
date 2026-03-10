@@ -103,6 +103,8 @@ Check out birds from around the world
 ## Installation
 **[Updated Comprehensive Installation Guide available here](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/wiki)**
 
+[Raspberry Pi 5 Setup: Getting Started Guide (Step By Step)](https://www.youtube.com/watch?v=ZH6vfvRstfM) *(Note: This is an excellent video tutorial that walks you through the exact process of flashing the OS and setting up your Raspberry Pi hardware for the first time.)*
+
 [Previous installation guide w/ pictures](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide) *(Note: The title of this older wiki guide states that it is deprecated and tells you to "use Nachtzuster's fork." Please be aware that this guide was written for the original creator (mcguirepr89), who predates both Nachtzuster and this Enhanced Version. **This Enhanced Version fork is NOT deprecated and you should absolutely still use it.** While the wiki guide itself is visually outdated and contains this warning, the pictures and initial OS installation process before you reach the web UI are still exactly the same and helpful as a visual reference. Just follow the steps, but make sure to choose **Bookworm** or **Trixie** when imaging your SD card, and use the `curl` command provided below instead of the one listed in the wiki.)*
 
 Please note that installing BirdNET-Pi on top of other existing servers is not supported. If this is something that you require, please open a discussion for your idea and inquire about how to contribute to development.
