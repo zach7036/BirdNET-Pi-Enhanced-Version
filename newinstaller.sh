@@ -44,7 +44,7 @@ if [[ ! -z $PACKAGES_MISSING ]] ; then
 fi
 
 branch=main
-git clone -b $branch --depth=1 https://github.com/zach7036/BirdNET-Pi-Modern-Version.git ${HOME}/BirdNET-Pi &&
+git clone -b $branch --depth=1 https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git ${HOME}/BirdNET-Pi &&
 
 $HOME/BirdNET-Pi/scripts/install_birdnet.sh
 if [ ${PIPESTATUS[0]} -eq 0 ];then

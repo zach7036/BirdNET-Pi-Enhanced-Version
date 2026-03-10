@@ -1,7 +1,7 @@
 <h1 align="center"><a href="https://github.com/mcguirepr89/BirdNET-Pi/blob/main/LICENSE">Review the license!!</a></h1>
 <h1 align="center">You may not use BirdNET-Pi to develop a commercial product!!!!</h1>
 <h1 align="center">
-  BirdNET-Pi: Modern Version
+  BirdNET-Pi: Enhanced Version
 </h1>
 <p align="center">
 A realtime acoustic bird classification system for the Raspberry Pi 5, 4B, 400, 3B+, and 0W2
@@ -10,7 +10,7 @@ A realtime acoustic bird classification system for the Raspberry Pi 5, 4B, 400, 
   <img src="https://user-images.githubusercontent.com/60325264/140656397-bf76bad4-f110-467c-897d-992ff0f96476.png" />
 </p>
 
-## About This Modern Version
+## About This Enhanced Version
 This repository is an enhanced, fully modernized version of BirdNET-Pi, built on top of the excellent backend foundations laid by [Nachtzuster](https://github.com/Nachtzuster/BirdNET-Pi) and the original creator [mcguirepr89](https://github.com/mcguirepr89/BirdNET-Pi). 
 
 This version introduces a complete overhaul of the user interface to bring the system inline with modern web design standards, along with highly requested functional improvements.
@@ -101,9 +101,9 @@ Check out birds from around the world
 * A USB Microphone or Sound Card
 
 ## Installation
-**[Updated Comprehensive Installation Guide available here](https://github.com/zach7036/BirdNET-Pi-Modern-Version/wiki)**
+**[Updated Comprehensive Installation Guide available here](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/wiki)**
 
-[Previous installation guide w/ pictures](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide) *(Note: The title of this older wiki guide states that it is deprecated and tells you to "use Nachtzuster's fork." Please be aware that this guide was written for the original creator (mcguirepr89), who predates both Nachtzuster and this Modern Version. **This Modern Version fork is NOT deprecated and you should absolutely still use it.** While the wiki guide itself is visually outdated and contains this warning, the pictures and initial OS installation process before you reach the web UI are still exactly the same and helpful as a visual reference. Just follow the steps, but make sure to choose **Bookworm** or **Trixie** when imaging your SD card, and use the `curl` command provided below instead of the one listed in the wiki.)*
+[Previous installation guide w/ pictures](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide) *(Note: The title of this older wiki guide states that it is deprecated and tells you to "use Nachtzuster's fork." Please be aware that this guide was written for the original creator (mcguirepr89), who predates both Nachtzuster and this Enhanced Version. **This Enhanced Version fork is NOT deprecated and you should absolutely still use it.** While the wiki guide itself is visually outdated and contains this warning, the pictures and initial OS installation process before you reach the web UI are still exactly the same and helpful as a visual reference. Just follow the steps, but make sure to choose **Bookworm** or **Trixie** when imaging your SD card, and use the `curl` command provided below instead of the one listed in the wiki.)*
 
 Please note that installing BirdNET-Pi on top of other existing servers is not supported. If this is something that you require, please open a discussion for your idea and inquire about how to contribute to development.
 
@@ -111,7 +111,7 @@ Please note that installing BirdNET-Pi on top of other existing servers is not s
 
 The system can be installed with a single command designed for a fresh OS installation:
 ```
-curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Modern-Version/main/newinstaller.sh | bash
+curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Enhanced-Version/main/newinstaller.sh | bash
 ```
 The installer takes care of any and all necessary updates, so you can run that as the very first command upon the first boot. The installation creates a log in `$HOME/installation-$(date "+%F").txt`.
 
@@ -119,7 +119,7 @@ The installer takes care of any and all necessary updates, so you can run that a
 If you are new to Raspberry Pi projects or feel overwhelmed by the installation process, don't worry! You can use [Claude AI](https://claude.ai) as your personal setup assistant. Just copy and paste the prompts below into Claude, and it will give you a customized, step-by-step walkthrough. If you run into any issues along the way, simply describe the problem to Claude for instant troubleshooting and guidance.
 
 First, paste this prompt into Claude:
-> Analyze this GitHub project. Give me a full and detailed breakdown and overview of all of it. https://github.com/zach7036/BirdNET-Pi-Modern-Version.git
+> Analyze this GitHub project. Give me a full and detailed breakdown and overview of all of it. https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git
 
 After Claude responds, paste this second prompt (be sure to replace the bracketed text with your own exact hardware):
 > Give me a detailed step by step guide on how to set everything up. I have a [Raspberry Pi 5] and the [MAONO USB Lavalier Microphone, 192KHZ/24BIT Plug & Play].
@@ -130,7 +130,7 @@ The BirdNET-Pi can be accessed from any web browser on the same network:
 - Default Basic Authentication Username: `birdnet`
 - Password is empty by default. Set this in "Tools" > "Settings" > "Advanced Settings"
 
-Please take a look at the [wiki](https://github.com/mcguirepr89/BirdNET-Pi/wiki) and our [discussions](https://github.com/zach7036/BirdNET-Pi-Modern-Version/discussions) for information on:
+Please take a look at the [wiki](https://github.com/mcguirepr89/BirdNET-Pi/wiki) and our [discussions](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) for information on:
 - [BirdNET-Pi's Deep Convolutional Neural Network(s)](https://github.com/mcguirepr89/BirdNET-Pi/wiki/BirdNET-Pi:-some-theory-on-classification-&-some-practical-hints)
 - [Making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi)
 - [Backing up and restoring your database](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Backup-and-Restore-the-Database)
@@ -179,17 +179,17 @@ Before switching, make sure your current installation is fully up-to-date and **
 If your OS is already correct, run these commands to migrate your existing installation to this modern repo:
 ```
 git remote remove origin
-git remote add origin https://github.com/zach7036/BirdNET-Pi-Modern-Version.git
+git remote add origin https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git
 ./scripts/update_birdnet.sh
 ```
 
 ## Troubleshooting and Ideas
 *Hint: A lot of weird problems can be solved by simply restarting the core services. Do this from the web interface "Tools" > "Services" > "Restart Core Services".*
 
-Having trouble or have an idea? Submit an [issue to the `zach7036/BirdNET-Pi-Modern-Version` tracker](https://github.com/zach7036/BirdNET-Pi-Modern-Version/issues) for trouble and a [discussion](https://github.com/zach7036/BirdNET-Pi-Modern-Version/discussions) for ideas. Please do *not* submit an issue as a discussion. Ensure you search the repo for your issue before creating a new one.
+Having trouble or have an idea? Submit an [issue to the `zach7036/BirdNET-Pi-Enhanced-Version` tracker](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues) for trouble and a [discussion](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) for ideas. Please do *not* submit an issue as a discussion. Ensure you search the repo for your issue before creating a new one.
 
 ## Sharing
-Please join a [Discussion](https://github.com/zach7036/BirdNET-Pi-Modern-Version/discussions) and consider joining [BirdWeather!](https://app.birdweather.com) If you find BirdNET-Pi has been worth your time, please consider [making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi).
+Please join a [Discussion](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) and consider joining [BirdWeather!](https://app.birdweather.com) If you find BirdNET-Pi has been worth your time, please consider [making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi).
 
 ## Cool Links
 - [Marie Lelouche's <i>Out of Spaces</i>](https://www.lestanneries.fr/exposition/marie-lelouche-out-of-spaces/) using BirdNET-Pi in post-sculpture VR! [Press Kit](https://github.com/mcguirepr89/BirdNET-Pi-assets/blob/main/dp_out_of_spaces_marie_lelouche_digital_05_01_22.pdf)

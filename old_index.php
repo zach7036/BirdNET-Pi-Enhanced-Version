@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
@@ -31,9 +31,9 @@ set_timezone();
 <div class="banner">
   <div class="logo" style="display: none;">
 <?php if(isset($_GET['logo'])) {
-echo "<a href=\"https://github.com/zach7036/BirdNET-Pi-Modern-Version.git\" target=\"_blank\"><img style=\"width:40px;height:40px;\" src=\"images/bird.png\"></a>";
+echo "<a href=\"https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git\" target=\"_blank\"><img style=\"width:40px;height:40px;\" src=\"images/bird.png\"></a>";
 } else {
-echo "<a href=\"https://github.com/zach7036/BirdNET-Pi-Modern-Version.git\" target=\"_blank\"><img style=\"width:40px;height:40px;\" src=\"images/bird.png\"></a>";
+echo "<a href=\"https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git\" target=\"_blank\"><img style=\"width:40px;height:40px;\" src=\"images/bird.png\"></a>";
 }?>
   </div>
 
