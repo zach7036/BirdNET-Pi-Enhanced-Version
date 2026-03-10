@@ -58,6 +58,13 @@ This version introduces a complete overhaul of the user interface to bring the s
 - Added strict JavaScript validation to ensure required fields (Protocol, Observers, Distance) are filled.
 - Engineered dynamic CSS **SVG Tooltips** (`ⓘ`) next to every field to actively guide the user on eBird's official formatting rules.
 
+## Screenshots
+![Overview Dashboard](docs/overview.png)
+
+![Analytics Dashboard - Top](docs/analytics_top.png)
+
+![Analytics Dashboard - Bottom](docs/analytics_bottom.png)
+
 ## Installation
 The system can be installed with a single command designed for a fresh OS installation:
 ```
