@@ -17,6 +17,14 @@ This version introduces a complete overhaul of the user interface to bring the s
 
 Note: see 'Migrating from previous forks' on how to migrate from Nachtzuster.
 
+If you're new to coding and/or this project feels overwhelming, simply copy these prompts into [Claude](https://claude.ai) and it will walk you through exactly what to do and how to do it. And if you have any questions or issues, simply ask Claude and it will be able to troubleshoot it for you and provide you the next steps on what to do.
+
+First, paste this prompt into Claude:
+> Analyze this GitHub project. Give me a full and detailed breakdown and overview of all of it. https://github.com/zach7036/BirdNET-Pi-Modern-Version.git
+
+After Claude responds, paste this second prompt (be sure to replace the bracketed text with your own exact hardware):
+> Give me a detailed step by step guide on how to set everything up. I have a [Raspberry Pi 5] and the [MAONO USB Lavalier Microphone, 192KHZ/24BIT Plug & Play].
+
 ## Introduction
 BirdNET-Pi is built on the [BirdNET framework](https://github.com/kahst/BirdNET-Analyzer) by [**@kahst**](https://github.com/kahst) <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/"><img src="https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg"></a> using [pre-built TFLite binaries](https://github.com/PINTO0309/TensorflowLite-bin) by [**@PINTO0309**](https://github.com/PINTO0309) . It is able to recognize bird sounds from a USB microphone or sound card in realtime and share its data with the rest of the world.
 
