@@ -83,19 +83,102 @@ Note: see 'Migrating from previous forks' on how to migrate from Nachtzuster.
 * A USB Microphone or Sound Card
 
 ## Installation
+[A comprehensive installation guide is available here](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide). *Note: This guide is slightly out-dated. Make sure to choose **Bookworm** or **Trixie** when imaging your SD card, and use the curl command below instead of the one in the wiki.*
+
+Please note that installing BirdNET-Pi on top of other existing servers is not supported. If this is something that you require, please open a discussion for your idea and inquire about how to contribute to development.
+
+[Raspberry Pi 3B[+] and 0W2 installation guide available here](https://github.com/mcguirepr89/BirdNET-Pi/wiki/RPi0W2-Installation-Guide)
+
 The system can be installed with a single command designed for a fresh OS installation:
 ```
 curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Modern-Version/main/newinstaller.sh | bash
 ```
-*Note: Make sure your SD Card is imaged with a 64-bit version of RaspiOS (Bookworm or Trixie).*
+The installer takes care of any and all necessary updates, so you can run that as the very first command upon the first boot. The installation creates a log in `$HOME/installation-$(date "+%F").txt`.
+
+## Access
+The BirdNET-Pi can be accessed from any web browser on the same network:
+- `http://birdnetpi.local` OR your Pi's IP address
+- Default Basic Authentication Username: `birdnet`
+- Password is empty by default. Set this in "Tools" > "Settings" > "Advanced Settings"
+
+Please take a look at the [wiki](https://github.com/mcguirepr89/BirdNET-Pi/wiki) and [discussions](https://github.com/mcguirepr89/BirdNET-Pi/discussions) for information on:
+- [BirdNET-Pi's Deep Convolutional Neural Network(s)](https://github.com/mcguirepr89/BirdNET-Pi/wiki/BirdNET-Pi:-some-theory-on-classification-&-some-practical-hints)
+- [Making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi)
+- [Backing up and restoring your database](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Backup-and-Restore-the-Database)
+- [Adjusting your sound card settings](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Adjusting-your-sound-card)
+- [Suggested USB microphones](https://github.com/mcguirepr89/BirdNET-Pi/discussions/39)
+- [Building your own microphone](https://github.com/DD4WH/SASS/wiki/Stereo--(Mono)-recording-low-noise-low-cost-system)
+- [Privacy concerns and options](https://github.com/mcguirepr89/BirdNET-Pi/discussions/166)
+
+## Updating 
+Use the web interface and go to **"Tools" > "System Controls" > "Update"**. If you encounter any issues with that, or suspect that the update did not work for some reason, please save its output and post it in an issue where we can help.
+
+## Backup and Restore
+Use the web interface and go to **"Tools" > "System Controls" > "Backup"** or **"Restore"**. Backup/Restore is primarily meant for migrating your data from one system to another. Since the time required to create or restore a backup depends on the size of the data set and the speed of the storage, this could take quite a while.
+
+Alternatively, the backup script can be used directly from the command line. These examples assume the backup medium is mounted on `/mnt`:
+To backup:
+```commandline
+./scripts/backup_data.sh -a backup -f /mnt/birds/backup-2024-07-09.tar
+```
+To restore:
+```commandline
+./scripts/backup_data.sh -a restore -f /mnt/birds/backup-2024-07-09.tar
+```
+
+## x86_64 support
+x86_64 support is mainly intended for developers or highly Linux-savvy users. Some brief pointers:
+- Use Debian 12 or 13.
+- The user needs passwordless `sudo`.
+
+For Proxmox, a user has reported adding this in their `cpu-models.conf` in order for the custom TFLite build to work:
+```
+cpu-model: BirdNet
+    flags +sse4.1
+    reported-model host
+```
+
+## Uninstallation
+The following command will completely uninstall the software and remove the BirdNET-Pi directory from your home folder, deleting all audio and database files in the process:
+```
+/usr/local/bin/uninstall.sh && cd ~ && rm -drf BirdNET-Pi
+```
 
 ## Migrating from previous forks
-If you already have a working installation from an older BirdNET-Pi fork and want to upgrade to this modern UI without losing your database and audio data:
+Before switching, make sure your current installation is fully up-to-date and **make sure to have a backup**. A backup is the only way to get back to the original fork if desired. Please note that upgrading your underlying OS in-place from Bullseye to Bookworm/Trixie is not going to work. If you are upgrading your OS, you need to start from a fresh install and copy back your data via the Restore tool.
+
+If your OS is already correct, run these commands to migrate your existing installation to this modern repo:
 ```
 git remote remove origin
 git remote add origin https://github.com/zach7036/BirdNET-Pi-Modern-Version.git
 ./scripts/update_birdnet.sh
 ```
+
+## Troubleshooting and Ideas
+*Hint: A lot of weird problems can be solved by simply restarting the core services. Do this from the web interface "Tools" > "Services" > "Restart Core Services".*
+
+Having trouble or have an idea? Submit an issue for trouble and a discussion for ideas. Please do *not* submit an issue as a discussion. Ensure you search the repo for your issue before creating a new one.
+
+## Sharing
+Please join a Discussion and consider joining [BirdWeather!](https://app.birdweather.com)
+If you find BirdNET-Pi has been worth your time, please share your setup, results, and customizations [HERE](https://github.com/mcguirepr89/BirdNET-Pi/discussions/69), and consider [making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi).
+
+## Homeassistant addon
+BirdNET-Pi can also be run as a [Homeassistant](https://www.home-assistant.io/) addon through Docker.
+For more information: https://github.com/alexbelgium/hassio-addons/blob/master/birdnet-pi/README.md
+
+## Docker
+BirdNET-Pi can also be run as a standalone Docker container.
+For more information: https://github.com/alexbelgium/hassio-addons/blob/master/birdnet-pi/README_standalone.md
+
+## Cool Links
+- [Marie Lelouche's <i>Out of Spaces</i>](https://www.lestanneries.fr/exposition/marie-lelouche-out-of-spaces/) using BirdNET-Pi in post-sculpture VR! [Press Kit](https://github.com/mcguirepr89/BirdNET-Pi-assets/blob/main/dp_out_of_spaces_marie_lelouche_digital_05_01_22.pdf)
+- [Research on noded BirdNET-Pi networks for farming](https://github.com/mcguirepr89/BirdNET-Pi-assets/blob/main/G23_Report_ModelBasedSysEngineering_FarmMarkBirdDetector_V1__Copy_.pdf)
+- [PixCams Build Guide](https://pixcams.com/building-a-birdnet-pi-real-time-acoustic-bird-id-station/)
+- [Core-Electronics Build Article](https://core-electronics.com.au/projects/bird-calls-raspberry-pi)
+- [RaspberryPi.com Blog Post](https://www.raspberrypi.com/news/classify-birds-acoustically-with-birdnet-pi/)
+- [MagPi Issue 119 Showcase Article](https://magpi.raspberrypi.com/issues/119/pdf)
+
 
 ## Features Deep Dive
 * **24/7 recording and automatic identification** of bird songs, chirps, and peeps using BirdNET machine learning
