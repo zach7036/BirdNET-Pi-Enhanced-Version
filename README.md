@@ -16,7 +16,7 @@ This repository is an enhanced, fully modernized version of BirdNET-Pi, built on
 This version introduces a complete overhaul of the user interface to bring the system inline with modern web design standards, along with highly requested functional improvements.
 
 Note: see 'Migrating from previous forks' on how to migrate from Nachtzuster.
-
+## New to Coding? Use Claude AI
 If you're new to coding and/or this project feels overwhelming, simply copy these prompts into [Claude](https://claude.ai) and it will walk you through exactly what to do and how to do it. And if you have any questions or issues, simply ask Claude and it will be able to troubleshoot it for you and provide you the next steps on what to do.
 
 First, paste this prompt into Claude:
