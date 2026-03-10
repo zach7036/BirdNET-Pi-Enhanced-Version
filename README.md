@@ -77,6 +77,11 @@ Note: see 'Migrating from previous forks' on how to migrate from Nachtzuster.
 
 ![Species Gallery](docs/species_gallery.png)
 
+## Requirements
+* A Raspberry Pi 5, Raspberry 4B, Raspberry Pi 400, Raspberry Pi 3B+, or Raspberry Pi 0W2 (The 3B+ and 0W2 must run on RaspiOS-ARM64-Lite)
+* An SD Card with the 64-bit version of RaspiOS installed (please use **Trixie**) -- Lite is recommended, but the installation works on RaspiOS-ARM64-Full as well. Downloads available within the Raspberry Pi Imager.
+* A USB Microphone or Sound Card
+
 ## Installation
 The system can be installed with a single command designed for a fresh OS installation:
 ```
