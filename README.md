@@ -15,12 +15,34 @@ This repository is an enhanced, fully modernized version of BirdNET-Pi, built on
 
 This version introduces a complete overhaul of the user interface to bring the system inline with modern web design standards, along with highly requested functional improvements.
 
-### Key Modernizations & Features:
-- **Beautiful, Modern UI:** A complete visual overhaul featuring responsive card-based layouts, sleek rounded corners, clean shadow effects, and a cohesive indigo/slate color palette.
-- **Enhanced Recording Views:** "Best Recordings", "Today's Detections", and "Species Detail" pages are now polished, easy-to-read grids.
-- **Upgraded eBird Export:** Generate perfectly formatted CSV checklists for eBird. Features include a new Date Picker, built-in interactive `ⓘ` help tooltips, automated data validation, and exact alignment with eBird's "Record Format (Extended)" requirements.
-- **Improved Charting:** Refined Daily and Seasonal charts with cleaner lines, adjusted opacities for a better visual hierarchy, and smoother interactions.
-- All the robust backend improvements from Nachtzuster's fork included: Bookworm support, faster TFLite 2.17.1, refined daemon scripts, and improved Backup & Restore.
+### Comprehensive List of Updates & New Features:
+
+**1. Complete UI & Theme Redesign**
+- Fully modernized visual aesthetic using a cohesive teal, slate, and off-white color palette.
+- Implementation of a CSS variable system for consistent styling and a beautiful dark mode.
+- Replaced outdated HTML tables with responsive, rounded, shadow-styled CSS "cards" across almost all views (Overview, Recordings, Species, Analytics).
+- Compacted header and grouped left-side navigation elements for a cleaner layout.
+
+**2. Dashboard & Layout Overhaul**
+- **KPI Cards:** Transformed the old overview statistics into sleek, responsive Key Performance Indicator (KPI) cards aligned smoothly at the top.
+- **Live Activity Feed:** Built a brand new, constantly updating "Live Activity" feed displaying recent detections with confidence badges, cleanly integrated into the right-side navigation column.
+- **Live Audio Player:** Redesigned the Live Audio player as a dynamic floating panel that pins to the top right and gracefully auto-retracts.
+
+**3. Advanced Analytics & Data Visualizations**
+- Replaced legacy graphs with fully interactive **Chart.js** instances, enabling zooming, panning, and responsive resizing without breaking aspect ratios.
+- **High-DPI Heatmaps:** Upgraded the 24-hour heatmap to render flawlessly on high-resolution Retina displays. Also fixed tooltip bounds and offset bugs for edge-case hovers.
+- **Weather Integration:** Integrated **Open-Meteo** hourly weather data to paint real-time temperature/conditions directly onto the Heatmap and Live Activity feed.
+
+**4. Enhanced Species & Media Galleries**
+- **Robust Image Fetching:** Completely overhauled how species thumbnails are fetched. Added fail-safes, session caching, and multi-source fallbacks (Wikipedia & Flickr API).
+- High-resolution 1024px thumbnails and proper scaling for crisp image rendering.
+- Modernized the "Best Recordings" and "Species Detail" views into responsive grid layouts highlighting audio/video players.
+
+**5. Upgraded eBird Integration**
+- Completely rebuilt the eBird Checklist Export utility.
+- Added a calendar **Date Picker** to allow historical checklist generation.
+- Added strict JavaScript validation to ensure required fields (Protocol, Observers, Distance) are filled.
+- Engineered dynamic CSS **SVG Tooltips** (`ⓘ`) next to every field to actively guide the user on eBird's official formatting rules.
 
 ## Installation
 The system can be installed with a single command designed for a fresh OS installation:
