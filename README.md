@@ -23,6 +23,20 @@ BirdNET-Pi is built on the [BirdNET framework](https://github.com/kahst/BirdNET-
 Check out birds from around the world
 - [BirdWeather](https://app.birdweather.com)<br>
 
+## Features Deep Dive
+* **24/7 recording and automatic identification** of bird songs, chirps, and peeps using BirdNET machine learning
+* **Automatic extraction and cataloguing** of bird clips from full-length recordings
+* **Tools to visualize your recorded bird data** and analyze trends
+* **Live audio stream and spectrogram**
+* **Automatic disk space management** that periodically purges old audio files
+* [BirdWeather](https://app.birdweather.com) integration
+* Web interface access to all data and logs provided by [Caddy](https://caddyserver.com)
+* SQLite3 Database, [Adminer](https://www.adminer.org/) database maintenance, and FTP server included
+* [Apprise Notifications](https://github.com/caronc/apprise) supporting 90+ notification platforms
+
+### Internationalization:
+The bird names are in English by default, but other localized versions are available thanks to the efforts of [@patlevin](https://github.com/patlevin). Use the web interface's "Tools" > "Settings" and select your "Database Language" to have detections translated natively.
+
 ## Comprehensive List of Updates & New Features:
 
 **1. Complete UI & Theme Redesign**
@@ -185,21 +199,6 @@ For more information: https://github.com/alexbelgium/hassio-addons/blob/master/b
 - [Core-Electronics Build Article](https://core-electronics.com.au/projects/bird-calls-raspberry-pi)
 - [RaspberryPi.com Blog Post](https://www.raspberrypi.com/news/classify-birds-acoustically-with-birdnet-pi/)
 - [MagPi Issue 119 Showcase Article](https://magpi.raspberrypi.com/issues/119/pdf)
-
-
-## Features Deep Dive
-* **24/7 recording and automatic identification** of bird songs, chirps, and peeps using BirdNET machine learning
-* **Automatic extraction and cataloguing** of bird clips from full-length recordings
-* **Tools to visualize your recorded bird data** and analyze trends
-* **Live audio stream and spectrogram**
-* **Automatic disk space management** that periodically purges old audio files
-* [BirdWeather](https://app.birdweather.com) integration
-* Web interface access to all data and logs provided by [Caddy](https://caddyserver.com)
-* SQLite3 Database, [Adminer](https://www.adminer.org/) database maintenance, and FTP server included
-* [Apprise Notifications](https://github.com/caronc/apprise) supporting 90+ notification platforms
-
-### Internationalization:
-The bird names are in English by default, but other localized versions are available thanks to the efforts of [@patlevin](https://github.com/patlevin). Use the web interface's "Tools" > "Settings" and select your "Database Language" to have detections translated natively.
 
 ---
 _Original BirdNET framework by [@kahst](https://github.com/kahst). Pre-built TFLite binaries by [@PINTO0309](https://github.com/PINTO0309)._
