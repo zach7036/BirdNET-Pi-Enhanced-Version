@@ -67,6 +67,14 @@ This version introduces a complete overhaul of the user interface to bring the s
 
 ![Analytics Dashboard - Bottom](docs/analytics_bottom.png)
 
+![Insights - Migration](docs/insights_migration.png)
+
+![Insights - Seasonal Presence](docs/insights_seasonality.png)
+
+![Insights - Weather](docs/insights_weather.png)
+
+![Species Gallery](docs/species_gallery.png)
+
 ## Installation
 The system can be installed with a single command designed for a fresh OS installation:
 ```
