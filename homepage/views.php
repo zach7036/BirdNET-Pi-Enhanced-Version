@@ -195,7 +195,7 @@ elseif ($config["LONGITUDE"] == "0.000") {
     <button type="submit" name="view" value="Spectrogram" form="views" onclick="document.getElementById('sidebar_subview').value='';">📊 <span>Spectrogram</span></button>
     <button type="submit" name="view" value="View Log" form="views" onclick="document.getElementById('sidebar_subview').value='';">📝 <span>Log</span></button>
     <button type="submit" name="view" value="Tools" form="views" onclick="document.getElementById('sidebar_subview').value='';">⚙️ <span>Tools</span><?php if(isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 50 && ($config['SILENCE_UPDATE_INDICATOR'] != 1)){ $updatediv = ' <div class="updatenumber">'.$_SESSION["behind"].'</div>'; } else { $updatediv = ""; } echo $updatediv; ?></button>
-    <button type="button" id="themeToggleBtn" onclick="toggleTheme()"><span id="theme-toggle-icon">🌗</span> <span>Theme</span></button>
+    <button type="button" id="themeToggleBtn" onclick="toggleTheme()"><span id="theme-toggle-icon">🌗</span> <span id="theme-toggle-text">Theme</span></button>
     <script>
       // Dropdown Toggle Logic
       document.addEventListener('DOMContentLoaded', function() {
@@ -203,11 +203,15 @@ elseif ($config["LONGITUDE"] == "0.000") {
         const toggle = dropdown.querySelector('.sidebar-dropdown-toggle');
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Initialize Theme Toggle Icon
+        // Initialize Theme Toggle Icon and Text
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const themeIcon = document.getElementById('theme-toggle-icon');
+        const themeText = document.getElementById('theme-toggle-text');
         if (themeIcon) {
           themeIcon.innerText = isDark ? '☀️' : '🌙';
+        }
+        if (themeText) {
+          themeText.innerText = isDark ? 'Light Mode' : 'Dark Mode';
         }
         
         // Toggle on click
@@ -235,10 +239,14 @@ elseif ($config["LONGITUDE"] == "0.000") {
         localStorage.setItem('birdnet-theme', newTheme);
         document.documentElement.setAttribute('data-theme', newTheme);
         
-        // Update icon
+        // Update icon and text
         const themeIcon = document.getElementById('theme-toggle-icon');
+        const themeText = document.getElementById('theme-toggle-text');
         if (themeIcon) {
           themeIcon.innerText = newTheme === 'dark' ? '☀️' : '🌙';
+        }
+        if (themeText) {
+          themeText.innerText = newTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
         }
         
         // If this page is inside top index.php iframe, update the parent as well
