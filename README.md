@@ -29,16 +29,30 @@ This version introduces a complete overhaul of the user interface to bring the s
 - **Live Audio Player:** Redesigned the Live Audio player as a dynamic floating panel that pins to the top right and gracefully auto-retracts.
 
 **3. Advanced Analytics & Data Visualizations**
-- Replaced legacy graphs with fully interactive **Chart.js** instances, enabling zooming, panning, and responsive resizing without breaking aspect ratios.
-- **High-DPI Heatmaps:** Upgraded the 24-hour heatmap to render flawlessly on high-resolution Retina displays. Also fixed tooltip bounds and offset bugs for edge-case hovers.
+- **Comprehensive Analytics Dashboard (Chart.js):** Replaced legacy graphs with fully interactive Chart.js instances (zoom, pan, responsive resize). Specific tools include:
+  - **Top 10 Species:** Horizontal bar ranking of most frequent visitors.
+  - **Detections by Time of Day:** Bar chart showing aggregate hourly activity levels.
+  - **Detection Trends:** Line chart plotting overall daily volume.
+  - **Species Detection Trends:** Stacked interactive area chart comparing daily volumes between uniquely selected species over time.
+  - **Species Diversity Over Time:** Line chart mapping the number of unique species detected per day.
+  - **Detection Patterns by Time of Day:** Multi-line chart overlapping hourly activity patterns for specific selected species.
+
+**4. All-New Deep Insights Pages**
+- Built an entirely new "Insights" suite that analyzes your raw SQLite data to generate behavioral conclusions:
+  - **Dashboard:** Generates a dynamic "Yard Health Score" based on volume, stability, and rarity. Highlights Lifetime Milestones and categorizes "Rare Visitors" (<5 detections).
+  - **Behavior Analysis:** Automatically calculates your local "Dawn Chorus" participants, identifies "Nocturnal Species", and plots the earliest/latest active windows for your birds.
+  - **Migration & Seasonality:** Tracks "New Arrivals" (species seen for the first time in 14 days), notes who has "Gone Quiet", and visualizes "Seasonal Presence" matching actual detections against eBird expected frequencies.
+
+**5. Enhanced Heatmap & Weather Integration**
+- **High-DPI Heatmaps:** Upgraded the 24-hour heatmap to render flawlessly on high-resolution Retina displays. 
 - **Weather Integration:** Integrated **Open-Meteo** hourly weather data to paint real-time temperature/conditions directly onto the Heatmap and Live Activity feed.
 
-**4. Enhanced Species & Media Galleries**
+**6. Enhanced Species & Media Galleries**
 - **Robust Image Fetching:** Completely overhauled how species thumbnails are fetched. Added fail-safes, session caching, and multi-source fallbacks (Wikipedia & Flickr API).
 - High-resolution 1024px thumbnails and proper scaling for crisp image rendering.
 - Modernized the "Best Recordings" and "Species Detail" views into responsive grid layouts highlighting audio/video players.
 
-**5. Upgraded eBird Integration**
+**7. Upgraded eBird Integration**
 - Completely rebuilt the eBird Checklist Export utility.
 - Added a calendar **Date Picker** to allow historical checklist generation.
 - Added strict JavaScript validation to ensure required fields (Protocol, Observers, Distance) are filled.
