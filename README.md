@@ -102,13 +102,13 @@ Check out birds from around the world
 * A USB Microphone or Sound Card
 
 ## Installation
-[A comprehensive installation guide is available here](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide).
+**[Updated Comprehensive Installation Guide available here](https://github.com/zach7036/BirdNET-Pi-Modern-Version/wiki/Installation-Guide)**
 
-*Note: The title of this wiki guide states that it is deprecated and tells you to "use Nachtzuster's fork." Please be aware that this guide was written for the original creator (mcguirepr89), who predates both Nachtzuster and this Modern Version. **This Modern Version fork is NOT deprecated and you should absolutely still use it.** While the wiki guide itself is visually outdated and contains this warning, the initial OS installation process before you reach the web UI is still exactly the same. Just follow the steps, but make sure to choose **Bookworm** or **Trixie** when imaging your SD card, and use the `curl` command provided below instead of the one listed in the wiki.*
+[Previous installation guide w/ pictures](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide) *(Note: The title of this older wiki guide states that it is deprecated; however, this Modern Version fork is actively maintained and **NOT deprecated**. The pictures and setup steps in that previous guide are still helpful as a visual reference, but please make sure to choose **Bookworm** or **Trixie** when imaging your SD card and use the `curl` command provided below instead of the one listed in the visual guide.)*
 
 Please note that installing BirdNET-Pi on top of other existing servers is not supported. If this is something that you require, please open a discussion for your idea and inquire about how to contribute to development.
 
-[Raspberry Pi 3B[+] and 0W2 installation guide available here](https://github.com/mcguirepr89/BirdNET-Pi/wiki/RPi0W2-Installation-Guide)
+[Raspberry Pi 3B[+] and 0W2 legacy installation guide available here](https://github.com/mcguirepr89/BirdNET-Pi/wiki/RPi0W2-Installation-Guide)
 
 The system can be installed with a single command designed for a fresh OS installation:
 ```
