@@ -59,6 +59,8 @@ This version introduces a complete overhaul of the user interface to bring the s
 - Engineered dynamic CSS **SVG Tooltips** (`ⓘ`) next to every field to actively guide the user on eBird's official formatting rules.
 
 ## Screenshots
+![Analytics Dashboard - Heatmap](docs/analytics_heatmap.png)
+
 ![Overview Dashboard](docs/overview.png)
 
 ![Analytics Dashboard - Top](docs/analytics_top.png)
