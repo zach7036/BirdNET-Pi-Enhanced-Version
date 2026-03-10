@@ -168,8 +168,7 @@ git remote add origin https://github.com/zach7036/BirdNET-Pi-Modern-Version.git
 Having trouble or have an idea? Submit an issue for trouble and a discussion for ideas. Please do *not* submit an issue as a discussion. Ensure you search the repo for your issue before creating a new one.
 
 ## Sharing
-Please join a Discussion and consider joining [BirdWeather!](https://app.birdweather.com)
-If you find BirdNET-Pi has been worth your time, please share your setup, results, and customizations [HERE](https://github.com/mcguirepr89/BirdNET-Pi/discussions/69), and consider [making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi).
+Please join a Discussion and consider joining [BirdWeather!](https://app.birdweather.com) If you find BirdNET-Pi has been worth your time, please consider [making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi).
 
 ## Homeassistant addon
 BirdNET-Pi can also be run as a [Homeassistant](https://www.home-assistant.io/) addon through Docker.
