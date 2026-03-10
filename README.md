@@ -115,7 +115,7 @@ curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Modern-Version/mai
 ```
 The installer takes care of any and all necessary updates, so you can run that as the very first command upon the first boot. The installation creates a log in `$HOME/installation-$(date "+%F").txt`.
 
-## New to Coding? Use Claude AI
+## Need help setting up this project? Use Claude AI
 If you're new to coding and/or this project feels overwhelming, simply copy these prompts into [Claude](https://claude.ai) and it will walk you through exactly what to do and how to do it. And if you have any questions or issues, simply ask Claude and it will be able to troubleshoot it for you and provide you the next steps on what to do.
 
 First, paste this prompt into Claude:
