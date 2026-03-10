@@ -34,8 +34,7 @@ Check out birds from around the world
 * SQLite3 Database, [Adminer](https://www.adminer.org/) database maintenance, and FTP server included
 * [Apprise Notifications](https://github.com/caronc/apprise) supporting 90+ notification platforms
 
-### Internationalization:
-The bird names are in English by default, but other localized versions are available thanks to the efforts of [@patlevin](https://github.com/patlevin). Use the web interface's "Tools" > "Settings" and select your "Database Language" to have detections translated natively.
+
 
 ## Comprehensive List of Updates & New Features:
 
@@ -199,6 +198,9 @@ For more information: https://github.com/alexbelgium/hassio-addons/blob/master/b
 - [Core-Electronics Build Article](https://core-electronics.com.au/projects/bird-calls-raspberry-pi)
 - [RaspberryPi.com Blog Post](https://www.raspberrypi.com/news/classify-birds-acoustically-with-birdnet-pi/)
 - [MagPi Issue 119 Showcase Article](https://magpi.raspberrypi.com/issues/119/pdf)
+
+### Internationalization:
+The bird names are in English by default, but other localized versions are available thanks to the efforts of [@patlevin](https://github.com/patlevin). Use the web interface's "Tools" > "Settings" and select your "Database Language" to have detections translated natively.
 
 ---
 _Original BirdNET framework by [@kahst](https://github.com/kahst). Pre-built TFLite binaries by [@PINTO0309](https://github.com/PINTO0309)._
