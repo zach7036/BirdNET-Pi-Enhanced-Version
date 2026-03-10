@@ -116,7 +116,7 @@ curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Modern-Version/mai
 The installer takes care of any and all necessary updates, so you can run that as the very first command upon the first boot. The installation creates a log in `$HOME/installation-$(date "+%F").txt`.
 
 ## Need help setting up this project? Use Claude AI
-If you're new to coding and/or this project feels overwhelming, simply copy these prompts into [Claude](https://claude.ai) and it will walk you through exactly what to do and how to do it. And if you have any questions or issues, simply ask Claude and it will be able to troubleshoot it for you and provide you the next steps on what to do.
+If you are new to Raspberry Pi projects or feel overwhelmed by the installation process, don't worry! You can use [Claude AI](https://claude.ai) as your personal setup assistant. Just copy and paste the prompts below into Claude, and it will give you a customized, step-by-step walkthrough. If you run into any issues along the way, simply describe the problem to Claude for instant troubleshooting and guidance.
 
 First, paste this prompt into Claude:
 > Analyze this GitHub project. Give me a full and detailed breakdown and overview of all of it. https://github.com/zach7036/BirdNET-Pi-Modern-Version.git
