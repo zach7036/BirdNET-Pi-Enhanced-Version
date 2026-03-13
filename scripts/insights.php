@@ -217,8 +217,7 @@ if ($subview == 'environmental') {
             'Calm (0-5)' => ['emoji' => '🍃', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
             'Breezy (6-15)' => ['emoji' => '🌬️', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
             'Windy (16-25)' => ['emoji' => '💨', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
-            'Very Windy (26-35)' => ['emoji' => '🌪️', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
-            'Gale Force (36+)' => ['emoji' => '🚩', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []]
+            'Very Windy (26-35+)' => ['emoji' => '🌪️', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []]
         ];
 
         // 1. Bracket totals
@@ -227,8 +226,7 @@ if ($subview == 'environmental') {
                 WHEN w.WindSpeed <= 5 THEN 'Calm (0-5)'
                 WHEN w.WindSpeed <= 15 THEN 'Breezy (6-15)'
                 WHEN w.WindSpeed <= 25 THEN 'Windy (16-25)'
-                WHEN w.WindSpeed <= 35 THEN 'Very Windy (26-35)'
-                ELSE 'Gale Force (36+)'
+                ELSE 'Very Windy (26-35+)'
             END as bracket,
             COUNT(*) as det_count, 
             COUNT(DISTINCT d.Sci_Name) as species_count 
@@ -253,8 +251,7 @@ if ($subview == 'environmental') {
                 WHEN w.WindSpeed <= 5 THEN 'Calm (0-5)'
                 WHEN w.WindSpeed <= 15 THEN 'Breezy (6-15)'
                 WHEN w.WindSpeed <= 25 THEN 'Windy (16-25)'
-                WHEN w.WindSpeed <= 35 THEN 'Very Windy (26-35)'
-                ELSE 'Gale Force (36+)'
+                ELSE 'Very Windy (26-35+)'
             END as bracket,
             CASE 
                 WHEN w.WindDirection >= 337.5 OR w.WindDirection < 22.5 THEN 'N'
