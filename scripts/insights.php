@@ -1134,7 +1134,7 @@ $db->close();
 
         <!-- Unified Wind Trends -->
         <section class="insights-section" style="grid-column: 1 / -1; margin-top: 10px;">
-            <div class="insights-section-title">🌬️ Detections by Wind Speed & Direction <span class="info-btn">ⓘ<span class="info-tooltip">A combined view of how wind intensity and direction affect bird activity at your location.</span></span></div>
+            <div class="insights-section-title">🌬️ Detections by Wind Speed & Direction <span class="info-btn">ⓘ<span class="info-tooltip">Correlates bird detections with wind intensity and direction. Rows show wind speed ranges from Calm to Gale Force. The middle columns break down detections by cardinal direction (N, NE, etc.), and the right column shows total detection counts for that speed category. This identifies how wind patterns and direction influence local bird activity.</span></span></div>
             <div class="insights-stats-list" style="padding: 15px 25px;">
                 <?php foreach($wind_impact as $bracket => $w): ?>
                 <div class="insights-stats-item" style="display: flex; flex-direction: row; align-items: stretch; justify-content: space-between; gap: 0; padding: 16px 20px; margin-bottom: 8px;">
