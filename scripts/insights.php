@@ -1139,7 +1139,7 @@ $db->close();
                 <?php foreach($wind_impact as $bracket => $w): ?>
                 <div class="insights-stats-item" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 20px; margin-bottom: 8px;">
                     <!-- Speed & Species Mix -->
-                    <div style="flex: 0 0 180px;">
+                    <div style="flex: 0 0 180px; padding-right: 20px; border-right: 1px solid var(--border-light);">
                         <div class="insights-stats-name" style="font-size: 1.1em; margin-bottom: 2px;"><?php echo $w['emoji']; ?> <?php echo $bracket; ?> mph</div>
                         <div style="font-size: 0.8em; color: var(--text-muted);">
                             <?php echo $w['det_count'] > 0 ? $w['species_count'] . ' species active' : 'No species recorded'; ?>
@@ -1147,7 +1147,7 @@ $db->close();
                     </div>
                     
                     <!-- Cardinal Mini-Grid (Center) -->
-                    <div style="flex: 1; display: flex; justify-content: center;">
+                    <div style="flex: 1; display: flex; justify-content: center; padding: 0 20px; border-right: 1px solid var(--border-light);">
                         <?php if(!empty($w['cardinals'])): ?>
                         <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
                             <?php foreach($w['cardinals'] as $dir): ?>
@@ -1167,7 +1167,7 @@ $db->close();
                     </div>
 
                     <!-- Total Detections (Right) -->
-                    <div style="flex: 0 0 100px; text-align: right;">
+                    <div style="flex: 0 0 100px; text-align: right; padding-left: 20px;">
                         <span class="insights-stats-count" style="font-size: 1.4em;"><?php echo $w['det_count'] > 0 ? number_format($w['det_count']) : 'N/A'; ?></span>
                     </div>
                 </div>
