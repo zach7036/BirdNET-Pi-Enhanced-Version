@@ -212,15 +212,16 @@ if ($subview == 'environmental') {
         }
         $condition_impact = $master_conditions;
 
-        // --- Wind Speed Impact ---
-        $master_wind = [
-            'Calm (0-5)' => ['emoji' => '🍃', 'det_count' => 0, 'species_count' => 0],
-            'Breezy (6-15)' => ['emoji' => '🌬️', 'det_count' => 0, 'species_count' => 0],
-            'Windy (16-25)' => ['emoji' => '💨', 'det_count' => 0, 'species_count' => 0],
-            'Very Windy (26-35)' => ['emoji' => '🌪️', 'det_count' => 0, 'species_count' => 0],
-            'Gale Force (36+)' => ['emoji' => '🚩', 'det_count' => 0, 'species_count' => 0]
+        // --- Unified Wind Analytics (Speed + Direction) ---
+        $unified_wind = [
+            'Calm (0-5)' => ['emoji' => '🍃', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
+            'Breezy (6-15)' => ['emoji' => '🌬️', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
+            'Windy (16-25)' => ['emoji' => '💨', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
+            'Very Windy (26-35)' => ['emoji' => '🌪️', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []],
+            'Gale Force (36+)' => ['emoji' => '🚩', 'det_count' => 0, 'species_count' => 0, 'cardinals' => []]
         ];
 
+        // 1. Bracket totals
         $wind_res = $db->query("SELECT 
             CASE 
                 WHEN w.WindSpeed <= 5 THEN 'Calm (0-5)'
@@ -239,27 +240,22 @@ if ($subview == 'environmental') {
         if ($wind_res) {
             while($row = $wind_res->fetchArray(SQLITE3_ASSOC)) {
                 $b = $row['bracket'];
-                if (isset($master_wind[$b])) {
-                    $master_wind[$b]['det_count'] = $row['det_count'];
-                    $master_wind[$b]['species_count'] = $row['species_count'];
+                if (isset($unified_wind[$b])) {
+                    $unified_wind[$b]['det_count'] = $row['det_count'];
+                    $unified_wind[$b]['species_count'] = $row['species_count'];
                 }
             }
         }
-        $wind_impact = $master_wind;
 
-        // --- Wind Direction Trends ---
-        $master_direction = [
-            'N' => ['emoji' => '⬆️', 'det_count' => 0, 'species_count' => 0],
-            'NE' => ['emoji' => '↗️', 'det_count' => 0, 'species_count' => 0],
-            'E' => ['emoji' => '➡️', 'det_count' => 0, 'species_count' => 0],
-            'SE' => ['emoji' => '↘️', 'det_count' => 0, 'species_count' => 0],
-            'S' => ['emoji' => '⬇️', 'det_count' => 0, 'species_count' => 0],
-            'SW' => ['emoji' => '↙️', 'det_count' => 0, 'species_count' => 0],
-            'W' => ['emoji' => '⬅️', 'det_count' => 0, 'species_count' => 0],
-            'NW' => ['emoji' => '↖️', 'det_count' => 0, 'species_count' => 0]
-        ];
-
-        $dir_res = $db->query("SELECT 
+        // 2. Cardinal breakdown per bracket
+        $nest_res = $db->query("SELECT 
+            CASE 
+                WHEN w.WindSpeed <= 5 THEN 'Calm (0-5)'
+                WHEN w.WindSpeed <= 15 THEN 'Breezy (6-15)'
+                WHEN w.WindSpeed <= 25 THEN 'Windy (16-25)'
+                WHEN w.WindSpeed <= 35 THEN 'Very Windy (26-35)'
+                ELSE 'Gale Force (36+)'
+            END as bracket,
             CASE 
                 WHEN w.WindDirection >= 337.5 OR w.WindDirection < 22.5 THEN 'N'
                 WHEN w.WindDirection < 67.5 THEN 'NE'
@@ -270,23 +266,26 @@ if ($subview == 'environmental') {
                 WHEN w.WindDirection < 292.5 THEN 'W'
                 ELSE 'NW'
             END as cardinal,
-            COUNT(*) as det_count, 
-            COUNT(DISTINCT d.Sci_Name) as species_count 
+            COUNT(*) as det_count
             FROM detections d 
             INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour 
-            WHERE w.WindDirection IS NOT NULL
-            GROUP BY cardinal");
+            WHERE w.WindSpeed IS NOT NULL AND w.WindDirection IS NOT NULL
+            GROUP BY bracket, cardinal");
 
-        if ($dir_res) {
-            while($row = $dir_res->fetchArray(SQLITE3_ASSOC)) {
-                $c = $row['cardinal'];
-                if (isset($master_direction[$c])) {
-                    $master_direction[$c]['det_count'] = $row['det_count'];
-                    $master_direction[$c]['species_count'] = $row['species_count'];
+        if ($nest_res) {
+            $cardinal_emojis = ['N'=>'⬆️','NE'=>'↗️','E'=>'➡️','SE'=>'↘️','S'=>'⬇️','SW'=>'↙️','W'=>'⬅️','NW'=>'↖️'];
+            while($row = $nest_res->fetchArray(SQLITE3_ASSOC)) {
+                $b = $row['bracket'];
+                if (isset($unified_wind[$b])) {
+                    $unified_wind[$b]['cardinals'][] = [
+                        'label' => $row['cardinal'],
+                        'emoji' => $cardinal_emojis[$row['cardinal']],
+                        'count' => $row['det_count']
+                    ];
                 }
             }
         }
-        $direction_impact = $master_direction;
+        $wind_impact = $unified_wind;
         $ideal_res = $db->query("SELECT d.Com_Name, ROUND(AVG(w.Temp), 1) as avg_temp, ROUND(MIN(w.Temp), 1) as min_temp, ROUND(MAX(w.Temp), 1) as max_temp, COUNT(*) as cnt FROM detections d INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour GROUP BY d.Sci_Name HAVING cnt >= 5 ORDER BY cnt DESC");
         while($row = $ideal_res->fetchArray(SQLITE3_ASSOC)) { $species_ideal[] = $row; }
         $trend_res = $db->query("SELECT d.Date, COUNT(*) as det_count, ROUND(AVG(w.Temp), 1) as avg_temp FROM detections d LEFT JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour WHERE d.Date >= '$one_month_ago' GROUP BY d.Date ORDER BY d.Date ASC");
@@ -1133,37 +1132,32 @@ $db->close();
             </div>
         </section>
 
-        <!-- Wind Speed Impact -->
-        <section class="insights-section">
-            <div class="insights-section-title">💨 Detections by Wind Speed <span class="info-btn">ⓘ<span class="info-tooltip">Correlating activity with wind intensity to see if gusty conditions suppress detections.</span></span></div>
-            <div class="insights-stats-list">
+        <!-- Unified Wind Trends -->
+        <section class="insights-section" style="grid-column: 1 / -1; margin-top: 10px;">
+            <div class="insights-section-title">🌬️ Detections by Wind Speed & Direction <span class="info-btn">ⓘ<span class="info-tooltip">A combined view of how wind intensity and direction affect bird activity at your location.</span></span></div>
+            <div class="insights-stats-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                 <?php foreach($wind_impact as $bracket => $w): ?>
-                <div class="insights-stats-item">
-                    <div>
-                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $w['emoji']; ?> <?php echo $bracket; ?> mph</div>
-                        <div style="font-size: 0.8em; color: var(--text-muted);">
-                            <?php echo $w['det_count'] > 0 ? $w['species_count'] . ' species active' : 'No species recorded'; ?>
+                <div class="insights-stats-item" style="flex-direction: column; align-items: stretch; gap: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 10px; margin-bottom: 5px;">
+                        <div>
+                            <div class="insights-stats-name" style="font-size: 1.1em;"><?php echo $w['emoji']; ?> <?php echo $bracket; ?> mph</div>
+                            <div style="font-size: 0.8em; color: var(--text-muted);">
+                                <?php echo $w['det_count'] > 0 ? $w['species_count'] . ' species active' : 'No species recorded'; ?>
+                            </div>
                         </div>
+                        <span class="insights-stats-count" style="font-size: 1.3em;"><?php echo $w['det_count'] > 0 ? number_format($w['det_count']) : 'N/A'; ?></span>
                     </div>
-                    <span class="insights-stats-count"><?php echo $w['det_count'] > 0 ? number_format($w['det_count']) : 'N/A'; ?></span>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </section>
-
-        <!-- Wind Direction Impact -->
-        <section class="insights-section">
-            <div class="insights-section-title">🧭 Detections by Wind Direction <span class="info-btn">ⓘ<span class="info-tooltip">Identifying which wind directions are most productive for detections at your location.</span></span></div>
-            <div class="insights-stats-list">
-                <?php foreach($direction_impact as $cardinal => $d): ?>
-                <div class="insights-stats-item">
-                    <div>
-                        <div class="insights-stats-name" style="margin-bottom: 2px;"><?php echo $d['emoji']; ?> Wind from the <?php echo $cardinal; ?></div>
-                        <div style="font-size: 0.8em; color: var(--text-muted);">
-                            <?php echo $d['det_count'] > 0 ? $d['species_count'] . ' species active' : 'No species recorded'; ?>
+                    
+                    <?php if(!empty($w['cardinals'])): ?>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <?php foreach($w['cardinals'] as $dir): ?>
+                        <div style="background: var(--bg-card); padding: 6px 4px; border-radius: 8px; border: 1px solid var(--border-light); text-align: center; font-size: 0.75em; display: flex; flex-direction: column; align-items: center;">
+                            <span style="color: var(--text-muted); font-weight: 700;"><?php echo $dir['emoji']; ?> <?php echo $dir['label']; ?></span>
+                            <span style="color: var(--accent); font-weight: 800;"><?php echo number_format($dir['count']); ?></span>
                         </div>
+                        <?php endforeach; ?>
                     </div>
-                    <span class="insights-stats-count"><?php echo $d['det_count'] > 0 ? number_format($d['det_count']) : 'N/A'; ?></span>
+                    <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
             </div>
