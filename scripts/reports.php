@@ -10,19 +10,8 @@ $date_raw = isset($_GET['date']) ? $_GET['date'] : 'today';
 
 // --- Date Range Calculation ---
 if (!isset($_GET['date'])) {
-    // Default to LAST completed period
-    switch ($type) {
-        case 'yearly':
-            $current_time = strtotime("-1 year");
-            break;
-        case 'monthly':
-            $current_time = strtotime("-1 month");
-            break;
-        case 'weekly':
-        default:
-            $current_time = strtotime("-1 week"); 
-            break;
-    }
+    // Default to CURRENT period
+    $current_time = time();
 } else {
     $current_time = strtotime($_GET['date']);
 }
