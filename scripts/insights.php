@@ -312,7 +312,7 @@ if ($subview == 'health') {
     $exp_res = $db->query("SELECT Com_Name, Sci_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present FROM detections WHERE strftime('%j', Date) BETWEEN strftime('%j', 'now', '-3 days') AND strftime('%j', 'now', '+3 days') AND strftime('%Y', Date) < strftime('%Y', 'now') GROUP BY Sci_Name ORDER BY years_present DESC");
     while($row = $exp_res->fetchArray(SQLITE3_ASSOC)) { $expected_today[] = $row; }
     $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC");
-    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $peak_species[] = $row; }
+    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week, COUNT(*) as cnt FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY cnt DESC LIMIT 1", true); $row['peak_week'] = $pw ? $pw['week'] : '??'; $row['peak_count'] = $pw ? $pw['cnt'] : 0; $peak_species[] = $row; }
 }
 
 if ($subview == 'forecasting') {
@@ -338,7 +338,7 @@ if ($subview == 'forecasting') {
     while($row = $exp_res->fetchArray(SQLITE3_ASSOC)) { $expected_today[] = $row; }
     
     $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC");
-    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $peak_species[] = $row; }
+    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week, COUNT(*) as cnt FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY cnt DESC LIMIT 1", true); $row['peak_week'] = $pw ? $pw['week'] : '??'; $row['peak_count'] = $pw ? $pw['cnt'] : 0; $peak_species[] = $row; }
 }
 
 $db->close();
@@ -1402,7 +1402,7 @@ $db->close();
                 <div class="insights-stats-item <?php echo $rank_pw > 10 ? 'hidden-item' : ''; ?>">
                     <div>
                         <div class="insights-stats-name"><?php echo $s['Com_Name']; ?></div>
-                        <div style="font-size: 0.8em; color: var(--text-muted);">Current week: <?php echo $current_week; ?></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo number_format($s['peak_count']); ?> detections</div>
                     </div>
                     <?php
                         $is_peak = ($s['peak_week'] == $current_week);
