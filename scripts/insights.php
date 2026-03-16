@@ -1402,7 +1402,7 @@ $db->close();
                 <div class="insights-stats-item <?php echo $rank_pw > 10 ? 'hidden-item' : ''; ?>">
                     <div>
                         <div class="insights-stats-name"><?php echo $s['Com_Name']; ?></div>
-                        <div style="font-size: 0.8em; color: var(--text-muted);"><?php echo number_format($s['peak_count']); ?> detections</div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Total Week <?php echo $s['peak_week']; ?> Detections: <?php echo number_format($s['peak_count']); ?></div>
                     </div>
                     <?php
                         $is_peak = ($s['peak_week'] == $current_week);
