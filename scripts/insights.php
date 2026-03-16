@@ -17,7 +17,7 @@ $nocturnal = []; $activity_windows = []; $new_arrivals = []; $gone_quiet = []; $
 $monthly_stats = []; $month_labels = '[]'; $month_div = '[]'; $month_det = '[]'; $shannon_index = 0; $diversity_score_text = 'N/A'; $yoy_diversity_diff = 0;
 $temp_brackets = []; $condition_impact = []; $species_ideal = []; $temp_trend_labels = '[]'; $temp_trend_temps = '[]'; $temp_trend_dets = '[]'; $has_weather = false;
 $confidence_trend = []; $conf_labels_json = '[]'; $conf_values_json = '[]'; $overall_avg_conf = 0; $phantom_species = []; $burst_days = []; $silent_days = [];
-$high_conf_count = 0; $med_conf_count = 0; $low_conf_count = 0; $expected_today = []; $top_5_species = []; $current_week = date('W');
+$high_conf_count = 0; $med_conf_count = 0; $low_conf_count = 0; $expected_today = []; $peak_species = []; $current_week = date('W');
 
 $one_month_ago = date('Y-m-d', strtotime('-30 days'));
 $two_weeks_ago = date('Y-m-d', strtotime('-14 days'));
@@ -311,8 +311,8 @@ if ($subview == 'health') {
     $low_conf_count = $db->querySingle("SELECT COUNT(*) FROM detections WHERE Confidence < 0.5") ?: 0;
     $exp_res = $db->query("SELECT Com_Name, Sci_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present FROM detections WHERE strftime('%j', Date) BETWEEN strftime('%j', 'now', '-3 days') AND strftime('%j', 'now', '+3 days') AND strftime('%Y', Date) < strftime('%Y', 'now') GROUP BY Sci_Name ORDER BY years_present DESC");
     while($row = $exp_res->fetchArray(SQLITE3_ASSOC)) { $expected_today[] = $row; }
-    $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC LIMIT 5");
-    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $top_5_species[] = $row; }
+    $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC");
+    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $peak_species[] = $row; }
 }
 
 if ($subview == 'forecasting') {
@@ -337,8 +337,8 @@ if ($subview == 'forecasting') {
     $exp_res = $db->query("SELECT Com_Name, Sci_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present FROM detections WHERE strftime('%j', Date) BETWEEN strftime('%j', 'now', '-3 days') AND strftime('%j', 'now', '+3 days') AND strftime('%Y', Date) < strftime('%Y', 'now') GROUP BY Sci_Name ORDER BY years_present DESC");
     while($row = $exp_res->fetchArray(SQLITE3_ASSOC)) { $expected_today[] = $row; }
     
-    $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC LIMIT 5");
-    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $top_5_species[] = $row; }
+    $top_5_res = $db->query("SELECT Sci_Name, Com_Name FROM detections GROUP BY Sci_Name ORDER BY COUNT(*) DESC");
+    while($row = $top_5_res->fetchArray(SQLITE3_ASSOC)) { $pw = $db->querySingle("SELECT strftime('%W', Date) as week FROM detections WHERE Sci_Name = '" . $db->escapeString($row['Sci_Name']) . "' GROUP BY week ORDER BY COUNT(*) DESC LIMIT 1"); $row['peak_week'] = $pw ?: '??'; $peak_species[] = $row; }
 }
 
 $db->close();
@@ -1398,8 +1398,8 @@ $db->close();
         <section class="insights-section">
             <div class="insights-section-title">📍 Historical Peak Weeks <span class="info-btn">ⓘ<span class="info-tooltip">The specific week of the year (1-52) when each species has historically reached its maximum detection volume.</span></span></div>
             <div class="insights-stats-list">
-                <?php foreach($top_5_species as $s): ?>
-                <div class="insights-stats-item">
+                <?php $rank_pw = 1; foreach($peak_species as $s): ?>
+                <div class="insights-stats-item <?php echo $rank_pw > 10 ? 'hidden-item' : ''; ?>">
                     <div>
                         <div class="insights-stats-name"><?php echo $s['Com_Name']; ?></div>
                         <div style="font-size: 0.8em; color: var(--text-muted);">Current week: <?php echo $current_week; ?></div>
@@ -1414,8 +1414,17 @@ $db->close();
                         <?php if($is_peak): ?><div style="font-size: 0.7em; color: #10b981; font-weight: 700;">PEAK NOW</div><?php endif; ?>
                     </div>
                 </div>
-                <?php endforeach; ?>
+                <?php $rank_pw++; endforeach; ?>
             </div>
+            <?php if(count($peak_species) > 10): ?>
+            <button class="show-list-btn" 
+                    onclick="toggleItems(this)" 
+                    data-expanded="false" 
+                    data-show-text="Show all <?php echo count($peak_species); ?> species ↓" 
+                    data-hide-text="Show top 10 species ↑">
+                Show all <?php echo count($peak_species); ?> species ↓
+            </button>
+            <?php endif; ?>
         </section>
     </div>
     <?php endif; ?>
