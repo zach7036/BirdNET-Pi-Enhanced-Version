@@ -13,6 +13,7 @@ install provides: the config file, the docroot link layout, and a database.
    BIRDNET_USER=pi
    SITE_NAME="BirdNET-Pi Dev"
    COLOR_SCHEME=light
+   TEMPERATURE_UNIT=fahrenheit
    LATITUDE=40.030
    LONGITUDE=-75.020
    SILENCE_UPDATE_INDICATOR=0

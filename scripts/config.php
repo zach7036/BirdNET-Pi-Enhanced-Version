@@ -71,6 +71,7 @@ if(isset($_GET["latitude"])){
   $language = $_GET["language"];
   $info_site = $_GET["info_site"];
   $color_scheme = $_GET["color_scheme"];
+  $temp_unit = (isset($_GET['temp_unit']) && strtolower($_GET['temp_unit']) === 'celsius') ? 'celsius' : 'fahrenheit';
   $timezone = $_GET["timezone"];
   $model = $_GET["model"];
   $sf_thresh = $_GET["sf_thresh"];
@@ -177,7 +178,12 @@ if(isset($_GET["latitude"])){
     $contents = preg_replace("/DATABASE_LANG=.*/", "DATABASE_LANG=$language", $contents);
   }
   $contents = preg_replace("/INFO_SITE=.*/", "INFO_SITE=$info_site", $contents);
-  $contents = preg_replace("/COLOR_SCHEME=.*/", "COLOR_SCHEME=$color_scheme", $contents);  
+  $contents = preg_replace("/COLOR_SCHEME=.*/", "COLOR_SCHEME=$color_scheme", $contents);
+  if (preg_match('/^TEMPERATURE_UNIT=.*/m', $contents)) {
+    $contents = preg_replace("/TEMPERATURE_UNIT=.*/", "TEMPERATURE_UNIT=$temp_unit", $contents);
+  } else {
+    $contents .= "\nTEMPERATURE_UNIT=$temp_unit\n";
+  }
   $contents = preg_replace("/FLICKR_FILTER_EMAIL=.*/", "FLICKR_FILTER_EMAIL=$flickr_filter_email", $contents);
   $contents = preg_replace("/APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES=.*/", "APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES=$minimum_time_limit", $contents);
   $contents = preg_replace("/MODEL=.*/", "MODEL=$model", $contents);
@@ -680,6 +686,22 @@ https://discordapp.com/api/webhooks/{WebhookID}/{WebhookToken}
           echo "<option value='{$color_scheme}' $isSelected>$color_scheme</option>";
         }
       ?>
+      </td></tr></table><br>
+
+      <table class="settingstable"><tr><td>
+      <h2>Temperature unit</h2>
+      Applies to weather readouts across the site (Now, Timeline, Overview, Insights).<br><br>
+      <label for="temp_unit">Show temperatures in : </label>
+      <select name="temp_unit" class="testbtn">
+      <?php
+      $temp_units = ['fahrenheit' => 'Fahrenheit (°F)', 'celsius' => 'Celsius (°C)'];
+      $current_temp_unit = (get_temp_unit() === 'C') ? 'celsius' : 'fahrenheit';
+      foreach($temp_units as $unit_value => $unit_label){
+          $isSelected = ($current_temp_unit === $unit_value) ? 'selected="selected"' : '';
+          echo "<option value='{$unit_value}' $isSelected>{$unit_label}</option>";
+        }
+      ?>
+      </select>
       </td></tr></table><br>
         
       <script>

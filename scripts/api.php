@@ -130,7 +130,8 @@ function api_current_weather($db) {
     'status' => 'current',
     'date' => $current['Date'],
     'hour' => (int)$current['Hour'],
-    'temp' => round((float)$current['Temp']),
+    'temp' => display_temp($current['Temp']),
+    'unit' => temp_unit_symbol(),
     'condition_code' => $code,
     'condition' => api_weather_label($code),
     'is_day' => $has_is_day ? (int)$current['IsDay'] : 1,
@@ -627,7 +628,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
       $w_res = db_execute_safe($db, $w_stmt, 'timeline weather rows');
       while ($w_row = db_fetch_assoc_safe($w_res)) {
         $weather_map[(int)$w_row['Hour']] = [
-          'temp' => round((float)$w_row['Temp']),
+          'temp' => display_temp($w_row['Temp']),
           'code' => (int)$w_row['ConditionCode'],
           'is_day' => isset($w_row['IsDay']) ? (int)$w_row['IsDay'] : 1
         ];
@@ -643,7 +644,8 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'total_species' => count($species_set),
     'peak_hour' => $peak_hour,
     'hours' => $hours_result,
-    'weather' => $weather_map
+    'weather' => $weather_map,
+    'weather_unit' => temp_unit_symbol()
   ]);
 
 } elseif (preg_match('#^/api/v1/species/search$#', $requestUri)) {

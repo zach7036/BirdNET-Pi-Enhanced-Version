@@ -46,7 +46,7 @@ function get_overview_weather($db, $date) {
 
   while ($row = db_fetch_assoc_safe($res)) {
     $weather[(int)$row['Hour']] = [
-      'temp' => round((float)$row['Temp']),
+      'temp' => display_temp($row['Temp']),
       'code' => (int)$row['ConditionCode'],
       'is_day' => $hasIsDay ? (int)$row['IsDay'] : 1
     ];
@@ -192,7 +192,7 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
       $weather = get_overview_weather($db, $today);
   }
 
-  echo json_encode(['species' => $species, 'hourly' => $hourly, 'weather' => $weather, 'currentHour' => $currentHour]);
+  echo json_encode(['species' => $species, 'hourly' => $hourly, 'weather' => $weather, 'weather_unit' => temp_unit_symbol(), 'currentHour' => $currentHour]);
   die();
 }
 

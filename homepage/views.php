@@ -246,7 +246,7 @@ foreach ($main_nav as $nav_item) {
               $w_stmt->bindValue(1, (int)date('G'), SQLITE3_INTEGER);
               $w_res = db_execute_safe($feed_db, $w_stmt, 'sidebar current weather');
               if ($w_row = db_fetch_assoc_safe($w_res)) {
-                  $temp = round((float)$w_row['Temp']);
+                  $temp = display_temp($w_row['Temp']);
                   $code = (int)$w_row['ConditionCode'];
                   $is_day = $hasIsDay ? (int)$w_row['IsDay'] : 1;
                   
@@ -260,7 +260,8 @@ foreach ($main_nav as $nav_item) {
                   elseif ($code >= 80 && $code <= 82) $emoji = $is_day === 0 ? '🌧️' : '🌦️';
                   elseif ($code >= 95) $emoji = '⛈️';
                   
-                  $current_weather_str = "<span id='liveFeedWeather' style='margin-left:auto; font-size:0.9em; font-weight:normal; color:var(--text-secondary, #6b7280);'>{$temp}&deg;F {$emoji}</span>";
+                  $temp_unit_html = h(temp_unit_symbol());
+                  $current_weather_str = "<span id='liveFeedWeather' style='margin-left:auto; font-size:0.9em; font-weight:normal; color:var(--text-secondary, #6b7280);'>{$temp}&deg;{$temp_unit_html} {$emoji}</span>";
               }
           }
       }
@@ -298,7 +299,7 @@ foreach ($main_nav as $nav_item) {
         if (!data || data.status !== 'current') return;
         const weather = document.getElementById('liveFeedWeather');
         if (!weather) return;
-        weather.innerHTML = Math.round(Number(data.temp)) + '&deg;F ' + liveFeedWeatherEmoji(data.condition_code, data.is_day);
+        weather.innerHTML = Math.round(Number(data.temp)) + '&deg;' + (data.unit || 'F') + ' ' + liveFeedWeatherEmoji(data.condition_code, data.is_day);
       })
       .catch(() => {
         // Keep the last known weather visible during transient API or database failures.

@@ -141,6 +141,13 @@ INFO_SITE="ALLABOUTBIRDS"
 
 COLOR_SCHEME="light"
 
+#---------------------------  Weather Temperature Unit  ------------------------#
+## Unit used for displaying temperature in the web interface and weather data.
+## Valid values: fahrenheit or celsius
+## default fahrenheit
+
+TEMPERATURE_UNIT=fahrenheit
+
 #------------------------------  Disk Management  ------------------------------#
 ## FULL_DISK can be set to configure how the system reacts to a full disk
 ## purge = Remove the oldest day's worth of recordings

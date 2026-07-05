@@ -43,6 +43,7 @@
         var hourly = data.hourly;
         var currentHour = data.currentHour;
         var weather = data.weather;
+        var weatherUnit = data.weather_unit || 'F';
         var hasWeather = weather && Object.keys(weather).length > 0;
 
         var displayed = species;
@@ -139,7 +140,7 @@
                 ctx.fillText(emoji, x, yHour - 16);
                 ctx.font = '10px Roboto Flex, sans-serif';
                 ctx.fillStyle = isDark ? '#aaaaaa' : '#666666';
-                ctx.fillText(w.temp + '°F', x, yHour - 28);
+                ctx.fillText(w.temp + '°' + weatherUnit, x, yHour - 28);
             }
         });
 
@@ -261,6 +262,7 @@
             var species = lastData.species;
             var hourly = lastData.hourly;
             var weather = lastData.weather;
+            var weatherUnit = lastData.weather_unit || 'F';
             var hasWeather = weather && Object.keys(weather).length > 0;
 
             var rect = canvas.getBoundingClientRect();
@@ -317,7 +319,7 @@
                         95: 'Thunderstorm', 96: 'Thunderstorm with Hail', 99: 'Thunderstorm with Heavy Hail'
                     };
                     var cond = codes[w.code] || 'Cloudy';
-                    weatherStr = '<br><span style="color:#aaa;font-size:10px;">' + w.temp + '°F • ' + cond + '</span>';
+                    weatherStr = '<br><span style="color:#aaa;font-size:10px;">' + w.temp + '°' + weatherUnit + ' • ' + cond + '</span>';
                 }
                 tooltip.innerHTML = '<strong>' + name + '</strong><br>' + hour + ':00 — ' + val + ' detection' + (val !== 1 ? 's' : '') + weatherStr;
                 tooltip.style.display = 'block';

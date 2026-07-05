@@ -113,7 +113,7 @@ $tl_date = isset($_GET['date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['da
     for (var h = 0; h < 24; h++) {
       var w = data.weather ? data.weather[h] : null;
       weatherHtml += '<div class="tl-wcell">' + (w
-        ? '<span class="hm-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span><span class="hm-temp">' + w.temp + '&deg;F</span>'
+        ? '<span class="hm-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span><span class="hm-temp">' + w.temp + '&deg;' + (data.weather_unit || 'F') + '</span>'
         : '') + '</div>';
       hoursHtml += '<div class="tl-hcell">' + hourLabel(h) + '</div>';
     }

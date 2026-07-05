@@ -95,7 +95,7 @@
         'Disk usage could not be read.';
       var lastDetection = health.last_detection_at || 'No detections';
       var weatherIsCurrent = weather.status === 'current';
-      var weatherLabel = weatherIsCurrent ? (Math.round(Number(weather.temp)) + '\u00b0F ' + (weather.condition || '')) : 'Missing current hour';
+      var weatherLabel = weatherIsCurrent ? (Math.round(Number(weather.temp)) + '\u00b0' + (weather.unit || 'F') + ' ' + (weather.condition || '')) : 'Missing current hour';
       var weatherTooltip = weatherIsCurrent ?
         'Current-hour weather from the weather sync table. This should match Live Activity. Synced row: ' + (weather.last_synced_at || 'unknown') + '.' :
         'Current-hour weather is missing. Last synced row: ' + (weather.last_synced_at || 'none') + '.';

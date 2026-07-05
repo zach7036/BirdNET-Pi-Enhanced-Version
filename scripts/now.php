@@ -283,7 +283,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
       : esc(formatAgo(v.seconds_ago));
     var weather = '';
     if (data.weather && data.weather.status === 'current') {
-      weather = ' &middot; ' + Math.round(data.weather.temp) + '&deg;F ' + esc(data.weather.condition);
+      weather = ' &middot; ' + Math.round(data.weather.temp) + '&deg;' + (data.weather.unit || 'F') + ' ' + esc(data.weather.condition);
     }
     document.getElementById('heroMeta').innerHTML =
       when +
@@ -348,7 +348,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     return (h - 12) + 'p';
   }
 
-  function renderHourChart(hourly, weather, currentHour) {
+  function renderHourChart(hourly, weather, currentHour, weatherUnit) {
     var max = 1;
     var counts = [];
     for (var h = 0; h < 24; h++) {
@@ -371,7 +371,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
       axis += '<div class="axis-col">' +
         '<span class="axis-time">' + hourLabel(ah) + '</span>' +
         (w ? '<span class="axis-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span>' +
-             '<span class="axis-temp">' + Math.round(w.temp) + '&deg;F</span>' : '') +
+             '<span class="axis-temp">' + Math.round(w.temp) + '&deg;' + (weatherUnit || 'F') + '</span>' : '') +
         '</div>';
     }
     return '<div class="spark">' + bars + '</div><div class="spark-axis">' + axis + '</div>';
@@ -392,7 +392,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
           '<a class="species-card-name" href="' + detailHref + '" title="' + esc(s.name) + '">' + esc(s.name) + '</a>' +
           '<span class="species-card-stats">' + s.count + ' detection' + (s.count === 1 ? '' : 's') + '</span>' +
         '</div>' +
-        renderHourChart(data.hourly ? data.hourly[s.name] : null, data.weather, data.currentHour) +
+        renderHourChart(data.hourly ? data.hourly[s.name] : null, data.weather, data.currentHour, data.weather_unit) +
         '</div>';
     }).join('');
   }

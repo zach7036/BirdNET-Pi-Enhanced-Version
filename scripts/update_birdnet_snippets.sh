@@ -331,6 +331,9 @@ fi
 if ! grep -E '^VISIT_GAP_MINUTES=' /etc/birdnet/birdnet.conf &>/dev/null;then
   echo "VISIT_GAP_MINUTES=5" >> /etc/birdnet/birdnet.conf
 fi
+if ! grep -E '^TEMPERATURE_UNIT=' /etc/birdnet/birdnet.conf &>/dev/null;then
+  echo "TEMPERATURE_UNIT=fahrenheit" >> /etc/birdnet/birdnet.conf
+fi
 
 # Data spine tables (Phase 1): reviews, species prefs, notes. Additive only -
 # the detections table is never altered. Keep in sync with createdb.sh and

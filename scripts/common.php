@@ -768,6 +768,28 @@ function get_visit_gap_seconds() {
   return (int)round($minutes * 60);
 }
 
+// Weather is always stored in the 'weather' table as Fahrenheit; this is the single
+// place that decides the display unit and converts for it.
+function get_temp_unit() {
+  $config = get_config();
+  return (isset($config['TEMPERATURE_UNIT']) && strtolower($config['TEMPERATURE_UNIT']) === 'celsius') ? 'C' : 'F';
+}
+
+function temp_unit_symbol() {
+  return get_temp_unit();
+}
+
+function display_temp($fahrenheit, $decimals = 0) {
+  if ($fahrenheit === null || $fahrenheit === '') {
+    return null;
+  }
+  $value = (float)$fahrenheit;
+  if (get_temp_unit() === 'C') {
+    $value = ($value - 32) * 5 / 9;
+  }
+  return round($value, $decimals);
+}
+
 /* $rows must be sorted by Date ASC, Time ASC and contain
    Date, Time, Sci_Name, Com_Name, Confidence, File_Name. */
 function visits_from_detections($rows, $gap_seconds = null) {
