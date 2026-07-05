@@ -371,7 +371,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
       axis += '<div class="axis-col">' +
         '<span class="axis-time">' + hourLabel(ah) + '</span>' +
         (w ? '<span class="axis-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span>' +
-             '<span class="axis-temp">' + Math.round(w.temp) + '&deg;</span>' : '') +
+             '<span class="axis-temp">' + Math.round(w.temp) + '&deg;F</span>' : '') +
         '</div>';
     }
     return '<div class="spark">' + bars + '</div><div class="spark-axis">' + axis + '</div>';

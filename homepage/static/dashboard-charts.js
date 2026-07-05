@@ -139,7 +139,7 @@
                 ctx.fillText(emoji, x, yHour - 16);
                 ctx.font = '10px Roboto Flex, sans-serif';
                 ctx.fillStyle = isDark ? '#aaaaaa' : '#666666';
-                ctx.fillText(w.temp + '°', x, yHour - 28);
+                ctx.fillText(w.temp + '°F', x, yHour - 28);
             }
         });
 
