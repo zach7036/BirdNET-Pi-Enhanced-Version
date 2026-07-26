@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BirdNET-Pi Weather Integration — How It Works &amp; How to Set It Up</title>
+<meta name="description" content="BirdNET-Pi Enhanced records hourly weather alongside every detection using Open-Meteo, then correlates temperature and conditions with bird activity. Setup requires only your station coordinates — no API key, no plugin.">
+<link rel="canonical" href="https://zach7036.github.io/weather.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="BirdNET-Pi Enhanced Version">
+<meta property="og:title" content="BirdNET-Pi Weather Integration — How It Works &amp; How to Set It Up">
+<meta property="og:description" content="Hourly weather recorded alongside every detection, correlated with bird activity. No API key required.">
+<meta property="og:url" content="https://zach7036.github.io/weather.html">
+<meta property="og:image" content="https://zach7036.github.io/assets/img/birdnet-pi-weather-insights.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zach7036.github.io/assets/img/birdnet-pi-weather-insights.png">
+<link rel="stylesheet" href="assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Do I need an API key for BirdNET-Pi weather?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Weather comes from Open-Meteo, which does not require an API key or an account. You only need to set your station's latitude and longitude in Settings." }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a weather plugin to install?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. There is no separate weather plugin. Weather syncing is built in and starts automatically once your coordinates are set, running hourly." }
+    },
+    {
+      "@type": "Question",
+      "name": "Why is my BirdNET-Pi weather data missing?",
+      "acceptedAnswer": { "@type": "Answer", "text": "The most common cause is that latitude and longitude are still at their default of 0.000. Set real coordinates in Settings, then run a manual sync from the Station Doctor page. Weather also backfills up to seven days of history when it syncs." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use my own temperature sensor instead?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. If you run Home Assistant, you can point BirdNET-Pi Enhanced at a temperature entity and it will use your own sensor reading for the current hour instead of the forecast value, falling back to Open-Meteo if the sensor goes stale or unreachable." }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">BirdNET-Pi <span>Enhanced</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html" aria-current="page">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Help</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap">
+
+  <p class="kicker">Weather</p>
+  <h1>Weather integration in BirdNET-Pi Enhanced</h1>
+  <p class="lead">
+    Bird activity tracks weather closely — birds sing earlier on warm mornings, go quiet in
+    rain, and behave differently under pressure changes. The Enhanced Version records hourly
+    weather alongside your detections so those relationships become visible instead of anecdotal.
+  </p>
+
+  <h2>Setup: one setting, no plugin, no API key</h2>
+  <p>
+    There is no weather plugin to install and no account to create. Weather comes from
+    <a href="https://open-meteo.com/">Open-Meteo</a>, which is free and keyless. The only thing
+    it needs from you is where your station is:
+  </p>
+  <ol>
+    <li>Open <strong>Settings</strong> in your BirdNET-Pi web interface.</li>
+    <li>Set your <strong>latitude</strong> and <strong>longitude</strong>.</li>
+    <li>Save.</li>
+  </ol>
+  <p>
+    That's the whole setup. Syncing starts automatically and runs hourly from then on. When it
+    runs it also backfills up to seven days of history, so a station that's been offline catches
+    up rather than leaving permanent gaps.
+  </p>
+  <div class="note">
+    <p>
+      Your coordinates do more than weather — species range filtering and the rarity detection
+      that powers "unusual for your area" both depend on them. If you set nothing else after
+      installing, set these.
+    </p>
+  </div>
+
+  <h2>Where weather shows up</h2>
+  <p>Once it's syncing, weather appears throughout the interface rather than on one page:</p>
+  <ul>
+    <li><strong>Today's species</strong> — temperature and conditions along the bottom axis of each species' hourly chart</li>
+    <li><strong>Timeline day replay</strong> — a weather strip across the top of the day</li>
+    <li><strong>The hero card</strong> — current conditions beside the most recent detection</li>
+    <li><strong>Weather Insights</strong> — a dedicated analysis page correlating conditions with activity</li>
+  </ul>
+
+  <figure>
+    <img src="assets/img/birdnet-pi-weather-analysis.png"
+         alt="BirdNET-Pi Enhanced weather insights page showing detection activity broken down by temperature bracket and weather condition"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Detection activity broken out by temperature bracket and condition.</figcaption>
+  </figure>
+
+  <h2>What the analysis tells you</h2>
+  <p>
+    The Weather Insights page groups your detections by temperature bracket and by condition, then
+    states what it finds in plain English — which temperature range your station is busiest in,
+    which species are most and least deterred by rain, how much activity drops in wind. Brackets
+    with no detections show a real zero rather than an ambiguous "N/A", so you can tell the
+    difference between "no birds" and "no data."
+  </p>
+  <figure>
+    <img src="assets/img/birdnet-pi-weather-insights.png"
+         alt="BirdNET-Pi Enhanced weather takeaways written as plain-English conclusions about how conditions affect bird activity at this station"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Conclusions, not just charts.</figcaption>
+  </figure>
+  <p>
+    These read against <em>your</em> station's own baseline, not a general expectation, so they
+    become more meaningful the longer you run. A few weeks of data is enough for the temperature
+    brackets to say something real.
+  </p>
+
+  <h2>Units</h2>
+  <p>
+    Set Celsius or Fahrenheit and your preferred wind speed unit under
+    <strong>Settings → Display &amp; Units</strong>. Weather is always stored in one canonical
+    format internally and converted only for display, so switching units never rewrites or
+    corrupts your history — and Celsius brackets are true 5&deg;C bins rather than converted
+    Fahrenheit ones.
+  </p>
+
+  <h2>Using your own temperature sensor</h2>
+  <p>
+    Forecast data is regional; your garden isn't. If you run
+    <a href="https://www.home-assistant.io/">Home Assistant</a> with a local temperature sensor,
+    you can point BirdNET-Pi Enhanced at that entity and it will use your actual reading for the
+    current hour instead of the forecast value.
+  </p>
+  <p>
+    Configure the Home Assistant URL, a long-lived access token, and the temperature entity ID in
+    Settings. If the sensor goes stale or Home Assistant becomes unreachable, the station falls
+    back to Open-Meteo automatically rather than freezing on a stale reading. The Station Doctor
+    page includes a live check so you can confirm the connection works.
+  </p>
+
+  <h2>Troubleshooting weather</h2>
+  <details>
+    <summary>My weather data is empty or missing</summary>
+    <p>
+      Almost always this means latitude and longitude are still <code>0.000</code>. Set real
+      coordinates in Settings, then trigger a manual sync from the Station Doctor page. If it
+      still fails, check that the Pi has outbound internet access.
+    </p>
+  </details>
+  <details>
+    <summary>There's a gap in my weather history</summary>
+    <p>
+      Sync backfills up to seven days, so short outages heal themselves on the next run. Gaps
+      longer than a week stay permanent — the backfill window doesn't reach further back.
+    </p>
+  </details>
+  <details>
+    <summary>The temperature doesn't match my thermometer</summary>
+    <p>
+      Open-Meteo gives you regional forecast data for your coordinates, which can differ from a
+      reading in your own garden by several degrees. Connect a Home Assistant sensor as described
+      above if you want your actual local temperature recorded instead.
+    </p>
+  </details>
+  <details>
+    <summary>Do I need to install a weather plugin?</summary>
+    <p>
+      No. There is no weather plugin. Older documentation elsewhere referred to one that doesn't
+      exist — weather is built in and needs only your coordinates.
+    </p>
+  </details>
+
+  <div class="next-steps">
+    <a class="btn btn-primary" href="install.html">Installation guide</a>
+    <a class="btn btn-ghost" href="features.html">Other insights features</a>
+    <a class="btn btn-ghost" href="troubleshooting.html">General troubleshooting</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version">GitHub</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Discussions</a>
+    </div>
+    <p>
+      BirdNET-Pi Enhanced Version by zach7036 — free and open source under CC BY-NC-SA 4.0.
+      Not affiliated with the Cornell Lab of Ornithology.
+    </p>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BirdNET-Pi Analytics, Insights &amp; Features — Enhanced Version</title>
+<meta name="description" content="A tour of what BirdNET-Pi Enhanced adds: interactive analytics charts, the behavioral insights suite, dawn chorus and nocturnal analysis, seasonal presence, the detection review queue, timeline day replay, species pages, and eBird export.">
+<link rel="canonical" href="https://zach7036.github.io/features.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="BirdNET-Pi Enhanced Version">
+<meta property="og:title" content="BirdNET-Pi Analytics, Insights &amp; Features — Enhanced Version">
+<meta property="og:description" content="Interactive analytics, behavioral insights, dawn chorus analysis, seasonal presence, a review queue, and timeline day replay.">
+<meta property="og:url" content="https://zach7036.github.io/features.html">
+<meta property="og:image" content="https://zach7036.github.io/assets/img/birdnet-pi-analytics-dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zach7036.github.io/assets/img/birdnet-pi-analytics-dashboard.png">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">BirdNET-Pi <span>Enhanced</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="install.html">Install</a>
+      <a href="features.html" aria-current="page">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Help</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap">
+
+  <p class="kicker">Features</p>
+  <h1>Analytics and insights, not just a detection log</h1>
+  <p class="lead">
+    Every BirdNET-Pi records which bird was heard and when. The Enhanced Version is built around
+    what you can learn from thousands of those records once they accumulate.
+  </p>
+
+  <h2>The Today dashboard</h2>
+  <p>
+    The home screen answers "what's happening in the yard right now." It leads with the most
+    recent bird — photo, confidence, how long ago, how many times it's visited this week — then a
+    short <strong>Today's Story</strong> that only speaks when something is actually unusual: a
+    new species, a bird returning after weeks away, a regular that's suddenly gone quiet, or a
+    day that's notably busier or quieter than your own two-week average.
+  </p>
+  <p>
+    Below that, each species detected today gets a card with a 24-hour activity chart and the
+    weather along the bottom axis.
+  </p>
+  <figure>
+    <img src="assets/img/birdnet-pi-species-heatmap-weather.png"
+         alt="BirdNET-Pi Enhanced today's species view with per-species hourly detection bars and a weather axis showing temperature and conditions"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Today's species, each with its own hourly activity chart and weather axis.</figcaption>
+  </figure>
+
+  <h2>Interactive analytics</h2>
+  <p>
+    The charts are real Chart.js instances — hover for exact values, click legend entries to
+    toggle series, and they resize properly on a phone. The set covers:
+  </p>
+  <ul>
+    <li><strong>Top species</strong> — horizontal ranking of your most frequent visitors</li>
+    <li><strong>Detections by time of day</strong> — aggregate hourly activity across your history</li>
+    <li><strong>Detection trends</strong> — daily volume over time</li>
+    <li><strong>Species detection trends</strong> — stacked comparison between species you pick</li>
+    <li><strong>Species diversity over time</strong> — unique species per day</li>
+    <li><strong>Detection patterns by time of day</strong> — overlaid hourly curves for selected species</li>
+  </ul>
+  <figure>
+    <img src="assets/img/birdnet-pi-analytics-charts.png"
+         alt="BirdNET-Pi Enhanced interactive charts showing top species ranking and detections by time of day"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Charts respond to hover, legend clicks, and screen size.</figcaption>
+  </figure>
+
+  <h2>Behavioral insights</h2>
+  <p>
+    The Insights section reads your own database and states conclusions in plain English. It's
+    deliberately quiet when there's nothing notable to say, so when it does speak it's worth
+    reading.
+  </p>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Dawn chorus &amp; nocturnal activity</h3>
+      <p>Calculates which species participate in your local dawn chorus and when it starts, identifies genuinely nocturnal detections, and plots the earliest and latest active windows for each bird.</p>
+    </div>
+    <div class="card">
+      <h3>Migration &amp; seasonality</h3>
+      <p>Flags new arrivals — species heard for the first time in a fortnight — notes which regulars have gone quiet, and charts seasonal presence against expected frequencies.</p>
+    </div>
+    <div class="card">
+      <h3>Yard health score</h3>
+      <p>A composite of detection volume, stability, and rarity that gives you one number to watch over time, plus lifetime milestones as you pass them.</p>
+    </div>
+    <div class="card">
+      <h3>Rare visitors</h3>
+      <p>Separates two kinds of rare: species you've barely recorded, and species the location model says shouldn't be here at this time of year at all.</p>
+    </div>
+  </div>
+  <figure>
+    <img src="assets/img/birdnet-pi-seasonal-presence.png"
+         alt="BirdNET-Pi Enhanced seasonal presence chart comparing actual detections against expected seasonal frequency for each species"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Seasonal presence — your detections against what's expected for the season.</figcaption>
+  </figure>
+
+  <h2>Review queue</h2>
+  <p>
+    BirdNET reports a confidence score, and scores in the middle of the range are genuinely
+    uncertain. The review queue collects those, groups them into visits rather than individual
+    detections, and gives you comparison clips of the same species from elsewhere in your
+    history so you can judge by ear.
+  </p>
+  <p>
+    Triage is keyboard-driven, and your verdicts propagate: detections you mark as false
+    positives are excluded from species counts, insights, and eBird exports, so a misidentified
+    bird doesn't quietly pollute your statistics forever.
+  </p>
+  <figure>
+    <img src="assets/img/birdnet-pi-review-queue.png"
+         alt="BirdNET-Pi Enhanced review queue showing an uncertain detection with spectrogram and comparison recordings of the same species"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Verify by comparison — the uncertain clip beside known examples.</figcaption>
+  </figure>
+
+  <h2>Timeline day replay</h2>
+  <p>
+    Pick any date and see the whole day at once: species as horizontal lanes, visits as blocks
+    along a 24-hour axis, weather across the top. Click any block to hear that clip. It's the
+    fastest way to understand the shape of a day — the dawn surge, the midday lull, the evening
+    return.
+  </p>
+  <figure>
+    <img src="assets/img/birdnet-pi-timeline-day-replay.png"
+         alt="BirdNET-Pi Enhanced timeline day replay with species lanes, visit blocks across 24 hours, and a weather strip"
+         width="1600" height="900" loading="lazy">
+    <figcaption>A full day, species by species, clickable throughout.</figcaption>
+  </figure>
+
+  <h2>Species pages and galleries</h2>
+  <p>
+    Every species gets its own page: a calendar heatmap of when you've heard it, its best
+    recordings, detection history, and notes you can write yourself. Thumbnails are fetched with
+    multi-source fallbacks and session caching, at high resolution, so the galleries actually
+    look like galleries.
+  </p>
+  <p>
+    You can favorite species, mute ones you don't want notifications for, and crown a favorite
+    recording — crowned clips are protected from the automatic disk cleanup.
+  </p>
+
+  <h2>Live audio and spectrogram</h2>
+  <p>
+    A live stream with a real-time scrolling spectrogram, so you can watch and listen to your
+    soundscape as it happens — useful for checking microphone placement and for catching things
+    the model misses.
+  </p>
+
+  <h2>eBird checklist export</h2>
+  <p>
+    A rebuilt eBird export tool with a date picker for historical checklists, validation on the
+    fields eBird requires (protocol, observers, distance), and inline guidance on eBird's
+    formatting rules. Detections you've reviewed as false positives are automatically excluded,
+    so you're not submitting identifications you don't believe.
+  </p>
+
+  <h2>Year in Birds</h2>
+  <p>
+    An annual summary — champions, monthly activity, and the year's notable moments — rendered as
+    a downloadable image worth sharing.
+  </p>
+  <figure>
+    <img src="assets/img/birdnet-pi-year-in-birds.png"
+         alt="BirdNET-Pi Enhanced Year in Birds annual summary showing champion species and monthly detection bars"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Your Year in Birds — downloadable as an image.</figcaption>
+  </figure>
+
+  <h2>Everything else</h2>
+  <ul>
+    <li><strong>Dark mode</strong> across every page, following your system preference</li>
+    <li><strong>Installable on a phone</strong> as a progressive web app, with a mobile tab bar</li>
+    <li><strong>Command palette</strong> — <code>Ctrl</code>+<code>K</code> to jump to any view or species</li>
+    <li><strong>Smart notifications</strong> — grouped by visit rather than per detection, with quiet hours and rare-bird alerts</li>
+    <li><strong>Station doctor</strong> — health checks with one-click fixes for common problems</li>
+    <li><strong>Unit preferences</strong> — Celsius or Fahrenheit, 12- or 24-hour time, number formats</li>
+    <li><strong>Localized species names</strong> in 20+ languages</li>
+    <li><strong>Backup and restore</strong> from the web interface or the command line</li>
+  </ul>
+
+  <div class="next-steps">
+    <a class="btn btn-primary" href="install.html">Install it</a>
+    <a class="btn btn-ghost" href="weather.html">How weather integration works</a>
+    <a class="btn btn-ghost" href="screenshots.html">Screenshot gallery</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version">GitHub</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Discussions</a>
+    </div>
+    <p>
+      BirdNET-Pi Enhanced Version by zach7036 — free and open source under CC BY-NC-SA 4.0.
+      Not affiliated with the Cornell Lab of Ornithology.
+    </p>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BirdNET-Pi Enhanced Installation Guide — Raspberry Pi 5, 4B &amp; 400</title>
+<meta name="description" content="Step-by-step guide to installing BirdNET-Pi Enhanced Version on a Raspberry Pi 5, 4B, 400, 3B+, or Zero 2 W: hardware, imaging 64-bit Raspberry Pi OS, the one-line installer, microphone setup, and first login.">
+<link rel="canonical" href="https://zach7036.github.io/install.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="BirdNET-Pi Enhanced Version">
+<meta property="og:title" content="BirdNET-Pi Enhanced Installation Guide — Raspberry Pi 5, 4B &amp; 400">
+<meta property="og:description" content="Install BirdNET-Pi Enhanced on a Raspberry Pi with one command. Hardware requirements, OS imaging, microphone setup, and first login.">
+<meta property="og:url" content="https://zach7036.github.io/install.html">
+<meta property="og:image" content="https://zach7036.github.io/assets/img/birdnet-pi-enhanced-dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zach7036.github.io/assets/img/birdnet-pi-enhanced-dashboard.png">
+<link rel="stylesheet" href="assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "Install BirdNET-Pi Enhanced Version on a Raspberry Pi",
+  "description": "Install the BirdNET-Pi Enhanced Version bird sound identification system on a Raspberry Pi running 64-bit Raspberry Pi OS.",
+  "totalTime": "PT45M",
+  "supply": [
+    { "@type": "HowToSupply", "name": "Raspberry Pi 5, 4B, 400, 3B+, or Zero 2 W" },
+    { "@type": "HowToSupply", "name": "microSD card with 64-bit Raspberry Pi OS" },
+    { "@type": "HowToSupply", "name": "USB microphone or sound card" }
+  ],
+  "step": [
+    { "@type": "HowToStep", "name": "Image the SD card", "text": "Use Raspberry Pi Imager to write the 64-bit version of Raspberry Pi OS (Trixie recommended) to your microSD card, enabling SSH and your Wi-Fi credentials in the imager settings." },
+    { "@type": "HowToStep", "name": "Connect the microphone", "text": "Plug a USB microphone or USB sound card into the Raspberry Pi before first boot." },
+    { "@type": "HowToStep", "name": "Run the installer", "text": "Boot the Pi, connect over SSH, and run the one-line installer command. The installer handles all required system updates itself." },
+    { "@type": "HowToStep", "name": "Open the web interface", "text": "Browse to http://birdnetpi.local or the Pi's IP address and log in with the username birdnet." },
+    { "@type": "HowToStep", "name": "Set your location and password", "text": "In Settings, set your latitude and longitude so species range filtering works, and set an admin password." }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">BirdNET-Pi <span>Enhanced</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="install.html" aria-current="page">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Help</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap">
+
+  <p class="kicker">Installation</p>
+  <h1>Installing BirdNET-Pi Enhanced on a Raspberry Pi</h1>
+  <p class="lead">
+    A complete install takes about 30–45 minutes, most of which is unattended. You need three
+    things: a Raspberry Pi, a microSD card with 64-bit Raspberry Pi OS, and a USB microphone.
+  </p>
+
+  <h2>What you need</h2>
+
+  <h3>Raspberry Pi</h3>
+  <p>
+    A <strong>Raspberry Pi 5, 4B, or 400 is strongly recommended.</strong> The Enhanced Version's
+    analytics and insights pages do real computation across your entire detection history, and on
+    older boards those pages get slow once you have months of data.
+  </p>
+  <p>
+    A Raspberry Pi 3B+ or Zero 2 W will run the detection engine, but both must use
+    <strong>RaspiOS-ARM64-Lite</strong>, and you should expect the heavier reporting pages to lag.
+  </p>
+
+  <h3>SD card and operating system</h3>
+  <p>
+    Use the <strong>64-bit</strong> version of Raspberry Pi OS — please use
+    <strong>Trixie</strong>. The Lite image is recommended because you don't need a desktop, but
+    the full image works too. Both are available directly inside the
+    <a href="https://www.raspberrypi.com/software/">Raspberry Pi Imager</a>.
+  </p>
+  <div class="note warn">
+    <p>
+      <strong>32-bit will not work.</strong> This is the single most common installation failure.
+      In Raspberry Pi Imager, expand "Raspberry Pi OS (other)" and pick an entry that explicitly
+      says <em>64-bit</em>.
+    </p>
+  </div>
+
+  <h3>Microphone</h3>
+  <p>
+    Any USB microphone or USB sound card will work. Microphone quality affects detection quality
+    more than almost anything else, so an inexpensive dedicated USB mic will noticeably outperform
+    a webcam's built-in microphone. Position it outdoors, sheltered from direct wind and rain.
+  </p>
+
+  <h2>Step 1 — Image the SD card</h2>
+  <p>
+    In Raspberry Pi Imager, choose your Pi model, select a 64-bit Raspberry Pi OS image, and
+    select your microSD card. Before writing, open the settings (the gear icon) and:
+  </p>
+  <ul>
+    <li>Set a hostname — <code>birdnetpi</code> is a good choice.</li>
+    <li>Enable SSH and set a username and password.</li>
+    <li>Enter your Wi-Fi network name and password, unless you're using Ethernet.</li>
+    <li>Set your locale and timezone. <strong>Get the timezone right</strong> — every "today", hourly chart, and dawn-chorus calculation depends on it.</li>
+  </ul>
+  <p>Write the image, then put the card in the Pi.</p>
+
+  <h2>Step 2 — Connect the microphone and boot</h2>
+  <p>
+    Plug the USB microphone in <em>before</em> powering on, so it's present when the system first
+    enumerates audio devices. Power up the Pi and give it a couple of minutes to complete its
+    first boot.
+  </p>
+
+  <h2>Step 3 — Run the installer</h2>
+  <p>Connect over SSH from another computer, substituting the username you chose:</p>
+  <pre><code>ssh yourusername@birdnetpi.local</code></pre>
+  <p>Then run the installer. This is the entire installation:</p>
+  <pre><code>curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Enhanced-Version/main/newinstaller.sh | bash</code></pre>
+  <p>
+    You can run this as the very first command on a fresh system — the installer takes care of
+    any and all necessary updates itself. It writes a log to
+    <code>$HOME/installation-$(date "+%F").txt</code>, which is the first thing to check if
+    anything goes wrong.
+  </p>
+  <div class="note">
+    <p>
+      Expect this to take a while and to look idle at points. Compiling and installing
+      dependencies on a Raspberry Pi is slow. Leave it alone until it returns.
+    </p>
+  </div>
+
+  <div class="note warn">
+    <p>
+      <strong>Installing alongside other servers is not supported.</strong> BirdNET-Pi expects to
+      own the web server configuration on the machine. If you need to coexist with an existing
+      web stack, open a
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">discussion</a>
+      first.
+    </p>
+  </div>
+
+  <h2>Step 4 — Open the web interface</h2>
+  <p>From any browser on the same network:</p>
+  <ul>
+    <li><code>http://birdnetpi.local</code> — or your Pi's IP address if that name doesn't resolve</li>
+    <li>Default username: <code>birdnet</code></li>
+    <li>The password is <strong>empty by default</strong></li>
+  </ul>
+
+  <h2>Step 5 — Finish setup</h2>
+  <p>
+    The dashboard shows a setup checklist until the essentials are done. Two of them genuinely
+    matter:
+  </p>
+  <ul>
+    <li>
+      <strong>Set your latitude and longitude</strong> in Settings. Without coordinates, species
+      range filtering can't work and you'll get identifications for birds that don't occur near
+      you. Weather data also depends on this.
+    </li>
+    <li>
+      <strong>Set an admin password</strong> under Advanced Settings. Until you do, anyone on your
+      network can change your station's configuration.
+    </li>
+  </ul>
+  <p>
+    Then wait. Most stations get their first detection within minutes, and the analytics and
+    insights pages become genuinely interesting after a week or two of data.
+  </p>
+
+  <h2>Keeping it updated</h2>
+  <p>
+    Update from the web interface under <strong>Tools → System Controls → Update</strong>. New
+    releases are published on the
+    <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/releases">GitHub releases page</a>.
+  </p>
+
+  <h2>Uninstalling</h2>
+  <p>
+    This removes the software and the BirdNET-Pi directory, <strong>deleting all of your audio
+    and database files</strong> in the process. Back up first if you care about your data.
+  </p>
+  <pre><code>/usr/local/bin/uninstall.sh &amp;&amp; cd ~ &amp;&amp; rm -drf BirdNET-Pi</code></pre>
+
+  <div class="next-steps">
+    <a class="btn btn-primary" href="features.html">What you can do with it</a>
+    <a class="btn btn-ghost" href="troubleshooting.html">Troubleshooting</a>
+    <a class="btn btn-ghost" href="migrate.html">Coming from another fork?</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version">GitHub</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Discussions</a>
+    </div>
+    <p>
+      BirdNET-Pi Enhanced Version by zach7036 — free and open source under CC BY-NC-SA 4.0.
+      Not affiliated with the Cornell Lab of Ornithology.
+    </p>
+  </div>
+</footer>
+</body>
+</html>

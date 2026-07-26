@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Migrating to BirdNET-Pi Enhanced from Nachtzuster or mcguirepr89</title>
+<meta name="description" content="How to switch an existing BirdNET-Pi installation to the Enhanced Version without losing your detection history: back up first, point the git remote at the Enhanced repo, and run the updater.">
+<link rel="canonical" href="https://zach7036.github.io/migrate.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="BirdNET-Pi Enhanced Version">
+<meta property="og:title" content="Migrating to BirdNET-Pi Enhanced from Nachtzuster or mcguirepr89">
+<meta property="og:description" content="Switch an existing BirdNET-Pi station to the Enhanced Version in three commands, keeping your full detection history.">
+<meta property="og:url" content="https://zach7036.github.io/migrate.html">
+<meta property="og:image" content="https://zach7036.github.io/assets/img/birdnet-pi-enhanced-dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zach7036.github.io/assets/img/birdnet-pi-enhanced-dashboard.png">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">BirdNET-Pi <span>Enhanced</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html" aria-current="page">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Help</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap">
+
+  <p class="kicker">Migration</p>
+  <h1>Migrating an existing BirdNET-Pi to the Enhanced Version</h1>
+  <p class="lead">
+    If you already run BirdNET-Pi — Nachtzuster's fork or the original mcguirepr89 version — you
+    don't need to start over. Your detections, recordings, and settings carry across. In the
+    normal case this is three commands.
+  </p>
+
+  <div class="note warn">
+    <p>
+      <strong>Back up before you start.</strong> A backup is the only way to return to your
+      previous fork if you change your mind. Take one from
+      <strong>Tools → System Controls → Backup</strong>, and copy the resulting file somewhere
+      that isn't the Pi.
+    </p>
+  </div>
+
+  <h2>Before you begin</h2>
+  <ul>
+    <li><strong>Update your current installation first.</strong> Migrating from an up-to-date station is far more reliable than migrating from one that's months behind.</li>
+    <li><strong>Check your OS version.</strong> You need 64-bit Raspberry Pi OS, Bookworm or Trixie.</li>
+    <li><strong>Take that backup.</strong> Genuinely.</li>
+  </ul>
+
+  <div class="note warn">
+    <p>
+      <strong>You cannot upgrade Bullseye in place.</strong> Upgrading the underlying OS from
+      Bullseye to Bookworm or Trixie without a fresh install does not work and will leave you
+      with a broken system. If you're on Bullseye, image a new card, install fresh, and restore
+      your data with the Restore tool — see <a href="#bullseye">the fresh-install route</a> below.
+    </p>
+  </div>
+
+  <h2>The normal route: your OS is already correct</h2>
+  <p>SSH into your Pi, then from inside the BirdNET-Pi directory:</p>
+  <pre><code>cd ~/BirdNET-Pi
+git remote remove origin
+git remote add origin https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git
+./scripts/update_birdnet.sh</code></pre>
+  <p>
+    That repoints your installation at the Enhanced repository and runs the standard updater,
+    which pulls the new code and applies any schema changes. Your database, audio files, and
+    configuration stay where they are.
+  </p>
+  <p>
+    When it finishes, reload the web interface. You should land on the new dashboard with your
+    full detection history already present.
+  </p>
+
+  <h2 id="bullseye">The fresh-install route: upgrading from Bullseye</h2>
+  <p>If you need to move to a newer OS, treat it as a new station plus a data restore:</p>
+  <ol>
+    <li>On the old system, take a full backup and copy it off the Pi.</li>
+    <li>Image a new SD card with 64-bit Raspberry Pi OS (Trixie recommended). See the <a href="install.html">installation guide</a>.</li>
+    <li>Install the Enhanced Version with the one-line installer.</li>
+    <li>In the new web interface, go to <strong>Tools → System Controls → Restore</strong> and restore your backup.</li>
+  </ol>
+  <p>
+    Restoring can take a long while — it depends on how much audio you've accumulated and how
+    fast your storage is. Let it finish.
+  </p>
+
+  <h2>After migrating</h2>
+  <p>Two settings are worth checking immediately, because the new features depend on them:</p>
+  <ul>
+    <li>
+      <strong>Latitude and longitude</strong> — these drive species range filtering, rarity
+      detection, and weather. If they were never set on your old station, set them now.
+    </li>
+    <li>
+      <strong>Admin password</strong> — set one under Advanced Settings if you haven't.
+    </li>
+  </ul>
+  <p>
+    Some of the newer pages need history to be interesting. Insights and seasonality compare
+    against your own station's baseline, so give them a couple of weeks before judging them —
+    though if you migrated with existing data, much of that is already available on day one.
+  </p>
+
+  <h2>Going back</h2>
+  <p>
+    The same procedure works in reverse: remove the origin remote, add the fork you want, and run
+    the updater. Since both forks share the SQLite database format, your detection history
+    survives the round trip. This is what the backup is insurance for.
+  </p>
+
+  <div class="note">
+    <p>
+      Something not working after migrating? Restarting the core services from
+      <strong>Tools → Services</strong> resolves a surprising share of post-migration oddities.
+      Beyond that, see <a href="troubleshooting.html">troubleshooting</a> or open an
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues">issue</a>.
+    </p>
+  </div>
+
+  <div class="next-steps">
+    <a class="btn btn-primary" href="features.html">What's new to explore</a>
+    <a class="btn btn-ghost" href="compare.html">Compare the versions</a>
+    <a class="btn btn-ghost" href="troubleshooting.html">Troubleshooting</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version">GitHub</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Discussions</a>
+    </div>
+    <p>
+      BirdNET-Pi Enhanced Version by zach7036 — free and open source under CC BY-NC-SA 4.0.
+      Not affiliated with the Cornell Lab of Ornithology.
+    </p>
+  </div>
+</footer>
+</body>
+</html>

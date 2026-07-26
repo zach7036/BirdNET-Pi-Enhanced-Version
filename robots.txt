@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://zach7036.github.io/sitemap.xml

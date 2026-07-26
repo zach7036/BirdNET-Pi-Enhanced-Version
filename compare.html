@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BirdNET-Pi Versions Compared — Enhanced vs. Nachtzuster</title>
+<meta name="description" content="An honest comparison of the two main BirdNET-Pi forks: the Enhanced Version by zach7036 and the Nachtzuster version. Same detection engine, different priorities — see which one fits your Raspberry Pi and how you want to use your data.">
+<link rel="canonical" href="https://zach7036.github.io/compare.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="BirdNET-Pi Enhanced Version">
+<meta property="og:title" content="BirdNET-Pi Versions Compared — Enhanced vs. Nachtzuster">
+<meta property="og:description" content="Same detection engine, different priorities. A straightforward comparison of the two main BirdNET-Pi forks.">
+<meta property="og:url" content="https://zach7036.github.io/compare.html">
+<meta property="og:image" content="https://zach7036.github.io/assets/img/birdnet-pi-analytics-dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zach7036.github.io/assets/img/birdnet-pi-analytics-dashboard.png">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">BirdNET-Pi <span>Enhanced</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html" aria-current="page">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Help</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap">
+
+  <p class="kicker">Choosing a version</p>
+  <h1>BirdNET-Pi Enhanced vs. Nachtzuster</h1>
+  <p class="lead">
+    There are two actively maintained BirdNET-Pi forks. They share the same detection engine and
+    identify birds equally well — the difference is what happens to your detections afterward.
+  </p>
+
+  <h2>The short answer</h2>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Choose the Enhanced Version if…</h3>
+      <ul class="plain">
+        <li>You want a modern dashboard rather than tables</li>
+        <li>You care about charts, trends, and patterns in your data</li>
+        <li>You want weather correlated with bird activity</li>
+        <li>You want to review and verify uncertain detections</li>
+        <li>You're running a Pi 4B, 400, or 5</li>
+        <li>You'll browse your station from a phone</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Choose Nachtzuster's version if…</h3>
+      <ul class="plain">
+        <li>You want the leanest possible install</li>
+        <li>You're on a Pi 3B+ or Zero 2 W</li>
+        <li>You mainly feed BirdWeather and rarely open the UI</li>
+        <li>You prefer the largest, longest-established community</li>
+        <li>You value a minimal, stable surface over new features</li>
+      </ul>
+    </div>
+  </div>
+  <p>
+    Neither is a wrong answer. The Enhanced Version does more, which costs some CPU and storage;
+    Nachtzuster's does less, on purpose, and does it reliably.
+  </p>
+
+  <h2>What's the same</h2>
+  <p>
+    Both forks descend from Patrick McGuire's original BirdNET-Pi and both use the same
+    <a href="https://github.com/kahst/BirdNET-Analyzer">BirdNET</a> machine learning framework
+    with the same TFLite models. That means:
+  </p>
+  <ul>
+    <li><strong>Identification accuracy is the same.</strong> Neither fork changes the model.</li>
+    <li>Both do 24/7 recording, automatic clip extraction, and disk-space management.</li>
+    <li>Both integrate with <a href="https://app.birdweather.com">BirdWeather</a>.</li>
+    <li>Both use the same SQLite database format, so your history moves between them.</li>
+    <li>Both support Apprise notifications and localized species names.</li>
+    <li>Both are free, open source, and CC BY-NC-SA 4.0 licensed.</li>
+  </ul>
+  <p>
+    If someone tells you one fork "detects more birds" than the other, that isn't how it works —
+    detection is the model's job, and it's the same model.
+  </p>
+
+  <h2>What the Enhanced Version adds</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Capability</th><th>Enhanced</th><th>Nachtzuster</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Real-time BirdNET identification</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+        <tr><td>Live audio stream &amp; spectrogram</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+        <tr><td>BirdWeather integration</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+        <tr><td>Redesigned responsive interface</td><td class="yes">Yes</td><td class="no">Classic UI</td></tr>
+        <tr><td>Dark mode</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Interactive charts (Chart.js)</td><td class="yes">Yes</td><td class="no">Static graphs</td></tr>
+        <tr><td>Behavioral insights suite</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Weather-correlated activity analysis</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Detection review queue</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Timeline day replay</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Per-species detail pages</td><td class="yes">Yes</td><td class="no">Basic</td></tr>
+        <tr><td>eBird checklist export tools</td><td class="yes">Rebuilt</td><td class="no">Basic</td></tr>
+        <tr><td>Year in Birds report</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Installable as a phone app (PWA)</td><td class="yes">Yes</td><td class="no">—</td></tr>
+        <tr><td>Runs well on Pi 3B+ / Zero 2 W</td><td class="no">Detection yes, reports slow</td><td class="yes">Yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>The difference in practice</h2>
+  <p>
+    Both forks will tell you that a Northern Cardinal was detected at 6:14 a.m. with 87%
+    confidence. The Enhanced Version is built around the next question: is that normal for this
+    time of year, has this bird been showing up daily or has it just returned after three weeks
+    away, does it sing earlier on warm mornings, and is 87% actually good enough to trust?
+  </p>
+
+  <figure>
+    <img src="assets/img/birdnet-pi-weather-insights.png"
+         alt="BirdNET-Pi Enhanced weather insights page showing plain-English takeaways about how temperature and conditions affect bird detection activity"
+         width="1600" height="900" loading="lazy">
+    <figcaption>Insights pages state conclusions in plain English rather than leaving you to read charts.</figcaption>
+  </figure>
+
+  <h2>Can I switch later?</h2>
+  <p>
+    Yes, in both directions, and your detection history comes with you — the database format is
+    shared. Switching is a few commands, not a reinstall. See the
+    <a href="migrate.html">migration guide</a>, and take a backup first.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>A note on the older wiki.</strong> The original mcguirepr89 installation guide is
+      marked deprecated and points readers to Nachtzuster's fork. That notice predates this
+      project entirely — it isn't a statement about the Enhanced Version, which is actively
+      maintained and regularly released.
+    </p>
+  </div>
+
+  <div class="next-steps">
+    <a class="btn btn-primary" href="install.html">Install the Enhanced Version</a>
+    <a class="btn btn-ghost" href="migrate.html">Migrate an existing station</a>
+    <a class="btn btn-ghost" href="screenshots.html">See the screenshots</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version">GitHub</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Discussions</a>
+    </div>
+    <p>
+      BirdNET-Pi Enhanced Version by zach7036 — free and open source under CC BY-NC-SA 4.0.
+      Not affiliated with the Cornell Lab of Ornithology.
+    </p>
+  </div>
+</footer>
+</body>
+</html>

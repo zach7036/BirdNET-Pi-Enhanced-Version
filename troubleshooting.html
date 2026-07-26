@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BirdNET-Pi Troubleshooting — Common Problems and Fixes</title>
+<meta name="description" content="Fixes for common BirdNET-Pi problems: no detections, birdnetpi.local not loading, installation failures, microphone not detected, missing weather data, false positives, disk filling up, and how to back up your database.">
+<link rel="canonical" href="https://zach7036.github.io/troubleshooting.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="BirdNET-Pi Enhanced Version">
+<meta property="og:title" content="BirdNET-Pi Troubleshooting — Common Problems and Fixes">
+<meta property="og:description" content="No detections, can't reach birdnetpi.local, install failures, microphone problems, missing weather, false positives, and full disks — with fixes.">
+<meta property="og:url" content="https://zach7036.github.io/troubleshooting.html">
+<meta property="og:image" content="https://zach7036.github.io/assets/img/birdnet-pi-system-health.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zach7036.github.io/assets/img/birdnet-pi-system-health.png">
+<link rel="stylesheet" href="assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Why is my BirdNET-Pi not detecting any birds?",
+      "acceptedAnswer": { "@type": "Answer", "text": "First restart the core services from Tools then Services. If that doesn't help, check that your USB microphone is detected and that the recording service is running. Open the Live page: if the spectrogram is flat and silent, the problem is audio capture rather than identification. Also confirm your latitude and longitude are set, since range filtering with default coordinates can suppress local species." }
+    },
+    {
+      "@type": "Question",
+      "name": "Why can't I reach birdnetpi.local?",
+      "acceptedAnswer": { "@type": "Answer", "text": "The .local hostname relies on mDNS, which some networks and devices do not resolve. Use the Raspberry Pi's IP address directly instead. You can find it from your router's device list or by running hostname -I on the Pi over SSH." }
+    },
+    {
+      "@type": "Question",
+      "name": "My BirdNET-Pi installation failed. What went wrong?",
+      "acceptedAnswer": { "@type": "Answer", "text": "The most common cause is installing on a 32-bit operating system. BirdNET-Pi requires the 64-bit version of Raspberry Pi OS. The installer writes a log to your home directory named installation followed by the date; check the end of that file for the actual error." }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I fix false positive bird detections?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Use the Review queue to mark incorrect identifications as false positives. Reviewed false positives are excluded from species counts, insights, and eBird exports. For species that are persistently wrong, add them to the exclude list in Settings. Setting accurate coordinates also helps, because range filtering suppresses species that do not occur in your area." }
+    },
+    {
+      "@type": "Question",
+      "name": "My Raspberry Pi disk is filling up with recordings",
+      "acceptedAnswer": { "@type": "Answer", "text": "BirdNET-Pi purges old audio automatically when space runs low, so a gradually filling disk is normal. You can lower the clip retention period in Settings under Privacy. Recordings you have crowned as favourites are protected from automatic purging." }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I back up my BirdNET-Pi database?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Use Tools then System Controls then Backup in the web interface, then copy the resulting archive off the Pi. You can also run scripts/backup_data.sh directly from the command line with the backup action and a target file path." }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">BirdNET-Pi <span>Enhanced</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html" aria-current="page">Help</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap">
+
+  <p class="kicker">Troubleshooting</p>
+  <h1>Common problems and how to fix them</h1>
+  <p class="lead">
+    Start here before opening an issue — most problems fall into a handful of categories, and a
+    surprising share of the strange ones are solved by restarting the core services.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>Try this first.</strong> Go to <strong>Tools → Services → Restart Core Services</strong>.
+      It resolves a genuinely large fraction of odd behaviour, and it's fast and safe.
+    </p>
+  </div>
+
+  <h2>Detection problems</h2>
+
+  <details>
+    <summary>No detections at all</summary>
+    <p>Work through it in this order:</p>
+    <ol>
+      <li>Restart core services from <strong>Tools → Services</strong>.</li>
+      <li>Open the <strong>Live</strong> page and look at the spectrogram. If it's flat and silent, this is an audio capture problem, not an identification problem — skip to the microphone section below.</li>
+      <li>Check your <strong>latitude and longitude</strong> in Settings. With coordinates left at <code>0.000</code>, range filtering has no idea where you are and can suppress the species that actually live around you.</li>
+      <li>Check the <strong>Station Doctor</strong> page, which tests the recording and analysis services directly and offers one-click fixes.</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary>Detections stopped suddenly after working fine</summary>
+    <p>
+      Usually a service that died rather than anything to do with the model. Restart core
+      services, then check Station Doctor. A full disk can also stop recording — see the storage
+      section.
+    </p>
+  </details>
+
+  <details>
+    <summary>Too many false positives</summary>
+    <p>
+      Some misidentification is inherent to acoustic ID, but you have three levers:
+    </p>
+    <ul>
+      <li><strong>Review them.</strong> The Review queue surfaces uncertain detections with comparison clips. Marking one as a false positive removes it from species counts, insights, and eBird exports.</li>
+      <li><strong>Set your coordinates.</strong> Range filtering suppresses species that don't occur near you, which eliminates a whole class of nonsense results.</li>
+      <li><strong>Use the exclude list.</strong> For a species that's persistently wrong at your station, add it to the exclusion list in Settings.</li>
+    </ul>
+    <p>Raising the confidence threshold also works, but costs you real detections — try the above first.</p>
+  </details>
+
+  <details>
+    <summary>It keeps detecting human speech or music</summary>
+    <p>
+      Settings includes a human-voice filter under the Privacy section. Raising its threshold
+      helps in environments with conversation, television, or radio nearby.
+    </p>
+  </details>
+
+  <h2>Access problems</h2>
+
+  <details>
+    <summary>birdnetpi.local won't load</summary>
+    <p>
+      That hostname depends on mDNS, which plenty of networks and devices simply don't resolve —
+      Windows and some Android versions are common offenders. Use the Pi's IP address instead.
+      Find it in your router's device list, or over SSH:
+    </p>
+    <pre><code>hostname -I</code></pre>
+    <p>Then browse to <code>http://192.168.x.x</code> with that address. Consider giving the Pi a DHCP reservation so it stays put.</p>
+  </details>
+
+  <details>
+    <summary>I don't know the login</summary>
+    <p>
+      The default username is <code>birdnet</code> and the password is <strong>empty</strong>
+      until you set one. If you set a password and lost it, you can change it over SSH from the
+      configuration file on the Pi.
+    </p>
+  </details>
+
+  <h2>Installation problems</h2>
+
+  <details>
+    <summary>The installer failed partway through</summary>
+    <p>
+      Check the install log first — it's in your home directory, named
+      <code>installation-YYYY-MM-DD.txt</code>. The real error is usually near the end, and it's
+      what anyone helping you will ask for.
+    </p>
+    <p>By far the most common cause is a <strong>32-bit OS</strong>. Confirm with:</p>
+    <pre><code>uname -m</code></pre>
+    <p>
+      You want <code>aarch64</code>. If you see <code>armv7l</code>, you're on 32-bit and need to
+      reimage with a 64-bit image.
+    </p>
+  </details>
+
+  <details>
+    <summary>Can I install alongside my existing web server?</summary>
+    <p>
+      Not supported. BirdNET-Pi expects to own the web server configuration on the machine, and
+      installing over an existing stack causes conflicts that are painful to unpick. Use a
+      dedicated Pi, or open a
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">discussion</a>
+      about your setup.
+    </p>
+  </details>
+
+  <details>
+    <summary>Is a Raspberry Pi 3B+ or Zero 2 W good enough?</summary>
+    <p>
+      For detection, yes — with <strong>RaspiOS-ARM64-Lite</strong> specifically. But the
+      analytics and insights pages do real work across your full history, and on those boards
+      they get slow as data accumulates. A Pi 4B, 400, or 5 is strongly recommended if you plan
+      to actually use the reporting features.
+    </p>
+  </details>
+
+  <h2>Microphone and audio</h2>
+
+  <details>
+    <summary>My USB microphone isn't detected</summary>
+    <p>Over SSH, check that the system can see it:</p>
+    <pre><code>arecord -l</code></pre>
+    <p>
+      If nothing is listed, it's a hardware or power issue: try a different USB port, avoid
+      unpowered hubs, and reboot with the microphone already plugged in. If it <em>is</em> listed
+      but you get no audio, check the input level under Settings — some USB microphones default
+      to very low gain.
+    </p>
+  </details>
+
+  <details>
+    <summary>Recordings are noisy or distorted</summary>
+    <p>
+      Usually placement or gain. Shelter the microphone from direct wind and rain, keep it away
+      from air conditioners and busy roads, and reduce the input gain if loud calls are clipping.
+      The Live spectrogram is the fastest way to evaluate a change — a constant band across the
+      bottom generally means low-frequency noise like traffic or wind.
+    </p>
+  </details>
+
+  <h2>Weather</h2>
+
+  <details>
+    <summary>No weather data is showing</summary>
+    <p>
+      Nearly always because latitude and longitude are still at their defaults. Set them in
+      Settings, then run a manual sync from Station Doctor. There's no plugin to install and no
+      API key needed. See the <a href="weather.html">weather guide</a> for detail.
+    </p>
+  </details>
+
+  <h2>Storage</h2>
+
+  <details>
+    <summary>The disk is filling up</summary>
+    <p>
+      Expected to a point — BirdNET-Pi purges old audio automatically as space gets tight. To use
+      less, lower the clip retention period in Settings under Privacy. Recordings you've crowned
+      as favourites are protected from automatic purging, so they'll survive cleanup.
+    </p>
+  </details>
+
+  <details>
+    <summary>How do I back up my data?</summary>
+    <p>
+      From the web interface: <strong>Tools → System Controls → Backup</strong>, then copy the
+      archive somewhere that isn't the Pi. From the command line, assuming your backup medium is
+      mounted at <code>/mnt</code>:
+    </p>
+    <pre><code>./scripts/backup_data.sh -a backup -f /mnt/birds/backup-2024-07-09.tar</code></pre>
+    <p>And to restore:</p>
+    <pre><code>./scripts/backup_data.sh -a restore -f /mnt/birds/backup-2024-07-09.tar</code></pre>
+    <p>Large collections take a long time in both directions. Let it finish.</p>
+  </details>
+
+  <h2>Still stuck?</h2>
+  <p>
+    Search the <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues">issue tracker</a>
+    before opening anything new — there's a good chance someone hit it already. Open an
+    <strong>issue</strong> for problems and a
+    <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">discussion</a>
+    for ideas and questions.
+  </p>
+  <p>
+    When reporting a problem, include your Raspberry Pi model, OS version, whether you installed
+    fresh or migrated, and the relevant part of the install log or service output. It saves a
+    round trip.
+  </p>
+
+  <div class="next-steps">
+    <a class="btn btn-primary" href="install.html">Installation guide</a>
+    <a class="btn btn-ghost" href="weather.html">Weather setup</a>
+    <a class="btn btn-ghost" href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Ask a question</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="install.html">Install</a>
+      <a href="features.html">Features</a>
+      <a href="weather.html">Weather</a>
+      <a href="compare.html">Compare</a>
+      <a href="migrate.html">Migrate</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version">GitHub</a>
+      <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions">Discussions</a>
+    </div>
+    <p>
+      BirdNET-Pi Enhanced Version by zach7036 — free and open source under CC BY-NC-SA 4.0.
+      Not affiliated with the Cornell Lab of Ornithology.
+    </p>
+  </div>
+</footer>
+</body>
+</html>
