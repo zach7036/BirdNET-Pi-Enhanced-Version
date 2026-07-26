@@ -230,6 +230,9 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
   'use strict';
   var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) { return String(s == null ? '' : s); };
   var visitExplainer = <?php echo js_arg($visit_explainer); ?>;
+  // Pristine server-rendered hero state, restored when the day rolls over
+  // while the page is open and there are no detections yet.
+  var heroPhotoPlaceholder = document.getElementById('heroPhoto').innerHTML;
 
   function formatAgo(seconds) {
     if (seconds < 90) return 'just now';
@@ -276,6 +279,20 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     if (!v) {
       document.getElementById('heroSpecies').textContent = 'No detections yet today';
       document.getElementById('heroMeta').textContent = 'The station is listening.';
+      document.getElementById('heroSci').textContent = '';
+      document.getElementById('heroBadges').innerHTML = '';
+      document.getElementById('heroPhoto').innerHTML = heroPhotoPlaceholder;
+      var emptyAudio = document.getElementById('heroAudio');
+      if (emptyAudio.getAttribute('data-src')) {
+        emptyAudio.pause();
+        emptyAudio.removeAttribute('data-src');
+        emptyAudio.removeAttribute('src');
+        emptyAudio.load();
+      }
+      emptyAudio.style.display = 'none';
+      var emptyDetailLink = document.getElementById('heroDetailLink');
+      emptyDetailLink.href = '?view=Species';
+      emptyDetailLink.innerHTML = 'All species &rarr;';
       return;
     }
     document.getElementById('heroSpecies').textContent = v.species;
@@ -333,10 +350,8 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     document.getElementById('kpiSpecies').textContent = data.today.species;
     document.getElementById('kpiVisits').textContent = data.today.visits;
     document.getElementById('kpiNew').textContent = data.today.new_species;
-    if (data.review_worthy > 0) {
-      document.getElementById('reviewWorthyCount').textContent = data.review_worthy;
-      document.getElementById('heroReviewLink').style.display = '';
-    }
+    document.getElementById('reviewWorthyCount').textContent = data.review_worthy;
+    document.getElementById('heroReviewLink').style.display = data.review_worthy > 0 ? '' : 'none';
   }
 
   function refreshNow() {
