@@ -47,10 +47,10 @@
 
   <div class="note warn">
     <p>
-      <strong>Back up before you start.</strong> A backup is the only way to return to your
-      previous fork if you change your mind. Take one from
-      <strong>Tools → System Controls → Backup</strong>, and copy the resulting file somewhere
-      that isn't the Pi.
+      <strong>Back up before you start.</strong> A backup is the only supported way to return to
+      your previous fork if you change your mind. Take one from
+      <strong>Settings → System Controls → Backup data</strong>, and copy the resulting file
+      somewhere that isn't the Pi.
     </p>
   </div>
 
@@ -92,7 +92,7 @@ git remote add origin https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.gi
     <li>On the old system, take a full backup and copy it off the Pi.</li>
     <li>Image a new SD card with 64-bit Raspberry Pi OS (Trixie recommended). See the <a href="install.html">installation guide</a>.</li>
     <li>Install the Enhanced Version with the one-line installer.</li>
-    <li>In the new web interface, go to <strong>Tools → System Controls → Restore</strong> and restore your backup.</li>
+    <li>In the new web interface, go to <strong>Settings → System Controls</strong> and restore your backup.</li>
   </ol>
   <p>
     Restoring can take a long while — it depends on how much audio you've accumulated and how
@@ -118,15 +118,22 @@ git remote add origin https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.gi
 
   <h2>Going back</h2>
   <p>
-    The same procedure works in reverse: remove the origin remote, add the fork you want, and run
-    the updater. Since both forks share the SQLite database format, your detection history
-    survives the round trip. This is what the backup is insurance for.
+    <strong>Restore your backup.</strong> That is the supported route back to your previous fork,
+    and it's the reason for taking one before you start.
+  </p>
+  <p>
+    Pointing the git remote back the other way and re-running the updater looks like it should
+    work — the Enhanced Version only ever adds tables to the database and never alters the
+    <code>detections</code> table, so your detection history itself isn't at risk. But the
+    installation also carries configuration keys and service definitions that the older fork's
+    updater doesn't know to clean up, and that path isn't tested. Restoring a backup onto a fresh
+    install is the route that's known to work.
   </p>
 
   <div class="note">
     <p>
       Something not working after migrating? Restarting the core services from
-      <strong>Tools → Services</strong> resolves a surprising share of post-migration oddities.
+      <strong>Settings → Services</strong> resolves a surprising share of post-migration oddities.
       Beyond that, see <a href="troubleshooting.html">troubleshooting</a> or open an
       <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues">issue</a>.
     </p>

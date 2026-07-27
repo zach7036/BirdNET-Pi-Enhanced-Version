@@ -33,7 +33,7 @@
     {
       "@type": "Question",
       "name": "Why is my BirdNET-Pi weather data missing?",
-      "acceptedAnswer": { "@type": "Answer", "text": "The most common cause is that latitude and longitude are still at their default of 0.000. Set real coordinates in Settings, then run a manual sync from the Station Doctor page. Weather also backfills up to seven days of history when it syncs." }
+      "acceptedAnswer": { "@type": "Answer", "text": "The most common cause is that latitude and longitude are still at their default of 0.000. Set real coordinates under Settings, Settings, Location and Weather, then run a manual sync from Settings then Station Doctor. Weather also backfills up to seven days of history when it syncs." }
     },
     {
       "@type": "Question",
@@ -80,8 +80,8 @@
     it needs from you is where your station is:
   </p>
   <ol>
-    <li>Open <strong>Settings</strong> in your BirdNET-Pi web interface.</li>
-    <li>Set your <strong>latitude</strong> and <strong>longitude</strong>.</li>
+    <li>In your BirdNET-Pi web interface, open <strong>Settings</strong> in the sidebar, then the <strong>Settings</strong> button on the page that opens.</li>
+    <li>Under <strong>Location &amp; Weather</strong>, set your <strong>latitude</strong> and <strong>longitude</strong>.</li>
     <li>Save.</li>
   </ol>
   <p>
@@ -129,7 +129,7 @@
   <h2>Units</h2>
   <p>
     Set Celsius or Fahrenheit and your preferred wind speed unit under
-    <strong>Settings → Display &amp; Units</strong>. Weather is always stored in one canonical
+    <strong>Settings → Settings → Display &amp; Units</strong>. Weather is always stored in one canonical
     format internally and converted only for display, so switching units never rewrites or
     corrupts your history — and Celsius brackets are true 5&deg;C bins rather than converted
     Fahrenheit ones.
@@ -154,8 +154,9 @@
     <summary>My weather data is empty or missing</summary>
     <p>
       Almost always this means latitude and longitude are still <code>0.000</code>. Set real
-      coordinates in Settings, then trigger a manual sync from the Station Doctor page. If it
-      still fails, check that the Pi has outbound internet access.
+      coordinates under <strong>Settings → Settings → Location &amp; Weather</strong>, then
+      trigger a manual sync from <strong>Settings → Station Doctor</strong>. If it still fails,
+      check that the Pi has outbound internet access.
     </p>
   </details>
   <details>
