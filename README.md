@@ -1,218 +1,425 @@
-<h1 align="center"><a href="https://github.com/mcguirepr89/BirdNET-Pi/blob/main/LICENSE">Review the license!!</a></h1>
-<h1 align="center">You may not use BirdNET-Pi to develop a commercial product!!!!</h1>
-<h1 align="center">
-  BirdNET-Pi: Enhanced Version
-</h1>
-<p align="center">
-A realtime acoustic bird classification system for the Raspberry Pi 5, 4B, 400, 3B+, and 0W2
-</p>
-<p align="center">
-  <img src="https://user-images.githubusercontent.com/60325264/140656397-bf76bad4-f110-467c-897d-992ff0f96476.png" />
-</p>
+<div align="center">
 
-## About This Enhanced Version
-This repository is an enhanced, fully modernized version of BirdNET-Pi, built on top of the excellent backend foundations laid by [Nachtzuster](https://github.com/Nachtzuster/BirdNET-Pi) and the original creator [mcguirepr89](https://github.com/mcguirepr89/BirdNET-Pi). 
+# BirdNET-Pi Enhanced Version
 
-This version introduces a complete overhaul of the user interface to bring the system inline with modern web design standards, along with highly requested functional improvements.
+**Turn a Raspberry Pi into a 24/7 backyard bird observatory.**
 
-Note: see 'Migrating from previous forks' on how to migrate from Nachtzuster.
-## Introduction
-BirdNET-Pi is built on the [BirdNET framework](https://github.com/kahst/BirdNET-Analyzer) by [**@kahst**](https://github.com/kahst) <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/"><img src="https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg"></a> using [pre-built TFLite binaries](https://github.com/PINTO0309/TensorflowLite-bin) by [**@PINTO0309**](https://github.com/PINTO0309) . It is able to recognize bird sounds from a USB microphone or sound card in realtime and share its data with the rest of the world.
+Identify birds by sound in real time — then actually understand what you're hearing.
+A modern dashboard, interactive analytics, weather-aware patterns, and plain-English
+insights about the birds around your home.
 
-Check out birds from around the world
-- [BirdWeather](https://app.birdweather.com)<br>
+[![Latest release](https://img.shields.io/github/v/release/zach7036/BirdNET-Pi-Enhanced-Version?label=release&color=0d7d78)](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/releases)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![Platform: Raspberry Pi](https://img.shields.io/badge/platform-Raspberry%20Pi-c51a4a.svg)](https://www.raspberrypi.com/)
 
-## Features Deep Dive
-* **24/7 recording and automatic identification** of bird songs, chirps, and peeps using BirdNET machine learning
-* **Automatic extraction and cataloguing** of bird clips from full-length recordings
-* **Tools to visualize your recorded bird data** and analyze trends
-* **Live audio stream and spectrogram**
-* **Automatic disk space management** that periodically purges old audio files
-* [BirdWeather](https://app.birdweather.com) integration
-* Web interface access to all data and logs provided by [Caddy](https://caddyserver.com)
-* SQLite3 Database, [Adminer](https://www.adminer.org/) database maintenance, and FTP server included
-* [Apprise Notifications](https://github.com/caronc/apprise) supporting 90+ notification platforms
+**[Website](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/)** ·
+[Install](#installation) ·
+[Features](#what-it-does) ·
+[Compare versions](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/compare.html) ·
+[Migrate](#migrating-from-another-fork) ·
+[Troubleshooting](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/troubleshooting.html)
 
+![The BirdNET-Pi Enhanced dashboard, showing today's story, the most recent bird with its photo and audio, station totals, and an hourly species heatmap](docs/now_page.png)
 
+</div>
 
-## Comprehensive List of Updates & New Features:
+---
 
-**1. Complete UI & Theme Redesign**
-- Fully modernized visual aesthetic using a cohesive teal, slate, and off-white color palette.
-- Implementation of a CSS variable system for consistent styling and a beautiful dark mode.
-- Replaced outdated HTML tables with responsive, rounded, shadow-styled CSS "cards" across almost all views (Overview, Recordings, Species, Analytics).
-- Compacted header and grouped left-side navigation elements for a cleaner layout.
+## More than a detection log
 
-**2. Dashboard & Layout Overhaul**
-- **KPI Cards:** Transformed the old overview statistics into sleek, responsive Key Performance Indicator (KPI) cards aligned smoothly at the top.
-- **Live Activity Feed:** Built a brand new, constantly updating "Live Activity" feed displaying recent detections with confidence badges, cleanly integrated into the right-side navigation column.
-- **Live Audio Player:** Redesigned the Live Audio player as a dynamic floating panel that pins to the top right and gracefully auto-retracts.
+Connect a USB microphone to a Raspberry Pi and BirdNET-Pi listens continuously, identifies
+species using the BirdNET machine learning framework, saves the best recordings, and organizes
+everything into a web dashboard you can open from any device on your network.
 
-**3. Advanced Analytics & Data Visualizations**
-- **Comprehensive Analytics Dashboard (Chart.js):** Replaced legacy graphs with fully interactive Chart.js instances (hover tooltips, legend toggling, responsive resizing). Specific tools include:
-  - **Top 10 Species:** Horizontal bar ranking of most frequent visitors.
-  - **Detections by Time of Day:** Bar chart showing aggregate hourly activity levels.
-  - **Detection Trends:** Line chart plotting overall daily volume.
-  - **Species Detection Trends:** Stacked interactive area chart comparing daily volumes between uniquely selected species over time.
-  - **Species Diversity Over Time:** Line chart mapping the number of unique species detected per day.
-  - **Detection Patterns by Time of Day:** Multi-line chart overlapping hourly activity patterns for specific selected species.
+Identifying birds is where this project starts, not where it stops. **The Enhanced Version is
+built around the question that comes after the detection.** Any BirdNET-Pi will tell you a
+Northern Cardinal was heard at 6:14 a.m. with 87% confidence. This one is designed to answer:
+is that normal for this time of year, has this bird been showing up daily or has it just
+returned after three weeks away, does it sing earlier on warm mornings — and is 87% actually
+good enough to trust?
 
-**4. All-New Deep Insights Pages**
-- Built an entirely new "Insights" suite that analyzes your raw SQLite data to generate behavioral conclusions:
-  - **Dashboard:** Generates a dynamic "Yard Health Score" based on volume, stability, and rarity. Highlights Lifetime Milestones and categorizes "Rare Visitors" (<5 detections).
-  - **Behavior Analysis:** Automatically calculates your local "Dawn Chorus" participants, identifies "Nocturnal Species", and plots the earliest/latest active windows for your birds.
-  - **Migration & Seasonality:** Tracks "New Arrivals" (species seen for the first time in 14 days), notes who has "Gone Quiet", and visualizes "Seasonal Presence" matching actual detections against eBird expected frequencies.
+> [!TIP]
+> **Choosing between BirdNET-Pi versions?** This fork and
+> [Nachtzuster's](https://github.com/Nachtzuster/BirdNET-Pi) share the same detection engine and
+> identify birds equally well — the difference is what happens to your detections afterward.
+> See the [side-by-side comparison](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/compare.html).
 
-**5. Enhanced Heatmap & Weather Integration**
-- **High-DPI Heatmaps:** Upgraded the 24-hour heatmap to render flawlessly on high-resolution Retina displays. 
-- **Weather Integration:** Integrated **Open-Meteo** hourly weather data to paint real-time temperature/conditions directly onto the Heatmap and Live Activity feed.
+## Contents
 
-**6. Enhanced Species & Media Galleries**
-- **Robust Image Fetching:** Completely overhauled how species thumbnails are fetched. Added fail-safes, session caching, and multi-source fallbacks (Wikipedia & Flickr API).
-- High-resolution 1024px thumbnails and proper scaling for crisp image rendering.
-- Modernized the "Best Recordings" and "Species Detail" views into responsive grid layouts highlighting audio/video players.
+- [What it does](#what-it-does)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [First run](#first-run)
+- [Configuration](#configuration)
+- [Updating](#updating)
+- [Backup and restore](#backup-and-restore)
+- [Migrating from another fork](#migrating-from-another-fork)
+- [REST API](#rest-api)
+- [Troubleshooting](#troubleshooting)
+- [Privacy](#privacy)
+- [Contributing and support](#contributing-and-support)
+- [Credits](#credits)
+- [License](#license)
 
-**7. Upgraded eBird Integration**
-- Completely rebuilt the eBird Checklist Export utility.
-- Added a calendar **Date Picker** to allow historical checklist generation.
-- Added strict JavaScript validation to ensure required fields (Protocol, Observers, Distance) are filled.
-- Engineered dynamic CSS **SVG Tooltips** (`ⓘ`) next to every field to actively guide the user on eBird's official formatting rules.
+---
 
-## Screenshots
-![Now Page - Today's Story, Last Heard & Species Heatmap](docs/now_page.png)
+## What it does
 
-![Now Page - Today's Species Heatmap with Weather](docs/now_heatmap.png)
+### Today — the dashboard
 
-![Timeline - Day Replay](docs/timeline_day_replay.png)
+The home screen answers "what's happening in the yard right now." It leads with the most recent
+bird — photo, confidence, how long ago, how many times it's visited this week — followed by
+**Today's Story**, which only speaks when something is genuinely unusual: a new species, a bird
+returning after weeks away, a regular that has suddenly gone quiet, or a day notably busier or
+quieter than your own two-week baseline.
 
-![Analytics Dashboard](docs/analytics_dashboard.png)
+Below that, every species detected today, as a grid of cards with individual hourly activity
+charts or as a single heatmap of species against hours. Both carry the day's weather.
 
-![Analytics Dashboard - Top](docs/analytics_top.png)
+![Today's species as a heatmap, with each species against all 24 hours and hourly temperature and conditions along the top](docs/now_heatmap.png)
 
-![Analytics Dashboard - Bottom](docs/analytics_bottom.png)
+### Timeline — replay any day
 
-![Species Gallery with Bird Detail Pages](docs/species_gallery_v2.png)
+Pick a date and see the whole day at once: species as horizontal lanes, visits as blocks along a
+24-hour axis, weather across the top. Click any block to hear that recording. It's the fastest
+way to understand the shape of a day — the dawn surge, the midday lull, the evening return.
 
-![Review Queue - Verify by Comparison](docs/review_queue.png)
+![Timeline day replay with species lanes, visit blocks across 24 hours, and a weather strip](docs/timeline_day_replay.png)
 
-![Insights - Plain-English Takeaways (Migration)](docs/migration_takeaways.png)
+### Charts — interactive analytics
 
-![Insights - Seasonal Presence](docs/seasonal_presence.png)
+Real Chart.js instances, not static images: hover for values, click legend entries to toggle
+series, and they resize properly on a phone.
 
-![Settings - System Health](docs/settings_health.png)
+| Chart | Shows |
+|---|---|
+| Top 10 Species | Your most frequent visitors, ranked |
+| Detections by Time of Day | Aggregate hourly activity across your history |
+| Detection Trends | Daily detection volume over time |
+| Species Diversity Over Time | Unique species per day |
+| Species Detection Trends | Stacked comparison between species you choose |
+| Detection Patterns by Time of Day | Overlaid hourly curves for selected species |
+| New Species Detected | First-ever sightings, with dates |
 
-![Insights - Weather Impacts with Takeaways](docs/weather_takeaways.png)
+![The analytics dashboard with interactive charts for top species, hourly activity, and detection trends](docs/analytics_dashboard.png)
 
-![Your Year in Birds](docs/year_in_birds.png)
+### Insights — conclusions, not just charts
+
+The Insights section reads your own database and states what it finds in plain English. It stays
+quiet when there's nothing notable to say, so when it speaks it's worth reading.
+
+- **Dashboard** — a **Yard Health Score** combining volume, stability, and rarity, plus lifetime
+  milestones as you pass them and rare visitors worth a second look
+- **Behavior** — your local **dawn chorus order**, which species are genuinely nocturnal, and the
+  earliest and latest active windows for each bird
+- **Migration** — **new arrivals** (first heard in the last fortnight), regulars that have **gone
+  quiet**, peak weeks, and seasonal presence against expected frequency
+- **Weather** — how temperature and conditions actually change activity at *your* station
+- **Health** — confidence distribution and detection reliability over time
+- **Trends & Forecasting** — long-term diversity including the **Shannon index**, with projections
+- **Reports** — weekly, monthly, and yearly summaries, printable
+
+![Migration insights with plain-English takeaways above new arrivals and gone-quiet lists](docs/migration_takeaways.png)
+
+### Review — verify what you're not sure about
+
+BirdNET reports a confidence score, and scores in the middle of the range are genuinely
+uncertain. The review queue collects those, groups them into **visits** rather than individual
+detections, and gives you comparison clips of the same species from elsewhere in your history so
+you can judge by ear.
+
+Triage is keyboard-driven — <kbd>Y</kbd> confirm, <kbd>N</kbd> false positive, <kbd>U</kbd>
+unsure, <kbd>H</kbd> hide, <kbd>R</kbd> reassign, <kbd>J</kbd>/<kbd>K</kbd> to move — and your
+verdicts propagate. Detections marked as false positives are excluded from species counts,
+insights, and eBird exports, so a misidentification doesn't quietly pollute your statistics
+forever.
+
+![The review queue showing an uncertain detection beside comparison recordings of the same species](docs/review_queue.png)
+
+### Birds — a page per species
+
+Every species gets a calendar heatmap of when you've heard it, its best recordings, full
+detection history, and notes you can write yourself. Favourite species, mute ones you don't want
+notifications for, and crown a favourite recording — crowned clips are protected from automatic
+disk cleanup.
+
+![The species gallery with high-resolution photographs, detection counts, and links to detail pages](docs/species_gallery_v2.png)
+
+### Live — hear and see it happen
+
+A live audio stream with a real-time scrolling spectrogram and detection labels, useful for
+checking microphone placement and catching what the model misses. Gain, compression, and
+frequency shift are adjustable, and there's a fullscreen kiosk mode.
+
+### Weather, woven through
+
+Hourly weather from [Open-Meteo](https://open-meteo.com/) is recorded alongside your detections
+and appears wherever activity does — species charts, the timeline, the dashboard hero, and a
+dedicated analysis page. **No API key and no plugin**: it starts automatically once your
+coordinates are set, syncs hourly, and backfills up to seven days after an outage.
+
+If you run [Home Assistant](https://www.home-assistant.io/), you can point the station at a
+temperature entity and it will use your own garden reading instead of the regional forecast,
+falling back to Open-Meteo if the sensor goes stale.
+
+### Everything else
+
+- **Year in Birds** — an annual summary with champions and monthly activity, downloadable as an image
+- **eBird checklist export** — rebuilt, with a date picker for historical checklists, validation on eBird's required fields, and reviewed false positives automatically excluded
+- **BirdWeather** — contribute detections to the worldwide network
+- **Notifications** — 90+ platforms via [Apprise](https://github.com/caronc/apprise), grouped by visit rather than per detection, with quiet hours, rare-species alerts, per-species throttling, and weekly reports
+- **Station Doctor** — health checks for the live stream, disk space, last detection, weather sync, local temperature sensor, location, and admin password, with one-click fixes
+- **Installable on a phone** as a progressive web app, with a mobile tab bar
+- **Command palette** — <kbd>Ctrl</kbd>+<kbd>K</kbd> to jump to any view or species
+- **Dark mode** across every page, following your system preference
+- **Your units** — Celsius or Fahrenheit, 12- or 24-hour time, number formats
+- **37 languages** for species names
+- **RTSP streams** as an audio source, in addition to a local microphone
+- **Automatic disk management**, backup and restore, file manager, database maintenance, and a web terminal
+
+---
 
 ## Requirements
-* A Raspberry Pi 5, Raspberry 4B, Raspberry Pi 400, Raspberry Pi 3B+, or Raspberry Pi 0W2 (The 3B+ and 0W2 must run on RaspiOS-ARM64-Lite). *Note: Due to the heavy data processing required for the modern Analytics and Insights pages, a newer Raspberry Pi (4B, 400, or 5) is highly recommended for optimal performance.*
-* An SD Card with the 64-bit version of RaspiOS installed (please use **Trixie**) -- Lite is recommended, but the installation works on RaspiOS-ARM64-Full as well. Downloads available within the [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
-* A USB Microphone or Sound Card
+
+| | |
+|---|---|
+| **Board** | Raspberry Pi 5, 4B, or 400 recommended. The 3B+ and Zero 2 W run detection but must use RaspiOS-ARM64-Lite, and the analytics and insights pages get slow as history accumulates. |
+| **OS** | **64-bit** Raspberry Pi OS — please use **Trixie**. Lite is recommended; Full works. Get it from the [Raspberry Pi Imager](https://www.raspberrypi.com/software/). |
+| **Audio** | Any USB microphone or USB sound card. Microphone quality affects results more than almost anything else. |
+| **Storage** | A 32 GB or larger card. Old clips are purged automatically as space runs low. |
+
+> [!WARNING]
+> **A 32-bit OS will not work.** This is the most common installation failure by a wide margin.
+> In Raspberry Pi Imager, expand "Raspberry Pi OS (other)" and pick an image that explicitly says
+> *64-bit*. Verify on the Pi with `uname -m` — you want `aarch64`, not `armv7l`.
+
+x86_64 is supported for developers and Linux-savvy users on Debian 12 or 13, with passwordless
+`sudo` required.
 
 ## Installation
-**[Updated Comprehensive Installation Guide available here](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/wiki)**
 
-[Raspberry Pi 5 Setup: Getting Started Guide (Step By Step)](https://www.youtube.com/watch?v=ZH6vfvRstfM) *(Note: This is an excellent video tutorial that walks you through the exact process of flashing the OS and setting up your Raspberry Pi hardware for the first time.)*
+On a fresh 64-bit Raspberry Pi OS installation, this is the entire setup:
 
-[Previous installation guide w/ pictures](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Installation-Guide) *(Note: The title of this older wiki guide states that it is deprecated and tells you to "use Nachtzuster's fork." Please be aware that this guide was written for the original creator (mcguirepr89), who predates both Nachtzuster and this Enhanced Version. **This Enhanced Version fork is NOT deprecated and you should absolutely still use it.** While the wiki guide itself is visually outdated and contains this warning, the pictures and initial OS installation process before you reach the web UI are still exactly the same and helpful as a visual reference. Just follow the steps, but make sure to choose **Bookworm** or **Trixie** when imaging your SD card, and use the `curl` command provided below instead of the one listed in the wiki.)*
-
-Please note that installing BirdNET-Pi on top of other existing servers is not supported. If this is something that you require, please open a discussion for your idea and inquire about how to contribute to development.
-
-[Raspberry Pi 3B[+] and 0W2 legacy installation guide available here](https://github.com/mcguirepr89/BirdNET-Pi/wiki/RPi0W2-Installation-Guide)
-
-The system can be installed with a single command designed for a fresh OS installation:
-```
+```bash
 curl -s https://raw.githubusercontent.com/zach7036/BirdNET-Pi-Enhanced-Version/main/newinstaller.sh | bash
 ```
-The installer takes care of any and all necessary updates, so you can run that as the very first command upon the first boot. The installation creates a log in `$HOME/installation-$(date "+%F").txt`.
 
-## Need help setting up this project? Use Claude AI
-If you are new to Raspberry Pi projects or feel overwhelmed by the installation process, don't worry! You can use [Claude AI](https://claude.ai) as your personal setup assistant. Just copy and paste the prompts below into Claude, and it will give you a customized, step-by-step walkthrough. If you run into any issues along the way, simply describe the problem to Claude for instant troubleshooting and guidance.
+You can run it as the very first command on first boot — the installer handles all necessary
+system updates itself. It writes a log to `$HOME/installation-$(date "+%F").txt`, which is the
+first place to look if anything goes wrong.
 
-First, paste this prompt into Claude:
-> Analyze this GitHub project. Give me a full and detailed breakdown and overview of all of it. https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git
+Expect it to take a while and to look idle at points; compiling dependencies on a Pi is slow.
 
-After Claude responds, paste this second prompt (be sure to replace the bracketed text with your own exact hardware):
-> Give me a detailed step by step guide on how to set everything up. I have a [Raspberry Pi 5] and the [MAONO USB Lavalier Microphone, 192KHZ/24BIT Plug & Play].
+📖 **[Full installation guide](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/install.html)** — hardware, imaging the SD card, microphone placement, and first login, step by step.
 
-## Access
-The BirdNET-Pi can be accessed from any web browser on the same network:
-- `http://birdnetpi.local` OR your Pi's IP address
-- Default Basic Authentication Username: `birdnet`
-- Password is empty by default. Set this in "Tools" > "Settings" > "Advanced Settings"
+> [!NOTE]
+> Installing on top of an existing web server is **not supported** — BirdNET-Pi expects to own the
+> web server configuration on the machine. Use a dedicated Pi, or open a
+> [discussion](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) about your setup.
 
-Please take a look at the [original wiki](https://github.com/mcguirepr89/BirdNET-Pi/wiki) and our [discussions](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) for information on:
-- [BirdNET-Pi's Deep Convolutional Neural Network(s)](https://github.com/mcguirepr89/BirdNET-Pi/wiki/BirdNET-Pi:-some-theory-on-classification-&-some-practical-hints)
-- [Making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi)
-- [Backing up and restoring your database](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Backup-and-Restore-the-Database)
-- [Adjusting your sound card settings](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Adjusting-your-sound-card)
-- [Suggested USB microphones](https://github.com/mcguirepr89/BirdNET-Pi/discussions/39)
-- [Building your own microphone](https://github.com/DD4WH/SASS/wiki/Stereo--(Mono)-recording-low-noise-low-cost-system)
-- [Privacy concerns and options](https://github.com/mcguirepr89/BirdNET-Pi/discussions/166)
+### New to Raspberry Pi?
 
-## Updating 
-Use the web interface and go to **"Tools" > "System Controls" > "Update"**. If you encounter any issues with that, or suspect that the update did not work for some reason, please save its output and post it in an issue where we can help.
+If the process feels daunting, an AI assistant makes a capable setup guide. Paste this into
+[Claude](https://claude.ai) to get oriented:
 
-## Backup and Restore
-Use the web interface and go to **"Tools" > "System Controls" > "Backup"** or **"Restore"**. Backup/Restore is primarily meant for migrating your data from one system to another. Since the time required to create or restore a backup depends on the size of the data set and the speed of the storage, this could take quite a while.
+> Analyze this GitHub project and give me a detailed overview.
+> https://github.com/zach7036/BirdNET-Pi-Enhanced-Version
 
-Alternatively, the backup script can be used directly from the command line. These examples assume the backup medium is mounted on `/mnt`:
-To backup:
-```commandline
-./scripts/backup_data.sh -a backup -f /mnt/birds/backup-2024-07-09.tar
+Then follow up with your actual hardware, and describe any errors you hit as they happen:
+
+> Give me a step-by-step guide to set this up. I have a [Raspberry Pi 5] and a
+> [MAONO USB Lavalier Microphone].
+
+## First run
+
+Open the web interface from any browser on the same network:
+
+- **`http://birdnetpi.local`** — or your Pi's IP address if that name doesn't resolve
+- Username: **`birdnet`**
+- Password: **empty by default**
+
+The dashboard shows a setup checklist until the essentials are done. Two of them genuinely matter:
+
+1. **Set your latitude and longitude** — *Settings → Settings → Location & Weather*. Without
+   coordinates, species range filtering can't work and you'll get identifications for birds that
+   don't occur near you. Weather and rarity detection depend on this too.
+2. **Set an admin password** — *Settings → Settings → Advanced Settings*. Until you do, anyone on
+   your network can change your station's configuration.
+
+Then wait. Most stations get their first detection within minutes, and the insights pages become
+genuinely interesting after a week or two of data.
+
+> [!TIP]
+> **Finding your way around Settings.** *Settings* in the sidebar opens a hub of tools — Station
+> Doctor, System Controls, Services, eBird Export, species lists. The first button on it, also
+> called *Settings*, is where the station's own options live. That's why paths below read
+> *Settings → Settings*.
+
+## Configuration
+
+Everything is configurable from the web interface. The main sections under *Settings → Settings*:
+
+| Section | Covers |
+|---|---|
+| Detection Model | Model choice, confidence threshold, sensitivity, overlap |
+| Location & Weather | Latitude, longitude, and weather sync |
+| Local temperature sensor | Optional Home Assistant temperature entity |
+| Display & Units | Temperature, wind speed, time format, number format, site name |
+| BirdWeather | Station ID for contributing to the network |
+| Notifications | Apprise targets, triggers, quiet hours, visit grouping, weekly report |
+| Privacy | Human-voice filtering, clip handling, what leaves your network |
+| Species Images | Image provider (Wikipedia or Flickr) and API key |
+| Language & Species Info | Species-name language and information source |
+| Color scheme | Light, dark, or follow the system |
+
+*Settings → Settings → Advanced Settings* holds the lower-level options: recording length,
+extraction length, audio format, channels, RTSP streams, frequency shift, the human-voice
+threshold, and **Disk Management** — whether a full disk purges old files or stops the services,
+the purge threshold, and how many files to keep per species.
+
+Species lists — custom, excluded, and whitelisted — are under *Settings* in the sidebar.
+
+## Updating
+
+From the web interface: **Settings → System Controls → Update**.
+
+Releases are published on the [releases page](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/releases)
+with notes on what changed. If an update seems not to have applied, save the output and open an issue.
+
+## Backup and restore
+
+From the web interface: **Settings → System Controls**, then *Backup data* or *Restore*. Copy the
+resulting archive somewhere that isn't the Pi.
+
+From the command line, assuming your backup medium is mounted at `/mnt`:
+
+```bash
+./scripts/backup_data.sh -a backup  -f /mnt/birds/backup-2026-07-27.tar
+./scripts/backup_data.sh -a restore -f /mnt/birds/backup-2026-07-27.tar
 ```
-To restore:
-```commandline
-./scripts/backup_data.sh -a restore -f /mnt/birds/backup-2024-07-09.tar
-```
 
-## x86_64 support
-x86_64 support is mainly intended for developers or highly Linux-savvy users. Some brief pointers:
-- Use Debian 12 or 13.
-- The user needs passwordless `sudo`.
+Large collections take a long time in both directions. Let it finish.
 
-For Proxmox, a user has reported adding this in their `cpu-models.conf` in order for the custom TFLite build to work:
-```
-cpu-model: BirdNet
-    flags +sse4.1
-    reported-model host
-```
+## Migrating from another fork
 
-## Uninstallation
-The following command will completely uninstall the software and remove the BirdNET-Pi directory from your home folder, deleting all audio and database files in the process:
-```
-/usr/local/bin/uninstall.sh && cd ~ && rm -drf BirdNET-Pi
-```
+Your detections, recordings, and settings carry across — the database schema is additive and the
+`detections` table is never altered.
 
-## Migrating from previous forks
-Before switching, make sure your current installation is fully up-to-date and **make sure to have a backup**. A backup is the only way to get back to the original fork if desired. Please note that upgrading your underlying OS in-place from Bullseye to Bookworm/Trixie is not going to work. If you are upgrading your OS, you need to start from a fresh install and copy back your data via the Restore tool.
+> [!IMPORTANT]
+> **Back up first.** Restoring a backup is the supported way to return to your previous fork if
+> you change your mind.
 
-If your OS is already correct, run these commands to migrate your existing installation to this enhanced repo:
-```
+Make sure your current installation is fully up to date, then:
+
+```bash
+cd ~/BirdNET-Pi
 git remote remove origin
 git remote add origin https://github.com/zach7036/BirdNET-Pi-Enhanced-Version.git
 ./scripts/update_birdnet.sh
 ```
 
-## Troubleshooting and Ideas
-*Hint: A lot of weird problems can be solved by simply restarting the core services. Do this from the web interface "Tools" > "Services" > "Restart Core Services".*
+> [!WARNING]
+> **Bullseye cannot be upgraded in place.** If you're on Bullseye, image a new card with a
+> supported 64-bit OS, install fresh, and restore your backup with the Restore tool.
 
-Having trouble or have an idea? Submit an [issue to the `zach7036/BirdNET-Pi-Enhanced-Version` tracker](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues) for trouble and a [discussion](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) for ideas. Please do *not* submit an issue as a discussion. Ensure you search the repo for your issue before creating a new one.
+📖 **[Full migration guide](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/migrate.html)**
 
-## Sharing
-Please join a [Discussion](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) and consider joining [BirdWeather!](https://app.birdweather.com) If you find BirdNET-Pi has been worth your time, please consider [making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi).
+## REST API
 
-## Cool Links
-- [Marie Lelouche's <i>Out of Spaces</i>](https://www.lestanneries.fr/exposition/marie-lelouche-out-of-spaces/) using BirdNET-Pi in post-sculpture VR! [Press Kit](https://github.com/mcguirepr89/BirdNET-Pi-assets/blob/main/dp_out_of_spaces_marie_lelouche_digital_05_01_22.pdf)
-- [Research on noded BirdNET-Pi networks for farming](https://github.com/mcguirepr89/BirdNET-Pi-assets/blob/main/G23_Report_ModelBasedSysEngineering_FarmMarkBirdDetector_V1__Copy_.pdf)
-- [PixCams Build Guide](https://pixcams.com/building-a-birdnet-pi-real-time-acoustic-bird-id-station/)
-- [Core-Electronics Build Article](https://core-electronics.com.au/projects/bird-calls-raspberry-pi)
-- [RaspberryPi.com Blog Post](https://www.raspberrypi.com/news/classify-birds-acoustically-with-birdnet-pi/)
-- [MagPi Issue 119 Showcase Article](https://magpi.raspberrypi.com/issues/119/pdf)
+Every screen is backed by a documented JSON API, so you can build your own dashboards, feed a
+home automation system, or export your data. `GET` endpoints are read-only; list endpoints accept
+`format=csv`.
 
-### Internationalization:
-The bird names are in English by default, but other localized versions are available thanks to the efforts of [@patlevin](https://github.com/patlevin). Use the web interface's "Tools" > "Settings" and select your "Database Language" to have detections translated natively.
+```
+GET  /api/v1/dashboard/now              Hero detection, today's totals, weather, services
+GET  /api/v1/detections/recent          Recent detections
+GET  /api/v1/detections/visits          Detections grouped into visits
+GET  /api/v1/detections/timeline        A day's detections for replay
+GET  /api/v1/species/list               Every species recorded
+GET  /api/v1/species/search             Species search
+GET  /api/v1/species/detail             One species in depth
+GET  /api/v1/analytics/bundle           All analytics in one cached response
+GET  /api/v1/analytics/{top_species|trends|patterns|diversity|activity|stats|detections|new_species}
+GET  /api/v1/reviews/queue              Visits awaiting review
+GET  /api/v1/reviews/examples           Comparison clips for a species
+GET  /api/v1/weather/current            Current conditions
+GET  /api/v1/station/doctor             Health checks
+GET  /api/v1/system/health              Service status
+GET  /api/v1/exports/ebird/preview      eBird checklist preview
+GET  /api/v1/image/{sci_name}           Species image URL
+GET  /api/v1/notes                      Notes
+POST /api/v1/reviews                    Record a review verdict (fans out across the visit)
+POST /api/v1/species/prefs              Favourite, mute, notify mode, crowned clip
+POST /api/v1/notes                      Add a note
+```
 
----
-_Original BirdNET framework by [@kahst](https://github.com/kahst). Pre-built TFLite binaries by [@PINTO0309](https://github.com/PINTO0309)._
+`POST` endpoints require basic authentication and an `X-Requested-With: XMLHttpRequest` header.
+
+## Troubleshooting
+
+Most odd behaviour is fixed by **Settings → Services → Restart Core Services**. After that,
+**Settings → Station Doctor** tests the recording and analysis services directly and offers
+one-click fixes.
+
+📖 **[Troubleshooting guide](https://zach7036.github.io/BirdNET-Pi-Enhanced-Version/troubleshooting.html)** — no detections, `birdnetpi.local` not loading, install failures, microphone problems, missing weather, false positives, and full disks.
+
+Search the [issue tracker](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues) before
+opening anything new. Use an **issue** for problems and a
+[**discussion**](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/discussions) for ideas and
+questions. When reporting a problem, include your Pi model, OS version, whether you installed
+fresh or migrated, and the relevant log output.
+
+## Privacy
+
+BirdNET-Pi records audio around your home, so it ships with protections on by default:
+
+- **Human-voice filtering** — when the model hears speech near a detection, that detection is discarded rather than saved
+- **Only short clips are kept** — full recordings are deleted after analysis; only extracted detection clips remain
+- **Local by default** — nothing leaves your network unless you enable an integration (BirdWeather, Apprise, weather sync, species images)
+
+## Contributing and support
+
+Issues and discussions are both welcome. If you find this project worth your time, consider
+[making your installation public](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Sharing-Your-BirdNET-Pi)
+or joining [BirdWeather](https://app.birdweather.com).
+
+Useful background from the original project's wiki, still largely applicable:
+
+- [Some theory on classification, and practical hints](https://github.com/mcguirepr89/BirdNET-Pi/wiki/BirdNET-Pi:-some-theory-on-classification-&-some-practical-hints)
+- [Adjusting your sound card](https://github.com/mcguirepr89/BirdNET-Pi/wiki/Adjusting-your-sound-card)
+- [Suggested USB microphones](https://github.com/mcguirepr89/BirdNET-Pi/discussions/39)
+- [Building your own microphone](https://github.com/DD4WH/SASS/wiki/Stereo--(Mono)-recording-low-noise-low-cost-system)
+
+## Credits
+
+BirdNET-Pi Enhanced builds on the work of [Nachtzuster](https://github.com/Nachtzuster/BirdNET-Pi)
+and original BirdNET-Pi creator [Patrick McGuire](https://github.com/mcguirepr89/BirdNET-Pi). It
+keeps the proven detection core intact while adding a redesigned interface, expanded analytics,
+weather-aware visualizations, better media and review tools, and an entirely new suite of
+behavioral and ecological insights.
+
+Bird identification is powered by the [BirdNET framework](https://github.com/kahst/BirdNET-Analyzer)
+by [@kahst](https://github.com/kahst), developed by the K. Lisa Yang Center for Conservation
+Bioacoustics at the Cornell Lab of Ornithology together with Chemnitz University of Technology.
+Pre-built TFLite binaries by [@PINTO0309](https://github.com/PINTO0309). Species-name
+localizations by [@patlevin](https://github.com/patlevin). The web interface is served by
+[Caddy](https://caddyserver.com), with [Adminer](https://www.adminer.org/) for database
+maintenance and [Apprise](https://github.com/caronc/apprise) for notifications.
+
+### Elsewhere
+
+- [PixCams build guide](https://pixcams.com/building-a-birdnet-pi-real-time-acoustic-bird-id-station/)
+- [Core Electronics build article](https://core-electronics.com.au/projects/bird-calls-raspberry-pi)
+- [Raspberry Pi blog post](https://www.raspberrypi.com/news/classify-birds-acoustically-with-birdnet-pi/)
+- [MagPi issue 119 showcase](https://magpi.raspberrypi.com/issues/119/pdf)
+- [Marie Lelouche's *Out of Spaces*](https://www.lestanneries.fr/exposition/marie-lelouche-out-of-spaces/), using BirdNET-Pi in VR
+
+## License
+
+BirdNET-Pi and BirdNET-Lite are licensed under
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+(CC BY-NC-SA 4.0).
+
+**You may not use BirdNET-Pi to develop a commercial product.** Please review the
+[full license](https://github.com/mcguirepr89/BirdNET-Pi/blob/main/LICENSE) before using,
+modifying, or redistributing this project.
