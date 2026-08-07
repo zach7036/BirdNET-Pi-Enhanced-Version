@@ -478,14 +478,12 @@ h1 {
 				<?php
 				//The setting representing which livestream to stream is more than the number of RTSP streams available
 				//maybe the list of streams has been modified
-                //This isn't the ideal for this, but needed a way to fix this setting without calling the advanced setting page
+				//Clamp for rendering only: this view is reachable without auth,
+				//so it must never rewrite birdnet.conf (unlocked truncate+write
+				//races with the settings page) or restart services. The saved
+				//setting is repaired the next time Settings is submitted.
 				if (array_key_exists($config['RTSP_STREAM_TO_LIVESTREAM'], $RTSP_Stream_Config) === false) {
-					$contents = file_get_contents('/etc/birdnet/birdnet.conf');
-					$contents = preg_replace("/RTSP_STREAM_TO_LIVESTREAM=.*/", "RTSP_STREAM_TO_LIVESTREAM=\"0\"", $contents);
-					$fh = fopen("/etc/birdnet/birdnet.conf", "w");
-					fwrite($fh, $contents);
-					get_config($force_reload=true);
-					exec("sudo systemctl restart livestream.service");
+					$config['RTSP_STREAM_TO_LIVESTREAM'] = 0;
 				}
 
 				//Print out the dropdown list for the RTSP streams

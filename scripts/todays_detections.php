@@ -520,10 +520,6 @@ function refreshTodayStats() {
 }
 
 window.addEventListener("load", function(){
-  <?php if($kiosk == true) { ?>
-    document.getElementById("myTopnav").remove();
-  <?php } ?>
-
   if(!TimelineView.data) {
     TimelineView.init("timeline_container", "<?php echo $config['LATITUDE'];?>", "<?php echo $config['LONGITUDE'];?>");
   }

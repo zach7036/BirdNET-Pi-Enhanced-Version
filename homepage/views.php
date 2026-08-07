@@ -422,8 +422,11 @@ function update_species_list($filename, $species, $add) {
         $str = preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", $str);
         file_put_contents("$filename", "$str");
         foreach ($species as $selectedOption) {
-            if (strpos($str, $selectedOption) === false) {
-                file_put_contents($filename, htmlspecialchars_decode($selectedOption, ENT_QUOTES)."\n", FILE_APPEND);
+            // The file stores decoded names; comparing the still-encoded form
+            // ("Bewick&#039;s Wren") re-appended every apostrophe species.
+            $decoded = htmlspecialchars_decode($selectedOption, ENT_QUOTES);
+            if (strpos($str, $decoded) === false) {
+                file_put_contents($filename, $decoded."\n", FILE_APPEND);
             }
         }
     } else {
@@ -700,6 +703,11 @@ if(isset($_GET['view'])){
       }
     }
   ob_end_flush();
+} elseif (isset($_GET['filename'])) {
+  // "Open in new tab" detection links and notification deep links are emitted
+  // as index.php?filename=<File_Name> with no view parameter; play.php owns
+  // the single-recording page.
+  include('play.php');
 } else {include('scripts/now.php');}
 ?>
 <script>

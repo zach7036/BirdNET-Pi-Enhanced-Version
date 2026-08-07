@@ -17,14 +17,19 @@
     }
     
 
+    // file() returns false on an unreadable file even when file_exists() passed
+    // (e.g. root-owned after a restore); count(false) is a fatal in PHP 8 and
+    // this page displays all warnings.
     if (file_exists($selectedfilename)) {
-        $eachselected = file($selectedfilename, FILE_IGNORE_NEW_LINES);
+        $eachselected = @file($selectedfilename, FILE_IGNORE_NEW_LINES) ?: [];
     }
     else {
         $eachselected = [];
     }
+    // labels.txt is an installer-created symlink and can dangle after a failed
+    // language change; render an empty list instead of raw warnings.
     $filename = './scripts/labels.txt';
-    $eachlabel = file($filename, FILE_IGNORE_NEW_LINES);
+    $eachlabel = @file($filename, FILE_IGNORE_NEW_LINES) ?: [];
 ?>
 
 
