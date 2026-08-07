@@ -2,7 +2,7 @@
 
 if [ "$EUID" == 0 ]
   then echo "Please run as a non-root user."
-  exit
+  exit 1
 fi
 
 if [ "$(uname -m)" != "aarch64" ] && [ "$(uname -m)" != "x86_64" ];then
@@ -15,14 +15,14 @@ fi
 PY_VERSION=$(python3 -c "import sys; print(f'{sys.version_info[0]}{sys.version_info[1]}')")
 if [ "${PY_VERSION}" == "39" ] ;then
   echo "### BirdNET-Pi requires a newer OS. Bullseye is deprecated, please use Bookworm. ###"
-  [ -z "${FORCE_BULLSEYE}" ] && exit
+  [ -z "${FORCE_BULLSEYE}" ] && exit 1
 fi
 
 # we require passwordless sudo
 sudo -K
 if ! sudo -n true; then
     echo "Passwordless sudo is not working. Aborting"
-    exit
+    exit 1
 fi
 
 # Simple new installer

@@ -35,7 +35,6 @@ sudo -u ${USER} ln -fs $my_dir/overview.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/stats.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/todays_detections.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/history.php ${EXTRACTED}
-sudo -u ${USER} ln -fs $my_dir/weekly_report.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/insights.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/homepage/images/favicon.ico ${EXTRACTED}
 sudo -u ${USER} ln -fs ${HOME}/phpsysinfo ${EXTRACTED}
