@@ -2,6 +2,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 from collections import OrderedDict
 from configparser import ConfigParser
@@ -14,6 +15,37 @@ DB_PATH = os.path.join(BASE_PATH, 'scripts/birds.db')
 MODEL_PATH = os.path.join(BASE_PATH, 'model')
 FONT_DIR = os.path.join(BASE_PATH, 'homepage/static')
 ANALYZING_NOW = os.path.expanduser('~/BirdSongs/StreamData/analyzing_now.txt')
+FAILED_DIR = os.path.expanduser('~/BirdSongs/Failed')
+FAILED_KEEP = 50
+
+
+def quarantine_wav(wav_path):
+    """Move a WAV whose reporting failed out of the RAM-backed StreamData tmpfs.
+
+    A transient failure (full disk, database lock storm) must not cost the
+    recording, and a persistent one must not fill RAM - so the file goes to
+    disk, capped at the newest FAILED_KEEP. To retry a quarantined recording,
+    move it back to StreamData and restart the analysis service.
+
+    Returns the destination path, or None when even the move failed and the
+    file was deleted instead (protecting RAM wins over recoverability).
+    """
+    try:
+        os.makedirs(FAILED_DIR, exist_ok=True)
+        dest = os.path.join(FAILED_DIR, os.path.basename(wav_path))
+        shutil.move(wav_path, dest)
+        for old in sorted(glob.glob(os.path.join(FAILED_DIR, '*.wav')), key=os.path.getmtime)[:-FAILED_KEEP]:
+            try:
+                os.remove(old)
+            except OSError:
+                pass
+        return dest
+    except (OSError, shutil.Error):
+        try:
+            os.remove(wav_path)
+        except OSError:
+            pass
+        return None
 
 
 def get_font():

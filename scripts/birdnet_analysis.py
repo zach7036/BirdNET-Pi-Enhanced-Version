@@ -12,7 +12,7 @@ import inotify.adapters
 from inotify.constants import IN_CLOSE_WRITE
 
 from utils.analysis import load_global_model, run_analysis
-from utils.helpers import get_settings, get_wav_files, ANALYZING_NOW
+from utils.helpers import get_settings, get_wav_files, quarantine_wav, ANALYZING_NOW
 from utils.classes import ParseFileName
 from utils.reporting import extract_detection, summary, write_to_file, write_to_db, apprise, bird_weather, heartbeat, \
     update_json_file
@@ -118,17 +118,17 @@ def handle_reporting_queue(queue):
             apprise(file, detections)
             bird_weather(file, detections)
             heartbeat()
+            os.remove(file.file_name)
         except BaseException as e:
             stderr = e.stderr.decode('utf-8') if isinstance(e, CalledProcessError) else ""
             log.exception(f'Unexpected error: {stderr}', exc_info=e)
-        finally:
-            # Always drop the WAV: StreamData is a RAM-backed tmpfs, and a file
-            # stranded by a reporting failure is re-analyzed (and re-fails) on
-            # every service restart while new recordings keep filling the RAM.
-            try:
-                os.remove(file.file_name)
-            except OSError:
-                pass
+            # Clear the RAM-backed tmpfs without losing the audio: an
+            # unconditional delete would turn a transient failure into
+            # permanent loss of every detection in the failure window.
+            dest = quarantine_wav(file.file_name)
+            if dest:
+                log.warning('Quarantined %s to %s; move it back to StreamData and restart to retry.',
+                            os.path.basename(file.file_name), os.path.dirname(dest))
 
         queue.task_done()
 
