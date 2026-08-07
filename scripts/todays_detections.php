@@ -316,12 +316,15 @@ die();
 }
 
 if (get_included_files()[0] === __FILE__) {
+  // Standalone access (this file is symlinked into the web root): the shell
+  // normally loads ui-helpers.js, which escapeHtml/safeHttpUrl delegate to.
   echo '<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BirdNET-Pi DB</title>
+  <script src="static/ui-helpers.js?v=' . (int)@filemtime('static/ui-helpers.js') . '" defer></script>
 </head>';
 }
 ?>
