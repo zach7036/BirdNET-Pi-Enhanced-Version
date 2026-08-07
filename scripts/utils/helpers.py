@@ -34,7 +34,9 @@ def get_font():
 class PHPConfigParser(ConfigParser):
     def get(self, section, option, *, raw=False, vars=None, fallback=None):
         value = super().get(section, option, raw=raw, vars=vars, fallback=fallback)
-        if raw:
+        if raw or value is None:
+            # A missing key returns the fallback as-is; stripping it would raise
+            # AttributeError and defeat every `is None` check at the call sites.
             return value
         else:
             return value.strip('"')

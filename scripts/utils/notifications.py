@@ -260,7 +260,9 @@ def should_notify(com_name):
 
     # is it still too soon?
     APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES = settings_dict.get('APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES')
-    if APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES != "0":
+    # An absent or blank key means no rate limit; without this the int() below
+    # raises and the except branch drops every repeat notification.
+    if APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES not in (None, "", "0"):
         if species_last_notified.get(com_name) is not None:
             try:
                 if int(time.time()) - species_last_notified[com_name] < int(APPRISE_MINIMUM_SECONDS_BETWEEN_NOTIFICATIONS_PER_SPECIES):
