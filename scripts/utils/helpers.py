@@ -15,8 +15,17 @@ DB_PATH = os.path.join(BASE_PATH, 'scripts/birds.db')
 MODEL_PATH = os.path.join(BASE_PATH, 'model')
 FONT_DIR = os.path.join(BASE_PATH, 'homepage/static')
 ANALYZING_NOW = os.path.expanduser('~/BirdSongs/StreamData/analyzing_now.txt')
-FAILED_DIR = os.path.expanduser('~/BirdSongs/Failed')
 FAILED_KEEP = 50
+
+
+def get_failed_dir():
+    # Beside the recordings tree (RECS_DIR) so quarantined audio sits on the
+    # volume the operator actually manages, which is not always the SD card.
+    try:
+        recs_dir = get_settings().get('RECS_DIR')
+    except Exception:
+        recs_dir = None
+    return os.path.join(os.path.expanduser(recs_dir or '~/BirdSongs'), 'Failed')
 
 
 def quarantine_wav(wav_path):
@@ -30,22 +39,27 @@ def quarantine_wav(wav_path):
     Returns the destination path, or None when even the move failed and the
     file was deleted instead (protecting RAM wins over recoverability).
     """
+    failed_dir = get_failed_dir()
     try:
-        os.makedirs(FAILED_DIR, exist_ok=True)
-        dest = os.path.join(FAILED_DIR, os.path.basename(wav_path))
+        os.makedirs(failed_dir, exist_ok=True)
+        dest = os.path.join(failed_dir, os.path.basename(wav_path))
         shutil.move(wav_path, dest)
-        for old in sorted(glob.glob(os.path.join(FAILED_DIR, '*.wav')), key=os.path.getmtime)[:-FAILED_KEEP]:
-            try:
-                os.remove(old)
-            except OSError:
-                pass
-        return dest
     except (OSError, shutil.Error):
         try:
             os.remove(wav_path)
         except OSError:
             pass
         return None
+    # Best-effort prune: a failure here must not mask the successful move.
+    try:
+        for old in sorted(glob.glob(os.path.join(failed_dir, '*.wav')), key=os.path.getmtime)[:-FAILED_KEEP]:
+            try:
+                os.remove(old)
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return dest
 
 
 def get_font():

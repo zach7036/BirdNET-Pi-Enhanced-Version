@@ -95,27 +95,34 @@ def write_to_db(file: ParseFileName, detection: Detection):
             con = sqlite3.connect(DB_PATH)
             try:
                 cur = con.cursor()
-                cur.execute("INSERT INTO detections VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (detection.date, detection.time, detection.scientific_name, detection.common_name, detection.confidence,
-                             conf['LATITUDE'], conf['LONGITUDE'], conf['CONFIDENCE'], str(detection.week), conf['SENSITIVITY'],
-                             conf['OVERLAP'], os.path.basename(detection.file_name_extr)))
-                # (Date, Time, Sci_Name, Com_Name, str(score),
-                # Lat, Lon, Cutoff, Week, Sens,
-                # Overlap, File_Name))
+                # A quarantined recording may be retried after a partial
+                # failure: skip detections that already made it in (the
+                # (Date, Sci_Name) index keeps the lookup cheap).
+                cur.execute("SELECT 1 FROM detections WHERE Date = ? AND Sci_Name = ? AND File_Name = ? LIMIT 1",
+                            (detection.date, detection.scientific_name, os.path.basename(detection.file_name_extr)))
+                if cur.fetchone() is None:
+                    cur.execute("INSERT INTO detections VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (detection.date, detection.time, detection.scientific_name, detection.common_name, detection.confidence,
+                                 conf['LATITUDE'], conf['LONGITUDE'], conf['CONFIDENCE'], str(detection.week), conf['SENSITIVITY'],
+                                 conf['OVERLAP'], os.path.basename(detection.file_name_extr)))
+                    # (Date, Time, Sci_Name, Com_Name, str(score),
+                    # Lat, Lon, Cutoff, Week, Sens,
+                    # Overlap, File_Name))
 
-                con.commit()
+                    con.commit()
             finally:
                 con.close()
             break
         except BaseException as e:
             if attempt_number == 2:
-                # The detection is in BirdDB.txt and was notified, but it will
-                # be permanently absent from the database - say so loudly.
+                # Re-raise so the caller quarantines the WAV: swallowing the
+                # failure deleted the recording while the detection stayed
+                # permanently absent from the database.
                 log.error("Giving up on writing %s to the database: %s",
                           os.path.basename(detection.file_name_extr), e)
-            else:
-                log.warning("Database busy: %s", e)
-                sleep(2)
+                raise
+            log.warning("Database busy: %s", e)
+            sleep(2)
 
 
 def summary(file: ParseFileName, detection: Detection):
