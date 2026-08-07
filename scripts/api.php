@@ -315,20 +315,12 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   ]);
 
 } elseif (preg_match('#^/api/v1/image/(\S+)$#', $requestUri, $matches)) {
-  // Settings > Image Provider "None" stores an empty string: the station
-  // promised no outbound image lookups, so this route must not fall through
-  // to Wikipedia the way an unguarded !== 'FLICKR' branch would.
+  // make_image_provider returns [null, null] for provider "None": the station
+  // promised no outbound image lookups, so the route 404s without contacting
+  // Wikipedia the way an unguarded !== 'FLICKR' branch would.
   $result = false;
-  if (!empty($config['IMAGE_PROVIDER'])) {
-    $flickr = new Flickr();
-    $wikipedia = new Wikipedia();
-    if ($config['IMAGE_PROVIDER'] === 'FLICKR') {
-      $image_provider = $flickr;
-      $fallback_provider = $wikipedia;
-    } else {
-      $image_provider = $wikipedia;
-      $fallback_provider = $flickr;
-    }
+  list($image_provider, $fallback_provider) = make_image_provider($config);
+  if ($image_provider) {
     $sci_name = urldecode($matches[1]);
     $result = $image_provider->get_image($sci_name, $fallback_provider);
   }

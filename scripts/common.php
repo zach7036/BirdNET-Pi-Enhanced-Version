@@ -440,6 +440,21 @@ class ImageProvider {
   }
 }
 
+// The single place that decides which image provider is primary and which is
+// the fallback. Returns [null, null] when image lookups are disabled
+// (IMAGE_PROVIDER unset or "None"): callers must skip lookups entirely - the
+// Settings privacy text promises no outbound image requests in that state.
+function make_image_provider($config) {
+  if (empty($config['IMAGE_PROVIDER'])) {
+    return [null, null];
+  }
+  $flickr = new Flickr();
+  $wikipedia = new Wikipedia();
+  return strtoupper($config['IMAGE_PROVIDER']) === 'FLICKR'
+      ? [$flickr, $wikipedia]
+      : [$wikipedia, $flickr];
+}
+
 class Flickr extends ImageProvider {
 
   protected $db_path = __ROOT__ . '/scripts/flickr_v4.db';

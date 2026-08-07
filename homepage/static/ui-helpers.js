@@ -7,6 +7,19 @@
     });
   }
 
+  // Third-party URLs (Flickr/Wikipedia image metadata) must resolve to plain
+  // http(s) before they reach an href/src; anything else collapses to '#'.
+  // This is the single canonical copy - pages delegate here so a hardening
+  // change propagates everywhere at once.
+  function safeHttpUrl(url) {
+    try {
+      var parsed = new URL(String(url), window.location.origin);
+      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '#';
+    } catch (e) {
+      return '#';
+    }
+  }
+
   function formatBytes(bytes) {
     var value = Number(bytes || 0);
     var units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -218,6 +231,7 @@
 
   window.BirdNETUI = {
     escapeHtml: escapeHtml,
+    safeHttpUrl: safeHttpUrl,
     formatBytes: formatBytes,
     formatDateTime: formatDateTime,
     skeleton: skeleton,

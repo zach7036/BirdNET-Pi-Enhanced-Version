@@ -205,22 +205,11 @@ function hideDialog() {
   document.getElementById('attribution-dialog').close();
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, function(ch) {
-    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[ch];
-  });
-}
-
-// Flickr titles are arbitrary uploader-authored text; treat every piece of
-// image metadata as hostile before it reaches the DOM.
-function safeHttpUrl(url) {
-  try {
-    const parsed = new URL(String(url), window.location.origin);
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '#';
-  } catch (e) {
-    return '#';
-  }
-}
+// Canonical escaping lives in BirdNETUI (static/ui-helpers.js); delegating
+// keeps a single copy of security-sensitive code. A missing helper fails
+// closed: the modal throws instead of rendering unescaped metadata.
+function escapeHtml(s) { return BirdNETUI.escapeHtml(s); }
+function safeHttpUrl(url) { return BirdNETUI.safeHttpUrl(url); }
 
 function setModalText(iter, title, text, authorlink) {
   const safeText = safeHttpUrl(text);

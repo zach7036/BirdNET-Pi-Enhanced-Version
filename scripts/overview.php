@@ -152,19 +152,7 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
   ensure_db_ok_json($stmt1);
   $res1 = db_execute_safe($db, $stmt1, 'overview chart species');
     // For image fetching
-    $image_provider = null;
-    $fallback_provider = null;
-    if (!empty($config["IMAGE_PROVIDER"])) {
-      $flickr = new Flickr();
-      $wikipedia = new Wikipedia();
-      if ($config["IMAGE_PROVIDER"] === 'FLICKR') {
-          $image_provider = $flickr;
-          $fallback_provider = $wikipedia;
-      } else {
-          $image_provider = $wikipedia;
-          $fallback_provider = $flickr;
-      }
-    }
+    list($image_provider, $fallback_provider) = make_image_provider($config);
 
     $species = [];
     while ($row = db_fetch_assoc_safe($res1)) {
@@ -244,19 +232,7 @@ if(isset($_GET['ajax_new_species_details']) && $_GET['ajax_new_species_details']
   ensure_db_ok_json($stmt);
   $res = db_execute_safe($db, $stmt, 'overview new species details');
 
-  $image_provider = null;
-  $fallback_provider = null;
-  if (!empty($config["IMAGE_PROVIDER"])) {
-    $flickr = new Flickr();
-    $wikipedia = new Wikipedia();
-    if ($config["IMAGE_PROVIDER"] === 'FLICKR') {
-        $image_provider = $flickr;
-        $fallback_provider = $wikipedia;
-    } else {
-        $image_provider = $wikipedia;
-        $fallback_provider = $flickr;
-    }
-  }
+  list($image_provider, $fallback_provider) = make_image_provider($config);
 
   $details = [];
   while ($row = db_fetch_assoc_safe($res)) {
@@ -334,15 +310,7 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
 
       if (!empty($config["IMAGE_PROVIDER"])) {
         if ($image_provider === null) {
-          $flickr = new Flickr();
-          $wikipedia = new Wikipedia();
-          if ($config["IMAGE_PROVIDER"] === 'FLICKR') {
-              $image_provider = $flickr;
-              $fallback_provider = $wikipedia;
-          } else {
-              $image_provider = $wikipedia;
-              $fallback_provider = $flickr;
-          }
+          list($image_provider, $fallback_provider) = make_image_provider($config);
           if ($image_provider->is_reset()) {
             $_SESSION['images'] = [];
           }
@@ -660,22 +628,11 @@ if (get_included_files()[0] === __FILE__) {
     return shorter;
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function(ch) {
-      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[ch];
-    });
-  }
-
-  // Image metadata (titles, author/license URLs) is third-party text from
-  // Flickr/Wikipedia; treat every piece as hostile before it reaches the DOM.
-  function safeHttpUrl(url) {
-    try {
-      const parsed = new URL(String(url), window.location.origin);
-      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '#';
-    } catch (e) {
-      return '#';
-    }
-  }
+  // Canonical escaping lives in BirdNETUI (static/ui-helpers.js); delegating
+  // keeps a single copy of security-sensitive code. A missing helper fails
+  // closed: the modal throws instead of rendering unescaped metadata.
+  function escapeHtml(s) { return BirdNETUI.escapeHtml(s); }
+  function safeHttpUrl(url) { return BirdNETUI.safeHttpUrl(url); }
 
   function setModalText(iter, title, text, authorlink, photolink, licenseurl) {
     const safeText = safeHttpUrl(text);

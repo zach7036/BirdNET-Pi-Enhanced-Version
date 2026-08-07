@@ -94,17 +94,10 @@ if ($is_csv_export) {
     exit();
 }
 
-// Image fetching logic
-$flickr = new Flickr();
-$wikipedia = new Wikipedia();
-
-if (isset($config['IMAGE_PROVIDER']) && strtolower($config['IMAGE_PROVIDER']) == 'flickr') {
-    $image_provider = $flickr;
-    $fallback_provider = $wikipedia;
-} else {
-    $image_provider = $wikipedia;
-    $fallback_provider = $flickr;
-}
+// Image fetching logic. make_image_provider returns [null, null] for provider
+// "None" - previously this page fell through to Wikipedia and made outbound
+// lookups a provider-less station had opted out of.
+list($image_provider, $fallback_provider) = make_image_provider($config);
 
 if ($image_provider && $image_provider->is_reset()) {
     $_SESSION['species_portal_v8_cache'] = [];
