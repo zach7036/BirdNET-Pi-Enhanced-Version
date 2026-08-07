@@ -6,8 +6,10 @@ require_once 'scripts/common.php';
 $db = new SQLite3('./scripts/birds.db', SQLITE3_OPEN_READONLY);
 $db->busyTimeout(1000);
 
-// Get active subview
-$subview = isset($_GET['subview']) ? $_GET['subview'] : 'dashboard';
+// Get active subview. Whitelisted: the value is echoed into the page and used
+// in the fragment-cache key, so arbitrary input must never get through.
+$valid_subviews = ['dashboard', 'behavior', 'migration', 'environmental', 'health', 'forecasting', 'report'];
+$subview = (isset($_GET['subview']) && in_array($_GET['subview'], $valid_subviews, true)) ? $_GET['subview'] : 'dashboard';
 
 // Initialize all potential variables to prevent undefined errors in HTML
 $lifetime_species = 0; $best_day_count = 0; $best_day_date = 'N/A'; $max_streak = 0;
@@ -987,7 +989,7 @@ $db->close();
                 elseif ($subview == 'environmental') echo 'Weather Impacts';
                 elseif ($subview == 'report') echo 'Reports';
                 elseif ($subview == 'forecasting') echo 'Trends & Forecasting';
-                else echo ucfirst($subview); 
+                else echo h(ucfirst($subview));
             ?></h1>
             <div class="insights-subtitle">
                 <?php
