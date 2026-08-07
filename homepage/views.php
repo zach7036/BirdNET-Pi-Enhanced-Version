@@ -612,7 +612,10 @@ if(isset($_GET['view'])){
                      'sudo shutdown now',
                      'sudo clear_all_data.sh',
                      "$restore");
-    $command = $_GET['submit'];
+    /* The sanitize filter at the top of this file HTML-encodes '&' to '&amp;',
+       so compound '&&' commands can never match the allowlist unless decoded
+       first. Safe: the command still has to exactly match an allowlist entry. */
+    $command = html_entity_decode($_GET['submit'], ENT_QUOTES);
     if(in_array($command,$allowedCommands)){
       if(isset($command)){
         $initcommand = $command;
