@@ -161,7 +161,7 @@ def sendAppriseNotifications(sci_name, com_name, confidence, confidencepct, path
     species_last_detected[com_name] = now_ts
     is_new_visit = prev_ts is None or (now_ts - prev_ts) > get_visit_gap_seconds(settings_dict)
 
-    title = html.unescape(settings_dict.get('APPRISE_NOTIFICATION_TITLE'))
+    title = html.unescape(settings_dict.get('APPRISE_NOTIFICATION_TITLE') or 'New BirdNET-Pi Detection')
     f = open(APPRISE_BODY, 'r')
     body = f.read()
 
