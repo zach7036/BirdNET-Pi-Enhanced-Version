@@ -23,8 +23,9 @@ $high_conf_count = 0; $med_conf_count = 0; $low_conf_count = 0; $expected_today 
 // Peak weeks come from SQLite's %W (weeks from the first Monday, 00-based);
 // PHP's date('W') is ISO-8601 and disagrees by one for much of the year, which
 // lit the PEAK NOW badge on the wrong rows. 'localtime' matches the Date
-// column, which stores local dates.
-$current_week = db_query_single_safe($db, "SELECT strftime('%W','now','localtime')", date('W'), 'insights current week');
+// column, which stores local dates. On a failed lookup the null simply lights
+// no badge - an ISO-week fallback would light the wrong rows again.
+$current_week = db_query_single_safe($db, "SELECT strftime('%W','now','localtime')", null, 'insights current week');
 
 $one_month_ago = date('Y-m-d', strtotime('-30 days'));
 $two_weeks_ago = date('Y-m-d', strtotime('-14 days'));
