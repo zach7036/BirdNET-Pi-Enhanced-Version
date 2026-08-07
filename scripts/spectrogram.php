@@ -478,19 +478,22 @@ h1 {
 				<?php
 				//The setting representing which livestream to stream is more than the number of RTSP streams available
 				//maybe the list of streams has been modified
-				//Clamp for rendering only: this view is reachable without auth,
-				//so it must never rewrite birdnet.conf (unlocked truncate+write
-				//races with the settings page) or restart services. The saved
-				//setting is repaired the next time Settings is submitted.
-				if (array_key_exists($config['RTSP_STREAM_TO_LIVESTREAM'], $RTSP_Stream_Config) === false) {
-					$config['RTSP_STREAM_TO_LIVESTREAM'] = 0;
+				//This view is reachable without auth, so it must never rewrite
+				//birdnet.conf (unlocked truncate+write races with the settings
+				//page) or restart services itself. Show the stale state
+				//honestly instead: picking a stream below goes through the
+				//authenticated Advanced save, which rewrites the setting and
+				//restarts the livestream.
+				$stale_livestream_index = (array_key_exists($config['RTSP_STREAM_TO_LIVESTREAM'], $RTSP_Stream_Config) === false);
+				if ($stale_livestream_index) {
+					echo '<option value="" selected disabled>Select a stream...</option>';
 				}
 
 				//Print out the dropdown list for the RTSP streams
 				foreach ($RTSP_Stream_Config as $stream_id => $stream_host) {
 					$isSelected = "";
 					//Match up the selected value saved in config so we can preselect it
-					if ($config['RTSP_STREAM_TO_LIVESTREAM'] == $stream_id) {
+					if (!$stale_livestream_index && $config['RTSP_STREAM_TO_LIVESTREAM'] == $stream_id) {
 						$isSelected = 'selected="selected"';
 					}
 					//Create the select option
@@ -499,6 +502,12 @@ h1 {
 
 				?>
             </select>
+			<?php if ($stale_livestream_index) { ?>
+			<div class="ui-message ui-message-warning" role="status" style="margin-top:6px">
+				<strong>Live audio is stopped</strong>
+				<span>The previously selected RTSP stream no longer exists. Choose a stream above to restart the livestream.</span>
+			</div>
+			<?php } ?>
         </div>
         &mdash;
 		<?php
