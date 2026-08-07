@@ -6,7 +6,10 @@ source /etc/birdnet/birdnet.conf
 if [ -n "${BIRDNET_USER}" ]; then
   echo "BIRDNET_USER: ${BIRDNET_USER}"
   USER=${BIRDNET_USER}
-  HOME=/home/${BIRDNET_USER}
+  # The account's real home dir - install_services.sh writes cron entries with
+  # it, so assuming /home/ here would break them on a non-standard home.
+  HOME=$(getent passwd "${BIRDNET_USER}" | cut -d: -f6)
+  HOME=${HOME:-/home/${BIRDNET_USER}}
 else
   echo "WARNING: no BIRDNET_USER found"
   USER=$(awk -F: '/1000/ {print $1}' /etc/passwd)
