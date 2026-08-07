@@ -398,13 +398,14 @@ install_automatic_update_cron() {
 }
 
 install_weather_cron() {
-  weather_cron_cmd="0 * * * * $USER /home/$USER/BirdNET-Pi/birdnet/bin/python3 /home/$USER/BirdNET-Pi/scripts/utils/weather.py >/dev/null 2>&1"
+  weather_cron_cmd="0 * * * * $USER $HOME/BirdNET-Pi/birdnet/bin/python3 $HOME/BirdNET-Pi/scripts/utils/weather.py >/dev/null 2>&1"
   if ! grep -F "$weather_cron_cmd" /etc/crontab &>/dev/null; then
     sed -i '/BirdNET-Pi\/scripts\/utils\/weather.py/d' /etc/crontab
     echo "#birdnet weather sync" >> /etc/crontab
     echo "$weather_cron_cmd" >> /etc/crontab
   fi
-  sudo -u ${USER} $HOME/BirdNET-Pi/birdnet/bin/python3 $HOME/BirdNET-Pi/scripts/utils/weather.py || true
+  # The first sync runs from install_birdnet.sh instead: the virtualenv this
+  # needs is only created after this script has finished.
 }
 
 chown_things() {

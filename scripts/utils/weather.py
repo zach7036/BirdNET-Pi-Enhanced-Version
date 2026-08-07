@@ -110,10 +110,56 @@ def fetch_ha_temperature(conf):
     return temp_f
 
 
+def ensure_weather_schema():
+    """Create/upgrade the weather table.
+
+    Runs before any network call so a fresh install has the table even when the
+    first fetch fails; the PHP pages check for its existence and would otherwise
+    keep triggering on-demand syncs forever on an offline station.
+    """
+    try:
+        con = sqlite3.connect(DB_PATH)
+        cur = con.cursor()
+
+        # Ensure the weather table exists isolated from the detections table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS weather (
+                Date DATE,
+                Hour INT,
+                Temp FLOAT,
+                ConditionCode INT,
+                IsDay INT,
+                WindSpeed FLOAT,
+                WindDirection INT,
+                PRIMARY KEY(Date, Hour)
+            )
+        ''')
+
+        # Check for new columns (for existing tables)
+        cur.execute("PRAGMA table_info(weather)")
+        columns = [column[1] for column in cur.fetchall()]
+        if 'IsDay' not in columns:
+            cur.execute("ALTER TABLE weather ADD COLUMN IsDay INT DEFAULT 1")
+        if 'WindSpeed' not in columns:
+            cur.execute("ALTER TABLE weather ADD COLUMN WindSpeed FLOAT")
+        if 'WindDirection' not in columns:
+            cur.execute("ALTER TABLE weather ADD COLUMN WindDirection INT")
+
+        con.commit()
+        con.close()
+        return True
+    except Exception as e:
+        log.error(f"Database error creating weather table: {e}")
+        return False
+
+
 def update_weather():
     conf = get_settings()
     lat = conf.get('LATITUDE', None)
     lon = conf.get('LONGITUDE', None)
+
+    if not ensure_weather_schema():
+        return
 
     if lat is None or lon is None or lat == '' or lon == '':
         log.error("Latitude or Longitude not set. Cannot fetch weather.")
@@ -137,31 +183,7 @@ def update_weather():
     try:
         con = sqlite3.connect(DB_PATH)
         cur = con.cursor()
-        
-        # Ensure the weather table exists isolated from the detections table
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS weather (
-                Date DATE,
-                Hour INT,
-                Temp FLOAT,
-                ConditionCode INT,
-                IsDay INT,
-                WindSpeed FLOAT,
-                WindDirection INT,
-                PRIMARY KEY(Date, Hour)
-            )
-        ''')
-        
-        # Check for new columns (for existing tables)
-        cur.execute("PRAGMA table_info(weather)")
-        columns = [column[1] for column in cur.fetchall()]
-        if 'IsDay' not in columns:
-            cur.execute("ALTER TABLE weather ADD COLUMN IsDay INT DEFAULT 1")
-        if 'WindSpeed' not in columns:
-            cur.execute("ALTER TABLE weather ADD COLUMN WindSpeed FLOAT")
-        if 'WindDirection' not in columns:
-            cur.execute("ALTER TABLE weather ADD COLUMN WindDirection INT")
-        
+
         # Insert or replace hourly metrics
         for t, temp, code, is_day, wind, direction in zip(times, temps, codes, is_days, winds, dirs):
             if temp is None:

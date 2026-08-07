@@ -50,6 +50,18 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TEXT DEFAULT (datetime('now','localtime')));
 CREATE INDEX IF NOT EXISTS idx_notes_date ON notes(date);
 CREATE INDEX IF NOT EXISTS idx_notes_sci ON notes(sci_name);
+-- Weather is isolated from detections: created here (not dropped) so the table
+-- exists from first boot even before the first successful sync, and so
+-- clearing detections keeps the weather history.
+CREATE TABLE IF NOT EXISTS weather (
+  Date DATE,
+  Hour INT,
+  Temp FLOAT,
+  ConditionCode INT,
+  IsDay INT,
+  WindSpeed FLOAT,
+  WindDirection INT,
+  PRIMARY KEY(Date, Hour));
 EOF
 chown $USER:$USER $HOME/BirdNET-Pi/scripts/birds.db
 chmod g+w $HOME/BirdNET-Pi/scripts/birds.db

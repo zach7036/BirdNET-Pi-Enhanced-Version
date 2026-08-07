@@ -59,4 +59,8 @@ CURRENT_TIMEZONE=$(timedatectl show --value --property=Timezone)
 
 ./install_language_label.sh || exit 1
 
+# First weather sync, now that the virtualenv exists. Creates the weather table
+# and backfills a week of history so the dashboards have data on first boot.
+$HOME/BirdNET-Pi/birdnet/bin/python3 $HOME/BirdNET-Pi/scripts/utils/weather.py || true
+
 exit 0
