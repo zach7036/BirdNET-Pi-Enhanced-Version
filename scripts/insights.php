@@ -22,8 +22,9 @@ $confidence_trend = []; $conf_labels_json = '[]'; $conf_values_json = '[]'; $ove
 $high_conf_count = 0; $med_conf_count = 0; $low_conf_count = 0; $expected_today = []; $peak_species = [];
 // Peak weeks come from SQLite's %W (weeks from the first Monday, 00-based);
 // PHP's date('W') is ISO-8601 and disagrees by one for much of the year, which
-// lit the PEAK NOW badge on the wrong rows.
-$current_week = db_query_single_safe($db, "SELECT strftime('%W','now')", date('W'), 'insights current week');
+// lit the PEAK NOW badge on the wrong rows. 'localtime' matches the Date
+// column, which stores local dates.
+$current_week = db_query_single_safe($db, "SELECT strftime('%W','now','localtime')", date('W'), 'insights current week');
 
 $one_month_ago = date('Y-m-d', strtotime('-30 days'));
 $two_weeks_ago = date('Y-m-d', strtotime('-14 days'));
@@ -581,14 +582,16 @@ if ($subview == 'forecasting') {
     $yoy_diversity_pct = $last_year_diversity > 0 ? round(($yoy_diversity_diff / $last_year_diversity) * 100) : 0;
 
     // The +-3-day window wraps the year boundary in late December / early
-    // January, where a plain BETWEEN (lower > upper) matches nothing. gmdate
-    // matches SQLite's UTC 'now'.
-    $doy_lo = sprintf('%03d', (int)gmdate('z', strtotime('-3 days')) + 1);
-    $doy_hi = sprintf('%03d', (int)gmdate('z', strtotime('+3 days')) + 1);
+    // January, where a plain BETWEEN (lower > upper) matches nothing. Local
+    // time throughout: the Date column stores local dates. "History" means
+    // strictly before the window itself - a plain year comparison would count
+    // last week's late-December birds as prior-year history on Jan 1-4.
+    $doy_lo = sprintf('%03d', (int)date('z', strtotime('-3 days')) + 1);
+    $doy_hi = sprintf('%03d', (int)date('z', strtotime('+3 days')) + 1);
     $doy_filter = $doy_lo <= $doy_hi
         ? "strftime('%j', Date) BETWEEN '$doy_lo' AND '$doy_hi'"
         : "(strftime('%j', Date) >= '$doy_lo' OR strftime('%j', Date) <= '$doy_hi')";
-    $expected_today = insights_query_all($db, "SELECT Com_Name, Sci_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present FROM detections WHERE $doy_filter AND strftime('%Y', Date) < strftime('%Y', 'now') GROUP BY Sci_Name ORDER BY years_present DESC");
+    $expected_today = insights_query_all($db, "SELECT Com_Name, Sci_Name, COUNT(DISTINCT strftime('%Y', Date)) as years_present FROM detections WHERE $doy_filter AND Date < date('now','localtime','-3 days') GROUP BY Sci_Name ORDER BY years_present DESC");
 
     // One grouped pass instead of a per-species peak-week query (unbounded N+1)
     $peak_rows = insights_query_all($db, "SELECT Sci_Name, Com_Name, week, cnt FROM (SELECT Sci_Name, Com_Name, strftime('%W', Date) AS week, COUNT(*) AS cnt, SUM(COUNT(*)) OVER (PARTITION BY Sci_Name) AS total, ROW_NUMBER() OVER (PARTITION BY Sci_Name ORDER BY COUNT(*) DESC) AS rn FROM detections GROUP BY Sci_Name, week) WHERE rn = 1 ORDER BY total DESC");
