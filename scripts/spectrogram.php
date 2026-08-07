@@ -484,7 +484,12 @@ h1 {
 				//honestly instead: picking a stream below goes through the
 				//authenticated Advanced save, which rewrites the setting and
 				//restarts the livestream.
-				$stale_livestream_index = (array_key_exists($config['RTSP_STREAM_TO_LIVESTREAM'], $RTSP_Stream_Config) === false);
+				//livestream.sh defaults an empty index to stream 0, so an
+				//empty/absent value is NOT stale - audio is actually playing.
+				//Only a nonempty index that no longer exists is stale.
+				$saved_stream = $config['RTSP_STREAM_TO_LIVESTREAM'] ?? '';
+				if ($saved_stream === '') { $saved_stream = 0; }
+				$stale_livestream_index = (array_key_exists($saved_stream, $RTSP_Stream_Config) === false);
 				if ($stale_livestream_index) {
 					echo '<option value="" selected disabled>Select a stream...</option>';
 				}
@@ -493,7 +498,7 @@ h1 {
 				foreach ($RTSP_Stream_Config as $stream_id => $stream_host) {
 					$isSelected = "";
 					//Match up the selected value saved in config so we can preselect it
-					if (!$stale_livestream_index && $config['RTSP_STREAM_TO_LIVESTREAM'] == $stream_id) {
+					if (!$stale_livestream_index && $saved_stream == $stream_id) {
 						$isSelected = 'selected="selected"';
 					}
 					//Create the select option
