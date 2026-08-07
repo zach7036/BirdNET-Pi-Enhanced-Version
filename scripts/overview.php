@@ -286,6 +286,8 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
   }
   $iterations = 0;
   $image_provider = null;
+  // Normalized so the client may send the identifier with or without a leading slash
+  $previous_identifier = ltrim($_GET['previous_detection_identifier'] ?? '', '/');
 
   // hopefully one of the 5 most recent detections has an image that is valid, we'll use that one as the most recent detection until the newer ones get their images created
   while($mostrecent = db_fetch_assoc_safe($result4)) {
@@ -297,8 +299,8 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
 
     // check to make sure the image actually exists, sometimes it takes a minute to be created\
     if(file_exists($home."/BirdSongs/Extracted/".$filename.".png")){
-      if($_GET['previous_detection_identifier'] == $filename) { die(); }
-      if($_GET['only_name'] == "true") { echo $comname.",".$filename;die(); }
+      if($previous_identifier !== '' && $previous_identifier === $filename) { die(); }
+      if(isset($_GET['only_name']) && $_GET['only_name'] == "true") { echo $comname.",".$filename;die(); }
 
       $iterations++;
 
@@ -421,7 +423,7 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
           $info_url = get_info_url($mostrecent['Sci_Name']);
           $url = $info_url['URL'];
         ?>
-        <div class="mrd-card <?php echo ($_GET['previous_detection_identifier'] == 'undefined') ? '' : 'fade-in'; ?>">
+        <div class="mrd-card <?php echo ($previous_identifier === '') ? '' : 'fade-in'; ?>">
           <div class="mrd-header">
             <span class="mrd-datetime"><?php echo $display_date . ' ' . $mostrecent['Time']; ?></span>
             <a class="mrd-open-link" target="_blank" href="index.php?filename=<?php echo $mostrecent['File_Name']; ?>">
@@ -794,11 +796,31 @@ if($dividedrefresh < 1) {
 </div>
 <script>
 // we're passing a unique ID of the currently displayed detection to our script, which checks the database to see if the newest detection entry is that ID, or not. If the IDs don't match, it must mean we have a new detection and it's loaded onto the page
+// The response body is only used as a probe: the server returns nothing when the
+// newest detection still matches the identifier we sent, so the refresh cascade
+// below only runs when something actually changed.
+var latest_detection_identifier = undefined;
+var initial_detection_load_done = false;
 function loadDetectionIfNewExists(previous_detection_identifier=undefined) {
   const xhttp = new XMLHttpRequest();
   xhttp.onload = function() {
+    // An empty body means the newest detection is the one we already have.
+    // The status notices are not detections either, so neither should refresh.
+    const has_new_detection = this.responseText.length > 0
+      && !this.responseText.includes("Database is busy")
+      && !this.responseText.includes("No Detections")
+      && !this.responseText.includes("processing a backlog");
+
+    // remember what the server just described so the next poll can short-circuit
+    if (has_new_detection) {
+      const match = this.responseText.match(/data-audio-src="([^"]*)"/);
+      if (match) latest_detection_identifier = match[1];
+    }
+
     // if there's a new detection that needs to be updated to the page
-    if(this.responseText.length > 0 && !this.responseText.includes("Database is busy") && !this.responseText.includes("No Detections") || previous_detection_identifier == undefined) {
+    // (the first load always populates, even on a station with no detections)
+    if(has_new_detection || !initial_detection_load_done) {
+      initial_detection_load_done = true;
       // Refresh KPIs and Recent Detections List
 
       // only going to load left chart & 5 most recents if there's a new detection
@@ -810,7 +832,7 @@ function loadDetectionIfNewExists(previous_detection_identifier=undefined) {
       initCustomAudioPlayers();
     }
   }
-  xhttp.open("GET", "overview.php?ajax_detections=true&previous_detection_identifier="+previous_detection_identifier, true);
+  xhttp.open("GET", "overview.php?ajax_detections=true&previous_detection_identifier="+encodeURIComponent(previous_detection_identifier === undefined ? '' : previous_detection_identifier), true);
   xhttp.send();
 }
 function loadLeftChart() {
@@ -865,12 +887,9 @@ function refreshDetection() {
     // If something is playing, skip the refresh
     if (isPlaying) return;
 
-    // Nothing playing, proceed with refresh
-    if (audioPlayers.length === 0) {
-      loadDetectionIfNewExists();
-      return;
-    }
-    const currentIdentifier = audioPlayers[0]?.dataset.audioSrc || undefined;
+    // Nothing playing, proceed with refresh. The player's own identifier wins
+    // when one is on the page; otherwise use the last one the server described.
+    const currentIdentifier = audioPlayers[0]?.dataset.audioSrc || latest_detection_identifier;
     loadDetectionIfNewExists(currentIdentifier);
   }
 }
@@ -930,7 +949,7 @@ document.addEventListener("visibilitychange", function() {
     clearInterval(i_fn2);
     if (customImage) clearInterval(i_fn3);
   } else {
-    loadDetectionIfNewExists();
+    loadDetectionIfNewExists(latest_detection_identifier);
     startAutoRefresh();
   }
 });
