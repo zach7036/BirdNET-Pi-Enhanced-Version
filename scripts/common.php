@@ -421,6 +421,10 @@ class ImageProvider {
 
   protected function set_image_in_db($sci_name, $com_en_name, $image_url, $title, $id, $author_url, $license_url) {
     $statement0 = $this->db->prepare("INSERT OR REPLACE INTO images VALUES (:sci_name, :com_en_name, :image_url, :title, :id, :author_url, :license_url, DATE(\"now\"))");
+    if ($statement0 === false) {
+      db_log_error($this->db, 'image cache insert prepare');
+      return;
+    }
     $statement0->bindValue(':sci_name', $sci_name);
     $statement0->bindValue(':com_en_name', $com_en_name);
     $statement0->bindValue(':image_url', $image_url);
@@ -428,7 +432,11 @@ class ImageProvider {
     $statement0->bindValue(':id', $id);
     $statement0->bindValue(':author_url', $author_url);
     $statement0->bindValue(':license_url', $license_url);
-    $statement0->execute();
+    // A silently failed INSERT means the species is never cached and every
+    // render repeats the provider's API calls - log it instead.
+    if (@$statement0->execute() === false) {
+      db_log_error($this->db, 'image cache insert');
+    }
   }
 }
 
@@ -546,14 +554,20 @@ class Flickr extends ImageProvider {
     if (empty($this->licenses_urls)) {
       $licenses_url = "https://api.flickr.com/services/rest/?method=flickr.photos.licenses.getInfo&api_key=" . $this->flickr_api_key . "&format=json&nojsoncallback=1";
       $licenses_response = $this->get_json($licenses_url);
-      $licenses_data = $licenses_response["licenses"]["license"];
+      $licenses_data = is_array($licenses_response) ? ($licenses_response["licenses"]["license"] ?? null) : null;
+      if (!is_array($licenses_data)) {
+        // A failed licenses call must not return null: license_url is NOT NULL
+        // in the cache schema, so a null silently voids the INSERT and the
+        // species re-runs all three Flickr calls on every subsequent render.
+        return '';
+      }
       foreach ($licenses_data as $license) {
         $license_id = $license["id"];
         $license_url = $license["url"];
         $this->licenses_urls[$license_id] = $license_url;
       }
     }
-    return $this->licenses_urls[$id];
+    return $this->licenses_urls[$id] ?? '';
   }
 
   public function get_uid_from_db() {

@@ -205,9 +205,28 @@ function hideDialog() {
   document.getElementById('attribution-dialog').close();
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[ch];
+  });
+}
+
+// Flickr titles are arbitrary uploader-authored text; treat every piece of
+// image metadata as hostile before it reaches the DOM.
+function safeHttpUrl(url) {
+  try {
+    const parsed = new URL(String(url), window.location.origin);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '#';
+  } catch (e) {
+    return '#';
+  }
+}
+
 function setModalText(iter, title, text, authorlink) {
-  document.getElementById('modalHeading').innerHTML = "Photo "+iter+": \""+title+"\" Attribution";
-  document.getElementById('modalText').innerHTML = "<div style='white-space:nowrap'>Image link: <a target='_blank' href="+text+">"+text+"</a><br>Author link: <a target='_blank' href="+authorlink+">"+authorlink+"</a></div>";
+  const safeText = safeHttpUrl(text);
+  const safeAuthor = safeHttpUrl(authorlink);
+  document.getElementById('modalHeading').textContent = "Photo "+iter+": \""+String(title)+"\" Attribution";
+  document.getElementById('modalText').innerHTML = "<div style='white-space:nowrap'>Image link: <a target='_blank' href='"+escapeHtml(safeText)+"'>"+escapeHtml(safeText)+"</a><br>Author link: <a target='_blank' href='"+escapeHtml(safeAuthor)+"'>"+escapeHtml(safeAuthor)+"</a></div>";
   showDialog();
 }
 </script>  
@@ -339,7 +358,8 @@ while($results=db_fetch_assoc_safe($result3)){
   flush();
 
   if (! empty($config["FLICKR_API_KEY"])) {
-    $flickrjson = json_decode(file_get_contents("https://www.flickr.com/services/rest/?method=flickr.photos.search&api_key=".$config["FLICKR_API_KEY"]."&text=\"".str_replace(' ', '%20', $engname)."\"&license=2%2C3%2C4%2C5%2C6%2C9&sort=relevance&per_page=15&format=json&nojsoncallback=1"), true)["photos"]["photo"];
+    $flickr_response = @file_get_contents("https://www.flickr.com/services/rest/?method=flickr.photos.search&api_key=".$config["FLICKR_API_KEY"]."&text=\"".str_replace(' ', '%20', $engname)."\"&license=2%2C3%2C4%2C5%2C6%2C9&sort=relevance&per_page=15&format=json&nojsoncallback=1");
+    $flickrjson = $flickr_response !== false ? (json_decode($flickr_response, true)["photos"]["photo"] ?? []) : [];
 
     foreach ($flickrjson as $val) {
 
@@ -347,7 +367,7 @@ while($results=db_fetch_assoc_safe($result3)){
       $modaltext = "https://flickr.com/photos/".$val["owner"]."/".$val["id"];
       $authorlink = "https://flickr.com/people/".$val["owner"];
       $imageurl = 'https://farm' .$val["farm"]. '.static.flickr.com/' .$val["server"]. '/' .$val["id"]. '_'  .$val["secret"].  '.jpg';
-      echo "<span style='cursor:pointer;' onclick='setModalText(".$iter.",\"".$val["title"]."\",\"".$modaltext."\", \"".$authorlink."\")'><img style='vertical-align:top' src=\"$imageurl\"></span>";
+      echo "<span style='cursor:pointer;' onclick='setModalText(".$iter.",".js_arg($val["title"]).",".js_arg($modaltext).", ".js_arg($authorlink).")'><img style='vertical-align:top' src=\"".h($imageurl)."\"></span>";
     }
   }
 }

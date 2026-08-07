@@ -315,17 +315,23 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   ]);
 
 } elseif (preg_match('#^/api/v1/image/(\S+)$#', $requestUri, $matches)) {
-  $flickr = new Flickr();
-  $wikipedia = new Wikipedia();
-  if ($config["IMAGE_PROVIDER"] === 'FLICKR') {
-    $image_provider = $flickr;
-    $fallback_provider = $wikipedia;
-  } else {
-    $image_provider = $wikipedia;
-    $fallback_provider = $flickr;
+  // Settings > Image Provider "None" stores an empty string: the station
+  // promised no outbound image lookups, so this route must not fall through
+  // to Wikipedia the way an unguarded !== 'FLICKR' branch would.
+  $result = false;
+  if (!empty($config['IMAGE_PROVIDER'])) {
+    $flickr = new Flickr();
+    $wikipedia = new Wikipedia();
+    if ($config['IMAGE_PROVIDER'] === 'FLICKR') {
+      $image_provider = $flickr;
+      $fallback_provider = $wikipedia;
+    } else {
+      $image_provider = $wikipedia;
+      $fallback_provider = $flickr;
+    }
+    $sci_name = urldecode($matches[1]);
+    $result = $image_provider->get_image($sci_name, $fallback_provider);
   }
-  $sci_name = urldecode($matches[1]);
-  $result = $image_provider->get_image($sci_name, $fallback_provider);
 
   if ($result == false) {
     http_response_code(404);
