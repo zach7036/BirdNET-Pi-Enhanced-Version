@@ -65,6 +65,16 @@ function get_overview_weather($db, $date) {
   return $weather;
 }
 
+// When the station cannot reach the weather API the missing-data trigger
+// fires on every chart load, each request stalling on a doomed 20s sync.
+// The lock file's mtime records the last attempt; retry at most every 10
+// minutes and leave the real syncing to the hourly cron. Callers can check
+// this before releasing their DB handle - a suppressed sync changes nothing.
+function weather_sync_cooldown_active() {
+  $last_attempt = @filemtime(sys_get_temp_dir() . '/birdnet_weather_sync.lock');
+  return $last_attempt !== false && time() - $last_attempt < 600;
+}
+
 function sync_overview_weather($home, $user) {
   $python = $home . "/BirdNET-Pi/birdnet/bin/python3";
   $script = $home . "/BirdNET-Pi/scripts/utils/weather.py";
@@ -72,16 +82,11 @@ function sync_overview_weather($home, $user) {
     return;
   }
 
-  // When the station cannot reach the weather API the missing-data trigger
-  // fires on every chart load, each request stalling on a doomed 20s sync.
-  // The lock file's mtime records the last attempt; retry at most every 10
-  // minutes and leave the real syncing to the hourly cron.
-  $lock_path = sys_get_temp_dir() . '/birdnet_weather_sync.lock';
-  $last_attempt = @filemtime($lock_path);
-  if ($last_attempt !== false && time() - $last_attempt < 600) {
+  if (weather_sync_cooldown_active()) {
     return;
   }
 
+  $lock_path = sys_get_temp_dir() . '/birdnet_weather_sync.lock';
   $lock = @fopen($lock_path, 'c');
   if (!$lock) {
     return;
@@ -209,7 +214,7 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
   $today = date('Y-m-d');
   $currentHour = (int)date('G');
   $weather = get_overview_weather($db, $today);
-  if (empty($weather) || !isset($weather[$currentHour])) {
+  if ((empty($weather) || !isset($weather[$currentHour])) && !weather_sync_cooldown_active()) {
       $db->close();
       sync_overview_weather($home, get_user());
       $db = new SQLite3('./scripts/birds.db', SQLITE3_OPEN_READONLY);
@@ -296,7 +301,9 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
     $_SESSION['images'] = [];
   }
   $iterations = 0;
+  $rows_examined = 0;
   $image_provider = null;
+  $backlog_notice = "<h3>Your system is currently processing a backlog of audio. This can take several hours before normal functionality of your BirdNET-Pi resumes.</h3>";
   // Normalized so the client may send the identifier with or without a leading
   // slash; anything but a plain string (e.g. a crafted array parameter) is
   // treated as no identifier rather than fataling in ltrim().
@@ -305,6 +312,7 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
 
   // hopefully one of the 5 most recent detections has an image that is valid, we'll use that one as the most recent detection until the newer ones get their images created
   while($mostrecent = db_fetch_assoc_safe($result4)) {
+    $rows_examined++;
     $comname = preg_replace('/ /', '_', $mostrecent['Com_Name']);
     $sciname = preg_replace('/ /', '_', $mostrecent['Sci_Name']);
     $comnamegraph = str_replace("'", "\'", $mostrecent['Com_Name']);
@@ -313,7 +321,13 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
 
     // check to make sure the image actually exists, sometimes it takes a minute to be created\
     if(file_exists($home."/BirdSongs/Extracted/".$filename.".png")){
-      if($previous_identifier !== '' && $previous_identifier === $filename) { die(); }
+      if($previous_identifier !== '' && $previous_identifier === $filename) {
+        // Rows skipped above this one are newer detections whose spectrograms
+        // are not rendered yet: report the backlog so the client keeps
+        // refreshing instead of concluding nothing changed.
+        if ($rows_examined > 1) { echo $backlog_notice; }
+        die();
+      }
       if(isset($_GET['only_name']) && $_GET['only_name'] == "true") { echo $comname.",".$filename;die(); }
 
       $iterations++;
@@ -445,7 +459,7 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
             </a>
           </div>
           <?php if(!empty($config["IMAGE_PROVIDER"]) && !empty($image[1])) { ?>
-            <img class="mrd-bird-img" onerror="this.style.display='none'" onclick='setModalText(<?php echo $iterations; ?>,"<?php echo urlencode($image[2]); ?>", "<?php echo $image[3]; ?>", "<?php echo $image[4]; ?>", "<?php echo $image[1]; ?>", "<?php echo $image[5]; ?>")' src="<?php echo $image[1]; ?>">
+            <img class="mrd-bird-img" onerror="this.style.display='none'" onclick='setModalText(<?php echo (int)$iterations; ?>, <?php echo js_arg($image[2]); ?>, <?php echo js_arg($image[3]); ?>, <?php echo js_arg($image[4]); ?>, <?php echo js_arg($image[1]); ?>, <?php echo js_arg($image[5]); ?>)' src="<?php echo h($image[1]); ?>">
           <?php } ?>
           <div class="mrd-species">
             <span class="mrd-species-name">
@@ -473,7 +487,7 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
     $result2 = db_execute_safe($db, $statement2, 'overview today count');
     $todaycount = db_fetch_assoc_safe($result2) ?: ['COUNT(*)' => 0];
     if($todaycount['COUNT(*)'] > 0) {
-      echo "<h3>Your system is currently processing a backlog of audio. This can take several hours before normal functionality of your BirdNET-Pi resumes.</h3>";
+      echo $backlog_notice;
     } else {
       echo "<h3>No Detections For Today.</h3>";
     }
@@ -548,8 +562,9 @@ if(isset($_GET['ajax_left_chart']) && $_GET['ajax_left_chart'] == "true") {
 
 if(isset($_GET['ajax_center_chart']) && $_GET['ajax_center_chart'] == "true") {
 
-  // Retrieve the cached data from session without regenerating
-  $chart_data = $_SESSION['chart_data'];
+  // Cached by a prior ajax_left_chart request; a fresh or expired session
+  // must not render a KPI strip of blanks, so fall back to computing it.
+  $chart_data = $_SESSION['chart_data'] ?? get_summary();
 ?>
 <div class="kpi-cards kpi-cards-compact" style="justify-content: center; margin: 0; max-width: 100%;">
   <div class="kpi-card kpi-card-sm"><div class="kpi-value"><?php echo format_number($chart_data['totalcount']);?></div><div class="kpi-label">Total</div></div>
@@ -645,13 +660,34 @@ if (get_included_files()[0] === __FILE__) {
     return shorter;
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[ch];
+    });
+  }
+
+  // Image metadata (titles, author/license URLs) is third-party text from
+  // Flickr/Wikipedia; treat every piece as hostile before it reaches the DOM.
+  function safeHttpUrl(url) {
+    try {
+      const parsed = new URL(String(url), window.location.origin);
+      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '#';
+    } catch (e) {
+      return '#';
+    }
+  }
+
   function setModalText(iter, title, text, authorlink, photolink, licenseurl) {
-    let text_display = shorten(text);
-    let authorlink_display = shorten(authorlink);
-    let licenseurl_display = shorten(licenseurl);
-    document.getElementById('modalHeading').innerHTML = "Photo: \""+decodeURIComponent(title.replaceAll("+"," "))+"\" Attribution";
-    document.getElementById('modalText').innerHTML = "<div><img style='border-radius:5px;max-height: calc(100vh - 15rem);display: block;margin: 0 auto;' src='"+photolink+"'></div><br><div style='white-space:nowrap'>Image link: <a target='_blank' href="+text+">"+text_display+"</a><br>Author link: <a target='_blank' href="+authorlink+">"+authorlink_display+"</a><br>License URL: <a href="+licenseurl+" target='_blank'>"+licenseurl_display+"</a></div>";
-    last_photo_link = text;
+    const safeText = safeHttpUrl(text);
+    const safeAuthor = safeHttpUrl(authorlink);
+    const safePhoto = safeHttpUrl(photolink);
+    const safeLicense = safeHttpUrl(licenseurl);
+    let text_display = shorten(safeText);
+    let authorlink_display = shorten(safeAuthor);
+    let licenseurl_display = shorten(safeLicense);
+    document.getElementById('modalHeading').textContent = "Photo: \""+String(title)+"\" Attribution";
+    document.getElementById('modalText').innerHTML = "<div><img style='border-radius:5px;max-height: calc(100vh - 15rem);display: block;margin: 0 auto;' src='"+escapeHtml(safePhoto)+"'></div><br><div style='white-space:nowrap'>Image link: <a target='_blank' href='"+escapeHtml(safeText)+"'>"+escapeHtml(text_display)+"</a><br>Author link: <a target='_blank' href='"+escapeHtml(safeAuthor)+"'>"+escapeHtml(authorlink_display)+"</a><br>License URL: <a href='"+escapeHtml(safeLicense)+"' target='_blank'>"+escapeHtml(licenseurl_display)+"</a></div>";
+    last_photo_link = safeText;
     showDialog();
   }
 
@@ -815,15 +851,22 @@ if($dividedrefresh < 1) {
 // returns nothing when the newest detection still matches the identifier we sent.
 var latest_detection_identifier = undefined;
 var initial_detection_load_done = false;
+// A forced refresh survives "Database is busy" responses: the flag stays set
+// until a cascade actually runs, so the next poll retries without an identifier.
+var force_full_refresh = false;
+// Backlog responses repeat for hours; cascade at most once per 30s for them.
+var last_backlog_refresh = 0;
+var last_cascade_date = new Date().toDateString();
 function loadDetectionIfNewExists(previous_detection_identifier=undefined) {
   const xhttp = new XMLHttpRequest();
   xhttp.onload = function() {
     // An empty body means the newest detection is the one we already have.
     // A backlog is different from the other notices: detections keep landing
     // in the database without spectrograms, so it must keep refreshing.
+    const is_busy = this.responseText.includes("Database is busy");
     const is_backlog = this.responseText.includes("processing a backlog");
     const has_new_detection = this.responseText.length > 0
-      && !this.responseText.includes("Database is busy")
+      && !is_busy
       && !this.responseText.includes("No Detections")
       && !is_backlog;
 
@@ -833,10 +876,15 @@ function loadDetectionIfNewExists(previous_detection_identifier=undefined) {
       if (match) latest_detection_identifier = match[0];
     }
 
+    const backlog_refresh_due = is_backlog && Date.now() - last_backlog_refresh > 30000;
+
     // if there's a new detection that needs to be updated to the page
     // (the first load always populates, even on a station with no detections)
-    if(has_new_detection || is_backlog || !initial_detection_load_done) {
+    if(!is_busy && (has_new_detection || backlog_refresh_due || force_full_refresh || !initial_detection_load_done)) {
       initial_detection_load_done = true;
+      force_full_refresh = false;
+      if (is_backlog) last_backlog_refresh = Date.now();
+      last_cascade_date = new Date().toDateString();
       // Refresh KPIs and Recent Detections List
 
       // only going to load left chart & 5 most recents if there's a new detection
@@ -903,9 +951,15 @@ function refreshDetection() {
     // If something is playing, skip the refresh
     if (isPlaying) return;
 
+    // While the tab stays visible across midnight nothing new may arrive for
+    // hours, yet the "Today" KPIs are already stale - force one full refresh.
+    if (new Date().toDateString() !== last_cascade_date) {
+      force_full_refresh = true;
+    }
+
     // Nothing playing, proceed with refresh. The player's own identifier wins
     // when one is on the page; otherwise use the last one the server described.
-    const currentIdentifier = audioPlayers[0]?.dataset.audioSrc || latest_detection_identifier;
+    const currentIdentifier = force_full_refresh ? undefined : (audioPlayers[0]?.dataset.audioSrc || latest_detection_identifier);
     loadDetectionIfNewExists(currentIdentifier);
   }
 }
@@ -967,6 +1021,7 @@ document.addEventListener("visibilitychange", function() {
   } else {
     // Force a full refresh: while the tab was hidden the KPIs and heatmap may
     // have gone stale (a date rollover) without any new detection to signal it.
+    force_full_refresh = true;
     loadDetectionIfNewExists();
     startAutoRefresh();
   }
