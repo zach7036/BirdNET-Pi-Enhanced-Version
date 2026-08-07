@@ -532,6 +532,7 @@ if ($subview == 'environmental') {
         ensure_db_ok($trend_stmt);
         $trend_stmt->bindValue(':one_month_ago', $one_month_ago, SQLITE3_TEXT);
         $trend_res = db_execute_safe($db, $trend_stmt, 'insights weather trend');
+        $temp_vs_detections = [];
         while($row = db_fetch_assoc_safe($trend_res)) { $temp_vs_detections[] = $row; }
         $temp_trend_labels = json_encode(array_map(function($r) { return date('M j', strtotime($r['Date'])); }, $temp_vs_detections));
         $temp_trend_temps = json_encode(array_map(function($r) { return $r['avg_temp'] === null ? null : display_temp($r['avg_temp'], 1); }, $temp_vs_detections));
