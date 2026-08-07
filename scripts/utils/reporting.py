@@ -93,21 +93,29 @@ def write_to_db(file: ParseFileName, detection: Detection):
     for attempt_number in range(3):
         try:
             con = sqlite3.connect(DB_PATH)
-            cur = con.cursor()
-            cur.execute("INSERT INTO detections VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (detection.date, detection.time, detection.scientific_name, detection.common_name, detection.confidence,
-                         conf['LATITUDE'], conf['LONGITUDE'], conf['CONFIDENCE'], str(detection.week), conf['SENSITIVITY'],
-                         conf['OVERLAP'], os.path.basename(detection.file_name_extr)))
-            # (Date, Time, Sci_Name, Com_Name, str(score),
-            # Lat, Lon, Cutoff, Week, Sens,
-            # Overlap, File_Name))
+            try:
+                cur = con.cursor()
+                cur.execute("INSERT INTO detections VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (detection.date, detection.time, detection.scientific_name, detection.common_name, detection.confidence,
+                             conf['LATITUDE'], conf['LONGITUDE'], conf['CONFIDENCE'], str(detection.week), conf['SENSITIVITY'],
+                             conf['OVERLAP'], os.path.basename(detection.file_name_extr)))
+                # (Date, Time, Sci_Name, Com_Name, str(score),
+                # Lat, Lon, Cutoff, Week, Sens,
+                # Overlap, File_Name))
 
-            con.commit()
-            con.close()
+                con.commit()
+            finally:
+                con.close()
             break
         except BaseException as e:
-            log.warning("Database busy: %s", e)
-            sleep(2)
+            if attempt_number == 2:
+                # The detection is in BirdDB.txt and was notified, but it will
+                # be permanently absent from the database - say so loudly.
+                log.error("Giving up on writing %s to the database: %s",
+                          os.path.basename(detection.file_name_extr), e)
+            else:
+                log.warning("Database busy: %s", e)
+                sleep(2)
 
 
 def summary(file: ParseFileName, detection: Detection):

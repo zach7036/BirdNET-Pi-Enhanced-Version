@@ -118,10 +118,17 @@ def handle_reporting_queue(queue):
             apprise(file, detections)
             bird_weather(file, detections)
             heartbeat()
-            os.remove(file.file_name)
         except BaseException as e:
             stderr = e.stderr.decode('utf-8') if isinstance(e, CalledProcessError) else ""
             log.exception(f'Unexpected error: {stderr}', exc_info=e)
+        finally:
+            # Always drop the WAV: StreamData is a RAM-backed tmpfs, and a file
+            # stranded by a reporting failure is re-analyzed (and re-fails) on
+            # every service restart while new recordings keep filling the RAM.
+            try:
+                os.remove(file.file_name)
+            except OSError:
+                pass
 
         queue.task_done()
 
