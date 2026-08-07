@@ -114,8 +114,9 @@ def ensure_weather_schema():
     """Create/upgrade the weather table.
 
     Runs before any network call so a fresh install has the table even when the
-    first fetch fails; the PHP pages check for its existence and would otherwise
-    keep triggering on-demand syncs forever on an offline station.
+    first fetch fails and the PHP pages read it as empty instead of erroring.
+    Retry pacing on an offline station is handled in overview.php, which
+    rate-limits its on-demand sync.
     """
     try:
         con = sqlite3.connect(DB_PATH)

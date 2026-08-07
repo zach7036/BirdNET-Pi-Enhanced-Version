@@ -72,12 +72,23 @@ function sync_overview_weather($home, $user) {
     return;
   }
 
-  $lock = @fopen(sys_get_temp_dir() . '/birdnet_weather_sync.lock', 'c');
+  // When the station cannot reach the weather API the missing-data trigger
+  // fires on every chart load, each request stalling on a doomed 20s sync.
+  // The lock file's mtime records the last attempt; retry at most every 10
+  // minutes and leave the real syncing to the hourly cron.
+  $lock_path = sys_get_temp_dir() . '/birdnet_weather_sync.lock';
+  $last_attempt = @filemtime($lock_path);
+  if ($last_attempt !== false && time() - $last_attempt < 600) {
+    return;
+  }
+
+  $lock = @fopen($lock_path, 'c');
   if (!$lock) {
     return;
   }
 
   if (@flock($lock, LOCK_EX | LOCK_NB)) {
+    @touch($lock_path);
     $timeout = is_executable('/usr/bin/timeout') ? "/usr/bin/timeout 20 " : "";
     $cmd = $timeout . "sudo -u " . escapeshellarg($user) . " " . escapeshellarg($python) . " " . escapeshellarg($script) . " >/dev/null 2>&1";
     @exec($cmd);
@@ -286,8 +297,11 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
   }
   $iterations = 0;
   $image_provider = null;
-  // Normalized so the client may send the identifier with or without a leading slash
-  $previous_identifier = ltrim($_GET['previous_detection_identifier'] ?? '', '/');
+  // Normalized so the client may send the identifier with or without a leading
+  // slash; anything but a plain string (e.g. a crafted array parameter) is
+  // treated as no identifier rather than fataling in ltrim().
+  $previous_identifier = $_GET['previous_detection_identifier'] ?? '';
+  $previous_identifier = is_string($previous_identifier) ? ltrim($previous_identifier, '/') : '';
 
   // hopefully one of the 5 most recent detections has an image that is valid, we'll use that one as the most recent detection until the newer ones get their images created
   while($mostrecent = db_fetch_assoc_safe($result4)) {
@@ -796,30 +810,32 @@ if($dividedrefresh < 1) {
 </div>
 <script>
 // we're passing a unique ID of the currently displayed detection to our script, which checks the database to see if the newest detection entry is that ID, or not. If the IDs don't match, it must mean we have a new detection and it's loaded onto the page
-// The response body is only used as a probe: the server returns nothing when the
-// newest detection still matches the identifier we sent, so the refresh cascade
-// below only runs when something actually changed.
+// The probe asks for only_name=true: a new detection answers "comname,By_Date/..."
+// without rendering a card or contacting the image providers, and the server
+// returns nothing when the newest detection still matches the identifier we sent.
 var latest_detection_identifier = undefined;
 var initial_detection_load_done = false;
 function loadDetectionIfNewExists(previous_detection_identifier=undefined) {
   const xhttp = new XMLHttpRequest();
   xhttp.onload = function() {
     // An empty body means the newest detection is the one we already have.
-    // The status notices are not detections either, so neither should refresh.
+    // A backlog is different from the other notices: detections keep landing
+    // in the database without spectrograms, so it must keep refreshing.
+    const is_backlog = this.responseText.includes("processing a backlog");
     const has_new_detection = this.responseText.length > 0
       && !this.responseText.includes("Database is busy")
       && !this.responseText.includes("No Detections")
-      && !this.responseText.includes("processing a backlog");
+      && !is_backlog;
 
     // remember what the server just described so the next poll can short-circuit
     if (has_new_detection) {
-      const match = this.responseText.match(/data-audio-src="([^"]*)"/);
-      if (match) latest_detection_identifier = match[1];
+      const match = this.responseText.match(/By_Date\/.*/);
+      if (match) latest_detection_identifier = match[0];
     }
 
     // if there's a new detection that needs to be updated to the page
     // (the first load always populates, even on a station with no detections)
-    if(has_new_detection || !initial_detection_load_done) {
+    if(has_new_detection || is_backlog || !initial_detection_load_done) {
       initial_detection_load_done = true;
       // Refresh KPIs and Recent Detections List
 
@@ -832,7 +848,7 @@ function loadDetectionIfNewExists(previous_detection_identifier=undefined) {
       initCustomAudioPlayers();
     }
   }
-  xhttp.open("GET", "overview.php?ajax_detections=true&previous_detection_identifier="+encodeURIComponent(previous_detection_identifier === undefined ? '' : previous_detection_identifier), true);
+  xhttp.open("GET", "overview.php?ajax_detections=true&only_name=true&previous_detection_identifier="+encodeURIComponent(previous_detection_identifier === undefined ? '' : previous_detection_identifier), true);
   xhttp.send();
 }
 function loadLeftChart() {
@@ -949,7 +965,9 @@ document.addEventListener("visibilitychange", function() {
     clearInterval(i_fn2);
     if (customImage) clearInterval(i_fn3);
   } else {
-    loadDetectionIfNewExists(latest_detection_identifier);
+    // Force a full refresh: while the tab was hidden the KPIs and heatmap may
+    // have gone stale (a date rollover) without any new detection to signal it.
+    loadDetectionIfNewExists();
     startAutoRefresh();
   }
 });
