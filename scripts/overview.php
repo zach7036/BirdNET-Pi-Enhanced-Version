@@ -158,12 +158,7 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
     while ($row = db_fetch_assoc_safe($res1)) {
       $img_url = "";
       if ($image_provider) {
-        $search_name = trim($row['Com_Name']);
-        $image = session_image_lookup('species_portal_v12_cache', $search_name);
-        if ($image === null) {
-          $image = session_image_store('species_portal_v12_cache', $search_name, $image_provider->get_image($row['Sci_Name'], $fallback_provider));
-        }
-        $img_url = $image[1];
+        $img_url = session_image_get('species_portal_v12_cache', trim($row['Com_Name']), $row['Sci_Name'], $image_provider, $fallback_provider)[1];
       }
 
       $species[] = [
@@ -225,12 +220,7 @@ if(isset($_GET['ajax_new_species_details']) && $_GET['ajax_new_species_details']
   while ($row = db_fetch_assoc_safe($res)) {
     $img_url = "";
     if ($image_provider) {
-      $search_name = trim($row['Com_Name']);
-      $image = session_image_lookup('species_portal_v12_cache', $search_name);
-      if ($image === null) {
-        $image = session_image_store('species_portal_v12_cache', $search_name, $image_provider->get_image($row['Sci_Name'], $fallback_provider));
-      }
-      $img_url = $image[1];
+      $img_url = session_image_get('species_portal_v12_cache', trim($row['Com_Name']), $row['Sci_Name'], $image_provider, $fallback_provider)[1];
     }
     $details[] = [
       'name' => $row['Com_Name'],
@@ -290,11 +280,7 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
           }
         }
 
-        $search_name = trim($mostrecent['Com_Name']);
-        $image = session_image_lookup('species_portal_v12_cache', $search_name);
-        if ($image === null) {
-          $image = session_image_store('species_portal_v12_cache', $search_name, $image_provider->get_image($mostrecent['Sci_Name'], $fallback_provider));
-        }
+        $image = session_image_get('species_portal_v12_cache', trim($mostrecent['Com_Name']), $mostrecent['Sci_Name'], $image_provider, $fallback_provider);
       }
     ?>
         <style>

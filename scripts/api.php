@@ -84,16 +84,6 @@ function api_open_rw_db() {
   return $db_rw;
 }
 
-function api_clip_relative_for_file($db, $file_name) {
-  $stmt = $db->prepare('SELECT Date, Com_Name FROM detections WHERE File_Name = :f LIMIT 1');
-  if ($stmt === false) {
-    return null;
-  }
-  $stmt->bindValue(':f', $file_name, SQLITE3_TEXT);
-  $row = db_fetch_assoc_safe(db_execute_safe($db, $stmt, 'clip relative lookup'));
-  return $row ? detection_clip_relative_path($row['Date'], $row['Com_Name'], $file_name) : null;
-}
-
 function api_current_weather($db) {
   $has_weather = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'api current weather table') > 0;
   if (!$has_weather) {
@@ -804,12 +794,6 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     api_error('Species not found', 404);
   }
 
-  // Best recording: the shared definition from common.php (review-excluded,
-  // confidence then recency). The pinned clip wins if it still exists;
-  // otherwise the best candidate whose audio survived disk cleanup. Selection
-  // happens below once prefs are loaded.
-  $best_candidates = species_best_candidates($db, $sci);
-  $all_time_best = $best_candidates[0] ?? null;
 
   $daily = [];
   $daily_stmt = $db->prepare("SELECT Date, COUNT(*) AS count FROM detections WHERE Sci_Name = :sci AND Date >= DATE('now', 'localtime', '-30 days') GROUP BY Date ORDER BY Date ASC");
@@ -837,32 +821,9 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   }
 
   $prefs = get_species_prefs_row($db, $sci);
-
-  $best = null;
-  $best_pinned = false;
-  if (!empty($prefs['crowned_clip'])) {
-    $pin_stmt = $db->prepare('SELECT Date, Time, Confidence, Com_Name, File_Name FROM detections WHERE File_Name = :f LIMIT 1');
-    $pin_stmt->bindValue(':f', $prefs['crowned_clip'], SQLITE3_TEXT);
-    $pin_row = db_fetch_assoc_safe(db_execute_safe($db, $pin_stmt, 'species detail pin'));
-    if ($pin_row) {
-      $pin_row['clip_path'] = detection_clip_relative_path($pin_row['Date'], $pin_row['Com_Name'], $pin_row['File_Name']);
-      if (clip_exists($pin_row['clip_path'])) {
-        $best = $pin_row;
-        $best_pinned = true;
-      }
-    }
-  }
-  if ($best === null) {
-    $surviving = surviving_best_recordings($best_candidates, 1);
-    $best = $surviving[0] ?? null;
-  }
-  // Quiet replacement is the rule; the page only hears about a purged clip
-  // when it scored higher than what is shown (or nothing survived at all).
-  $purged_best = null;
-  if ($all_time_best && !clip_exists($all_time_best['clip_path'])
-      && (!$best || ($all_time_best['File_Name'] !== $best['File_Name'] && (float)$all_time_best['Confidence'] > (float)$best['Confidence']))) {
-    $purged_best = ['date' => $all_time_best['Date'], 'confidence' => round((float)$all_time_best['Confidence'], 4)];
-  }
+  // Best recording, purged-best note and the best-confidence tile all come
+  // from the one shared definition (pinned clip first, then best surviving).
+  $best_info = species_best_recording($db, $sci, $prefs);
 
   $precision = null;
   $review_counts = [];
@@ -897,16 +858,9 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'total_detections' => (int)$info['total'],
     'first_seen' => $info['first_seen'],
     'last_seen' => $info['last_seen'],
-    'best_confidence' => round((float)($all_time_best ? $all_time_best['Confidence'] : $info['best_confidence']), 4),
-    'best_recording' => $best ? [
-      'date' => $best['Date'],
-      'time' => $best['Time'],
-      'confidence' => round((float)$best['Confidence'], 4),
-      'file' => $best['File_Name'],
-      'clip_path' => $best['clip_path'],
-      'pinned' => $best_pinned
-    ] : null,
-    'purged_best' => $purged_best,
+    'best_confidence' => $best_info['best_confidence'] ?? round((float)$info['best_confidence'], 4),
+    'best_recording' => $best_info['best_recording'],
+    'purged_best' => $best_info['purged_best'],
     'daily_30d' => $daily,
     'hourly_pattern' => $hourly,
     'calendar' => $calendar,
@@ -1171,10 +1125,9 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
      renders an empty comparison strip. Only return examples whose audio file
      is still present. When the By_Date dir itself is absent (dev harness),
      existence can't be checked, so skip the filter. */
-  $clip_base = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\') . '/By_Date';
-  $clip_check = is_dir($clip_base);
-  $clip_exists = function ($rel) use ($clip_base, $clip_check) {
-    return !$clip_check || file_exists($clip_base . '/' . $rel);
+  $clip_check = is_dir(clip_base_dir());
+  $clip_exists = function ($rel) use ($clip_check) {
+    return !$clip_check || clip_exists($rel);
   };
 
   $confirmed_strong = [];
@@ -1587,7 +1540,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     $new_crown = trim((string)($body['crowned_clip'] === null ? '' : $body['crowned_clip']));
     if ($new_crown === '') {
       if (!empty($existing['crowned_clip'])) {
-        $old_rel = api_clip_relative_for_file($db, $existing['crowned_clip']);
+        $old_rel = clip_relative_for_file($db, $existing['crowned_clip']);
         if ($old_rel !== null) {
           purge_protect_remove($old_rel);
         }
@@ -1602,7 +1555,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
         api_error('crowned_clip not found for this species', 404);
       }
       if (!empty($existing['crowned_clip']) && $existing['crowned_clip'] !== $new_crown) {
-        $old_rel = api_clip_relative_for_file($db, $existing['crowned_clip']);
+        $old_rel = clip_relative_for_file($db, $existing['crowned_clip']);
         if ($old_rel !== null) {
           purge_protect_remove($old_rel);
         }
@@ -1644,7 +1597,10 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
       'custom_threshold' => $threshold,
       'crowned_clip' => $crowned
     ],
-    'crown_protected' => $crown_protected
+    'crown_protected' => $crown_protected,
+    // The recomputed best-recording block, so a pin/unpin can re-render
+    // without re-running the whole species/detail handler.
+    'best' => species_best_recording($db, $sci, ['crowned_clip' => $crowned])
   ]);
 
 } elseif (preg_match('#^/api/v1/notes$#', $requestUri) && $requestMethod === 'POST') {

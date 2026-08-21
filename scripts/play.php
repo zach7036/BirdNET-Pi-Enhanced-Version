@@ -43,7 +43,9 @@ function normalize_recording_relative_path($path) {
 }
 
 function recording_absolute_path($home, $relative, $shifted = false) {
-  return $home . '/BirdSongs/Extracted/By_Date/' . ($shifted ? 'shifted/' : '') . $relative;
+  // clip_base_dir() (common.php) is the one definition of where clips live;
+  // $home is kept for the callers' sake.
+  return clip_base_dir() . '/' . ($shifted ? 'shifted/' : '') . $relative;
 }
 
 function require_ajax_request() {

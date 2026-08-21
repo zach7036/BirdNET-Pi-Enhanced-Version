@@ -215,6 +215,16 @@ if ($bird_sci === '') {
   // (the pinned clip first, then the shared best-recording definition), so a
   // purged clip is replaced quietly. It only gets a mention when it scored
   // higher than what is shown - or when nothing survived at all.
+  // Audio that fails to load: note it beside the clip's meta line and drop the
+  // dead player. insertAdjacentHTML leaves the meta's existing children (and
+  // their listeners, e.g. the Pin button) intact where innerHTML += would not.
+  function clipFailed(el, text) {
+    var meta = el.parentNode && el.parentNode.querySelector('.bird-best-meta, .bird-visit-meta');
+    if (meta) meta.insertAdjacentHTML('beforeend', ' <span class="visit-empty">(' + text + ')</span>');
+    el.remove();
+  }
+  window.clipFailed = clipFailed;
+
   function purgedNote(d) {
     if (!d.purged_best) return '';
     return '<div class="bird-best-purged visit-empty">A ' + Math.round(d.purged_best.confidence * 100) + '% recording from ' +
@@ -232,7 +242,7 @@ if ($bird_sci === '') {
     var pinned = !!b.pinned;
     box.innerHTML =
       '<img class="bird-best-spec" loading="lazy" src="' + clipUrl(b.clip_path, '.png') + '" alt="Spectrogram" onerror="this.style.display=\'none\'">' +
-      '<audio controls preload="none" src="' + clipUrl(b.clip_path) + '" style="width:100%" onerror="this.parentNode.querySelector(\'.bird-best-meta\').innerHTML += \' <span class=&quot;visit-empty&quot;>(clip could not be loaded)</span>\'; this.remove();"></audio>' +
+      '<audio controls preload="none" src="' + clipUrl(b.clip_path) + '" style="width:100%" onerror="clipFailed(this, \'clip could not be loaded\')"></audio>' +
       '<div class="bird-best-meta">' + esc(b.date) + ' ' + esc(b.time) + ' &middot; ' + Math.round(b.confidence * 100) + '%' +
       (pinned
         ? ' <span class="crowned-tag" title="Your pick: shown as the best recording and always kept by disk cleanup">&#128204; Pinned</span> <button type="button" class="ui-button-link" id="crownBtn" data-mode="uncrown">Unpin</button>'
@@ -241,13 +251,14 @@ if ($bird_sci === '') {
     document.getElementById('crownBtn').addEventListener('click', function () {
       var mode = this.getAttribute('data-mode');
       postJson('api/v1/species/prefs', { sci_name: sci, crowned_clip: mode === 'crown' ? b.file : '' })
-        .then(function () {
-          // Re-fetch: after an unpin the automatic best may be a different clip.
-          return fetch('api/v1/species/detail?sci_name=' + encodeURIComponent(sci) + '&_=' + Date.now(), { headers: { 'Accept': 'application/json' } });
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (d2) {
-          detail = d2;
+        .then(function (j) {
+          // The POST returns the recomputed best block (after an unpin the
+          // automatic best may be a different clip) - no second detail fetch.
+          detail.prefs = j.prefs;
+          if (j.best) {
+            detail.best_recording = j.best.best_recording;
+            detail.purged_best = j.best.purged_best;
+          }
           renderBest(detail);
           showActionResult(mode === 'crown' ? 'Pinned - this clip is now the featured best recording and will always be kept.' : 'Unpinned - back to the automatic best recording.');
         })
@@ -265,7 +276,7 @@ if ($bird_sci === '') {
       var range = v.first_time.slice(0, 5) + (v.first_time === v.last_time ? '' : '–' + v.last_time.slice(0, 5));
       return '<li class="bird-visit-item">' +
         '<div class="bird-visit-meta">' + esc(v.date) + ' &middot; ' + esc(range) + ' &middot; ' + v.count + '&times; &middot; ' + Math.round(v.best_confidence * 100) + '%</div>' +
-        '<audio controls preload="none" src="' + clipUrl(v.clip_path) + '" onerror="this.parentNode.querySelector(\'.bird-visit-meta\').innerHTML += \' <span class=&quot;visit-empty&quot;>(clip purged)</span>\'; this.remove();"></audio>' +
+        '<audio controls preload="none" src="' + clipUrl(v.clip_path) + '" onerror="clipFailed(this, \'clip purged\')"></audio>' +
         '</li>';
     }).join('');
   }

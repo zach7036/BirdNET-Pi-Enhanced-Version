@@ -131,7 +131,7 @@ if(isset($_GET["latitude"])){
   $temperature_unit = (isset($_GET['temperature_unit']) && $_GET['temperature_unit'] === 'celsius') ? 'celsius' : 'fahrenheit';
   $wind_speed_unit = (isset($_GET['wind_speed_unit']) && in_array($_GET['wind_speed_unit'], ['kmh', 'ms'], true)) ? $_GET['wind_speed_unit'] : 'mph';
   $time_format = (isset($_GET['time_format']) && $_GET['time_format'] === '24') ? '24' : '12';
-  $protected_recordings = (isset($_GET['protected_recordings_per_species']) && in_array($_GET['protected_recordings_per_species'], ['1', '2', '3'], true)) ? $_GET['protected_recordings_per_species'] : '2';
+  $protected_recordings = (isset($_GET['protected_recordings_per_species']) && in_array($_GET['protected_recordings_per_species'], PROTECTED_RECORDINGS_CHOICES, true)) ? $_GET['protected_recordings_per_species'] : PROTECTED_RECORDINGS_DEFAULT;
   $number_format_pref = (isset($_GET['number_format']) && in_array($_GET['number_format'], ['comma', 'space'], true)) ? $_GET['number_format'] : 'point';
   $sidebar_site_name = isset($_GET['sidebar_site_name']) ? 1 : 0;
   // Front-page info box: owner-authored HTML, stored in its own file (a
@@ -648,8 +648,8 @@ https://discordapp.com/api/webhooks/{WebhookID}/{WebhookToken}
         <li><strong>Best recordings are never purged:</strong> each species' highest-confidence clips survive cleanup, and when a higher-scoring clip arrives it takes over protection automatically. Clips you pin on a bird's page are always kept.
           <label for="protected_recordings_per_species" style="margin-left:6px">Keep per species:</label>
           <select name="protected_recordings_per_species" class="testbtn">
-            <?php $protected_current = in_array($config['PROTECTED_RECORDINGS_PER_SPECIES'] ?? '2', ['1', '2', '3'], true) ? $config['PROTECTED_RECORDINGS_PER_SPECIES'] : '2';
-            foreach (['1', '2', '3'] as $n) { ?>
+            <?php $protected_current = (string)protected_recordings_per_species();
+            foreach (PROTECTED_RECORDINGS_CHOICES as $n) { ?>
             <option value="<?php echo $n; ?>" <?php if ($protected_current === $n) { echo 'selected'; } ?>><?php echo $n; ?></option>
             <?php } ?>
           </select>

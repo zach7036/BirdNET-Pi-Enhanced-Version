@@ -154,9 +154,7 @@ if (get_included_files()[0] === __FILE__) {
 
   while($results=db_fetch_assoc_safe($result))
   {
-    $comname = preg_replace('/ /', '_', $results['Com_Name']);
-    $comname = preg_replace('/\'/', '', $comname);
-    $filename = "/By_Date/".$results['Date']."/".$comname."/".$results['File_Name'];
+    $filename = "/By_Date/" . detection_clip_relative_path($results['Date'], $results['Com_Name'], $results['File_Name']);
     $birds[] = $results['Com_Name'];
     $values[] = get_label($results, $_GET['sort']);
   }
@@ -378,9 +376,7 @@ while($results=db_fetch_assoc_safe($result3)){
 <?php
 while($results=db_fetch_assoc_safe($result))
 {
-$comname = preg_replace('/ /', '_', $results['Com_Name']);
-$comname = preg_replace('/\'/', '', $comname);
-$filename = "/By_Date/".$results['Date']."/".$comname."/".$results['File_Name'];
+$filename = "/By_Date/" . detection_clip_relative_path($results['Date'], $results['Com_Name'], $results['File_Name']);
 ?>
       <tr>
       <td class="relative"><a target="_blank" href="index.php?filename=<?php echo $results['File_Name']; ?>"><img title="Open in new tab" class="copyimage" width=25 src="images/copy.png"></a>

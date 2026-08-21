@@ -111,16 +111,8 @@ function render_species_cards($species_list, $image_provider, $fallback_provider
         $image_url = 'images/bird.png';
 
         if ($image_provider) {
-            if (!isset($_SESSION['species_portal_v8_cache'])) {
-                $_SESSION['species_portal_v8_cache'] = [];
-            }
-
-            $search_name = trim($com_name);
-            $image = session_image_lookup('species_portal_v8_cache', $search_name);
-            if ($image === null) {
-                $image = session_image_store('species_portal_v8_cache', $search_name, $image_provider->get_image($sci_name, $fallback_provider));
-            }
-            $image_url = ($image && !empty($image[1])) ? $image[1] : 'images/bird.png';
+            $image = session_image_get('species_portal_v8_cache', trim($com_name), $sci_name, $image_provider, $fallback_provider);
+            $image_url = !empty($image[1]) ? $image[1] : 'images/bird.png';
         }
 
         $info = get_info_url($sci_name);
