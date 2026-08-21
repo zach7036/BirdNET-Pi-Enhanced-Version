@@ -18,21 +18,18 @@
 
 #live-audio-tab {
   align-self: flex-end;
-  min-width: 124px;
+  width: 50px;
   height: 50px;
-  padding: 0 18px;
+  padding: 0;
   background: linear-gradient(135deg, #5a4cf4 0%, #4b2ee8 100%);
   border: 0;
-  border-radius: 999px;
+  border-radius: 50%;
   box-shadow: 0 10px 24px rgba(79, 70, 229, 0.3), 0 3px 8px rgba(49, 46, 129, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   cursor: pointer;
   font: inherit;
-  font-size: 1rem;
-  font-weight: 700;
   color: #fff;
   user-select: none;
   pointer-events: auto;
@@ -207,23 +204,15 @@
   }
 
   #live-audio-tab {
-    min-width: 108px;
+    width: 44px;
     height: 44px;
-    padding: 0 15px;
-    gap: 8px;
-    font-size: 0.95rem;
+    padding: 0;
   }
 
   .live-audio-mic {
     width: 20px;
     height: 20px;
     flex-basis: 20px;
-  }
-
-  #live-audio-tab .live-audio-status-dot {
-    width: 10px;
-    height: 10px;
-    flex-basis: 10px;
   }
 
   #live-audio-content {

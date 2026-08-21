@@ -119,8 +119,6 @@ function nav_icon($name) {
 <div id="live-audio-panel">
   <button type="button" id="live-audio-tab" onclick="toggleAudioPanel()" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
     <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
-    <span>Live</span>
-    <span class="live-audio-status-dot" aria-hidden="true"></span>
   </button>
   <div id="live-audio-content" role="region" aria-labelledby="live-audio-title" aria-hidden="true">
     <div class="live-audio-heading">
