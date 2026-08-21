@@ -474,6 +474,9 @@
                     }
                 }
             }, function (message) {
+                // Same rule as the success path: a slow, failed older request
+                // must not paint an error over a newer successful render.
+                if (mySeq !== refreshSeq) return;
                 var heatmapError = document.getElementById('heatmapError');
                 if (heatmapError && window.BirdNETUI) {
                     BirdNETUI.setMessage(heatmapError, 'error', 'Heatmap unavailable', message);
