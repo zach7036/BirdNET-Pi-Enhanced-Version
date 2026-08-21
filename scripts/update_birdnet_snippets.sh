@@ -360,6 +360,12 @@ fi
 if ! grep -E '^HA_TEMP_ENTITY=' /etc/birdnet/birdnet.conf &>/dev/null;then
   echo 'HA_TEMP_ENTITY=""' >> /etc/birdnet/birdnet.conf
 fi
+if ! grep -E '^PROTECTED_RECORDINGS_PER_SPECIES=' /etc/birdnet/birdnet.conf &>/dev/null;then
+  echo 'PROTECTED_RECORDINGS_PER_SPECIES=2' >> /etc/birdnet/birdnet.conf
+fi
+# Protect each species' current best recordings right away rather than at the
+# next cleanup run - the old page-render mechanism left stale lists behind.
+sudo_with_user php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" || true
 
 # Data spine tables (Phase 1): reviews, species prefs, notes. Additive only -
 # the detections table is never altered. Keep in sync with createdb.sh and

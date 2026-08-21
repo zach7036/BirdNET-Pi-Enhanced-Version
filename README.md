@@ -166,8 +166,10 @@ forever.
 
 Every species gets a calendar heatmap of when you've heard it, its best recordings, full
 detection history, and notes you can write yourself. Favorite species, mute ones you don't want
-notifications for, and crown a favorite recording — crowned clips are protected from automatic
-disk cleanup.
+notifications for, and pin a favorite recording as the species' best. Each species' highest-
+confidence clips are protected from automatic disk cleanup (how many is a setting, default 2),
+a new higher-scoring clip takes over that protection automatically, and pinned clips are always
+kept.
 
 ![The species gallery with high-resolution photographs, detection counts, and links to detail pages](docs/species_gallery_v2.png)
 

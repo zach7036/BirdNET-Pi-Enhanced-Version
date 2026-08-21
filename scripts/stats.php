@@ -12,10 +12,6 @@ $home = get_home();
 
 $result = fetch_species_array($_GET['sort']);
 
-if(!file_exists($home."/BirdNET-Pi/scripts/disk_check_exclude.txt") || strpos(file_get_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt"),"##start") === false) {
-  file_put_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", "");
-  file_put_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", "##start\n##end\n");
-}
 
 if (get_included_files()[0] === __FILE__) {
   // Standalone access (this file is symlinked into the web root): the shell
@@ -380,15 +376,11 @@ while($results=db_fetch_assoc_safe($result3)){
     <input type="hidden" name="view" value="Species Stats">
     <table>
 <?php
-$excludelines = [];
 while($results=db_fetch_assoc_safe($result))
 {
 $comname = preg_replace('/ /', '_', $results['Com_Name']);
 $comname = preg_replace('/\'/', '', $comname);
 $filename = "/By_Date/".$results['Date']."/".$comname."/".$results['File_Name'];
-
-array_push($excludelines, $results['Date']."/".$comname."/".$results['File_Name']);
-array_push($excludelines, $results['Date']."/".$comname."/".$results['File_Name'].".png");
 ?>
       <tr>
       <td class="relative"><a target="_blank" href="index.php?filename=<?php echo $results['File_Name']; ?>"><img title="Open in new tab" class="copyimage" width=25 src="images/copy.png"></a>
@@ -399,8 +391,9 @@ array_push($excludelines, $results['Date']."/".$comname."/".$results['File_Name'
 <?php
 }
 
-$file = file_get_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt");
-file_put_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", "##start"."\n".implode("\n",$excludelines)."\n".substr($file, strpos($file, "##end")));
+// Purge protection used to be a side effect of rendering this page (the
+// disk-full purge curl'd it first). scripts/update_purge_protection.php now
+// owns disk_check_exclude.txt and both cleanup scripts run it directly.
 ?>
     </table>
   </form>

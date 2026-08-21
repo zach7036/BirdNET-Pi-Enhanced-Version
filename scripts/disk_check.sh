@@ -10,7 +10,10 @@ if [ "${used//%}" -ge "$purge_threshold" ]; then
   case $FULL_DISK in
     purge) echo "Removing oldest data"
         cd ${EXTRACTED}/By_Date/
-        curl localhost/views.php?view=Species%20Stats &>/dev/null
+        # Refresh purge protection (each species' best recordings + pinned clips)
+        # straight from the database before deleting anything, so a new best is
+        # already protected and the one it displaced is purgeable.
+        php $HOME/BirdNET-Pi/scripts/update_purge_protection.php >/dev/null 2>&1
         if ! grep -qxFe \#\#start $HOME/BirdNET-Pi/scripts/disk_check_exclude.txt; then
             exit
         fi

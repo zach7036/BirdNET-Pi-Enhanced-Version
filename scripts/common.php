@@ -1243,6 +1243,90 @@ function purge_protected($relative) {
   return in_array($relative, $lines, true);
 }
 
+/* ===== Best recordings: one definition shared by the Birds page, the
+   Species Stats page, and purge protection ===== */
+
+// Highest confidence first; ties go to the most recent clip (more likely to
+// still exist, reflects the current mic and placement, and ages out of the
+// per-species cleanup last); File_Name makes the order fully deterministic so
+// what the page shows is exactly what cleanup protects.
+const BEST_RECORDING_ORDER = 'Confidence DESC, Date DESC, Time DESC, File_Name DESC';
+
+// How many of each species' best recordings survive disk cleanup (1-3).
+function protected_recordings_per_species() {
+  $config = get_config();
+  $n = (int)($config['PROTECTED_RECORDINGS_PER_SPECIES'] ?? 2);
+  return ($n >= 1 && $n <= 3) ? $n : 2;
+}
+
+function clip_absolute_path($relative) {
+  $config = get_config();
+  $extracted = !empty($config['EXTRACTED']) ? $config['EXTRACTED'] : get_home() . '/BirdSongs/Extracted';
+  return rtrim($extracted, '/') . '/By_Date/' . $relative;
+}
+
+function clip_exists($relative) {
+  return is_file(clip_absolute_path($relative));
+}
+
+function clip_relative_for_file($db, $file_name) {
+  $stmt = $db->prepare('SELECT Date, Com_Name FROM detections WHERE File_Name = :f LIMIT 1');
+  if ($stmt === false) {
+    return null;
+  }
+  $stmt->bindValue(':f', $file_name, SQLITE3_TEXT);
+  $row = db_fetch_assoc_safe(db_execute_safe($db, $stmt, 'clip relative lookup'));
+  return $row ? detection_clip_relative_path($row['Date'], $row['Com_Name'], $file_name) : null;
+}
+
+// Best-first candidates for one species. Detections reviewed as false
+// positives or hidden are excluded: a confidently wrong detection must never
+// become a featured, permanently protected "best recording".
+function species_best_candidates($db, $sci_name, $limit = 50) {
+  $stmt = $db->prepare('SELECT Date, Time, Confidence, Com_Name, File_Name FROM detections WHERE Sci_Name = :sci' . and_review_exclusion($db) . ' ORDER BY ' . BEST_RECORDING_ORDER . ' LIMIT ' . (int)$limit);
+  if ($stmt === false) {
+    return [];
+  }
+  $stmt->bindValue(':sci', $sci_name, SQLITE3_TEXT);
+  $rows = [];
+  $res = db_execute_safe($db, $stmt, 'species best candidates');
+  while ($row = db_fetch_assoc_safe($res)) {
+    $row['clip_path'] = detection_clip_relative_path($row['Date'], $row['Com_Name'], $row['File_Name']);
+    $rows[] = $row;
+  }
+  return $rows;
+}
+
+// Best-first candidates for every species in one pass (purge protection).
+// Returns Sci_Name => rows, each capped at $per_species candidates.
+function all_species_best_candidates($db, $per_species = 50) {
+  $sql = 'SELECT Sci_Name, Date, Time, Confidence, Com_Name, File_Name FROM ('
+       . 'SELECT Sci_Name, Date, Time, Confidence, Com_Name, File_Name, '
+       . 'ROW_NUMBER() OVER (PARTITION BY Sci_Name ORDER BY ' . BEST_RECORDING_ORDER . ') AS rn '
+       . 'FROM detections WHERE 1=1' . and_review_exclusion($db) . ') WHERE rn <= ' . (int)$per_species
+       . ' ORDER BY Sci_Name, rn';
+  $by_species = [];
+  foreach (db_query_all_safe($db, $sql, 'all species best candidates') as $row) {
+    $row['clip_path'] = detection_clip_relative_path($row['Date'], $row['Com_Name'], $row['File_Name']);
+    $by_species[$row['Sci_Name']][] = $row;
+  }
+  return $by_species;
+}
+
+// The first $keep candidates whose audio still exists on disk.
+function surviving_best_recordings($candidates, $keep) {
+  $found = [];
+  foreach ($candidates as $row) {
+    if (clip_exists($row['clip_path'])) {
+      $found[] = $row;
+      if (count($found) >= $keep) {
+        break;
+      }
+    }
+  }
+  return $found;
+}
+
 function purge_protect_remove($relative) {
   $path = purge_exclude_path();
   if (!file_exists($path)) {

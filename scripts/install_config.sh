@@ -173,6 +173,11 @@ FULL_DISK=purge
 ## purge operations are triggered.
 PURGE_THRESHOLD=95
 
+## How many of each species' highest-confidence recordings (1-3) survive disk
+## cleanup. A new higher-scoring clip takes over protection automatically;
+## clips pinned on a bird's page are always kept.
+PROTECTED_RECORDINGS_PER_SPECIES=2
+
 ## Maximum amount of files to keep for a given specie (0 = keep all)
 ## Files from the last 7 days, and files protected from purge, are not taken into
 ## account in this number

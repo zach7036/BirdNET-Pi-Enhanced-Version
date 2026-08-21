@@ -131,6 +131,7 @@ if(isset($_GET["latitude"])){
   $temperature_unit = (isset($_GET['temperature_unit']) && $_GET['temperature_unit'] === 'celsius') ? 'celsius' : 'fahrenheit';
   $wind_speed_unit = (isset($_GET['wind_speed_unit']) && in_array($_GET['wind_speed_unit'], ['kmh', 'ms'], true)) ? $_GET['wind_speed_unit'] : 'mph';
   $time_format = (isset($_GET['time_format']) && $_GET['time_format'] === '24') ? '24' : '12';
+  $protected_recordings = (isset($_GET['protected_recordings_per_species']) && in_array($_GET['protected_recordings_per_species'], ['1', '2', '3'], true)) ? $_GET['protected_recordings_per_species'] : '2';
   $number_format_pref = (isset($_GET['number_format']) && in_array($_GET['number_format'], ['comma', 'space'], true)) ? $_GET['number_format'] : 'point';
   $sidebar_site_name = isset($_GET['sidebar_site_name']) ? 1 : 0;
   // Front-page info box: owner-authored HTML, stored in its own file (a
@@ -192,6 +193,7 @@ if(isset($_GET["latitude"])){
   $contents = preg_replace("/TEMPERATURE_UNIT=.*/", "TEMPERATURE_UNIT=$temperature_unit", $contents);
   $contents = preg_replace("/WIND_SPEED_UNIT=.*/", "WIND_SPEED_UNIT=$wind_speed_unit", $contents);
   $contents = preg_replace("/TIME_FORMAT=.*/", "TIME_FORMAT=$time_format", $contents);
+  $contents = preg_replace("/PROTECTED_RECORDINGS_PER_SPECIES=.*/", "PROTECTED_RECORDINGS_PER_SPECIES=$protected_recordings", $contents);
   $contents = preg_replace("/NUMBER_FORMAT=.*/", "NUMBER_FORMAT=$number_format_pref", $contents);
   $contents = preg_replace("/HA_URL=.*/", "HA_URL=\"$ha_url\"", $contents);
   $contents = preg_replace("/HA_TOKEN=.*/", "HA_TOKEN=\"$ha_token\"", $contents);
@@ -643,6 +645,15 @@ https://discordapp.com/api/webhooks/{WebhookID}/{WebhookToken}
           <?php } ?>
         </li>
         <li><strong>Only short clips are kept:</strong> full-length recordings are deleted after analysis; only the extracted detection clips remain, and old clips are purged automatically when disk space runs low.</li>
+        <li><strong>Best recordings are never purged:</strong> each species' highest-confidence clips survive cleanup, and when a higher-scoring clip arrives it takes over protection automatically. Clips you pin on a bird's page are always kept.
+          <label for="protected_recordings_per_species" style="margin-left:6px">Keep per species:</label>
+          <select name="protected_recordings_per_species" class="testbtn">
+            <?php $protected_current = in_array($config['PROTECTED_RECORDINGS_PER_SPECIES'] ?? '2', ['1', '2', '3'], true) ? $config['PROTECTED_RECORDINGS_PER_SPECIES'] : '2';
+            foreach (['1', '2', '3'] as $n) { ?>
+            <option value="<?php echo $n; ?>" <?php if ($protected_current === $n) { echo 'selected'; } ?>><?php echo $n; ?></option>
+            <?php } ?>
+          </select>
+        </li>
         <li><strong>Local by default:</strong> nothing leaves your network unless you enable an integration (BirdWeather, Apprise, weather sync, species images).</li>
       </ul>
       </td></tr></table><br>

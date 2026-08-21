@@ -12,6 +12,12 @@ if [[ "$max_files_species" -lt 1 ]]; then
     exit 0
 fi
 
+# Refresh purge protection (each species' best recordings + pinned clips) from
+# the database first. This script used to trust whatever disk_check_exclude.txt
+# happened to contain - a list only the disk-full purge refreshed - so a new
+# best recording that postdated the last refresh could be deleted here.
+php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" >/dev/null 2>&1
+
 # Get unique species
 bird_names=$(
     sqlite3 -readonly "$HOME"/BirdNET-Pi/scripts/birds.db <<EOF
