@@ -15,6 +15,9 @@ if [ "${used//%}" -ge "$purge_threshold" ]; then
         # and the web Lock/Pin writers: nothing rewrites the list while this
         # deletion pass is reading it. Held until the script exits.
         exec 9>"$HOME/BirdNET-Pi/scripts/disk_check_exclude.lock"
+        # If this created the file (cron ran before the updater did), make it
+        # writable for the web user too, or every Lock/Unlock would fail.
+        chmod 666 "$HOME/BirdNET-Pi/scripts/disk_check_exclude.lock" 2>/dev/null
         if ! flock -w 120 9; then
             echo "disk_check: cleanup lock busy, skipping purge" >&2
             exit 1

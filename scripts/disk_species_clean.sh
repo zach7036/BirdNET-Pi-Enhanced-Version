@@ -16,6 +16,9 @@ fi
 # Lock/Pin writers - the two cleanup jobs can genuinely overlap at 02:00.
 # Held until the script exits.
 exec 9>"$HOME/BirdNET-Pi/scripts/disk_check_exclude.lock"
+# If this created the file (cron ran before the updater did), make it writable
+# for the web user too, or every Lock/Unlock would fail.
+chmod 666 "$HOME/BirdNET-Pi/scripts/disk_check_exclude.lock" 2>/dev/null
 if ! flock -w 600 9; then
     echo "disk_species_clean: cleanup lock busy, skipping cleanup" >&2
     exit 1

@@ -144,6 +144,7 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
   $output = [];
   exec("sudo -u ".escapeshellarg($user)." ".escapeshellarg($home."/BirdNET-Pi/scripts/birdnet_changeidentification.sh")." ".escapeshellarg($oldname)." ".escapeshellarg($newname)." log_errors 2>&1", $output, $status);
   if ($status === 0) {
+    $rename_notices = [];
     /* The rename script updates detections and moves the files, but two
        other places still reference the old name: detection_reviews (the
        trust-loop history) and disk_check_exclude.txt (crown purge
@@ -178,7 +179,7 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
           $pin->bindValue(':of', $oldname, SQLITE3_TEXT);
           db_execute_safe($rw, $pin, 'changefile clear pin');
           if ($rw->changes() > 0) {
-            header('X-BirdNET-Notice: pin-cleared');
+            $rename_notices[] = 'pin-cleared';
           }
         }
       } catch (Exception $e) {
@@ -193,10 +194,14 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
       // next cleanup.
       $old_rel = detection_clip_relative_path($old_row['Date'], $old_row['Com_Name'], $oldname);
       $new_rel = detection_clip_relative_path($old_row['Date'], $new_com, $new_file);
-      if (purge_protected($old_rel)) {
-        purge_protect_remove($old_rel);
-        purge_protect_add($new_rel);
+      if (!purge_protect_move($old_rel, $new_rel)) {
+        // The rename itself succeeded; only the lock could not be carried
+        // (cleanup held the lock). Say so rather than silently dropping it.
+        $rename_notices[] = 'lock-not-carried';
       }
+    }
+    if (!empty($rename_notices)) {
+      header('X-BirdNET-Notice: ' . implode(',', $rename_notices));
     }
     echo "OK";
   } else {
@@ -328,6 +333,9 @@ function deleteDetection(filename,copylink=false) {
 }
 
 function toggleLock(filename, type, elem) {
+  // Ignore clicks while a request is in flight: a second click would capture
+  // the spinner as the icon to restore on failure.
+  if ((elem.getAttribute("src") || "").indexOf("spinner.gif") !== -1) return;
   const xhttp = new XMLHttpRequest();
   const previousIcon = elem.getAttribute("src");
   xhttp.onload = function() {
@@ -338,7 +346,7 @@ function toggleLock(filename, type, elem) {
         elem.setAttribute("onclick", elem.getAttribute("onclick").replace("add","del"));
       } else {
         elem.setAttribute("src","images/unlock.svg");
-        elem.setAttribute("title", "This file will be deleted when disk space needs to be freed.");
+        elem.setAttribute("title", "Not manually locked. Each species' best recordings and pinned clips are protected automatically; lock this file to keep it regardless.");
         elem.setAttribute("onclick", elem.getAttribute("onclick").replace("del","add"));
       }
     } else {
@@ -500,9 +508,14 @@ function changeDetection(filename,copylink=false) {
         const xhttp2 = new XMLHttpRequest();
         xhttp2.onload = function() {
           if(this.responseText == "OK"){
-            var note = this.getResponseHeader("X-BirdNET-Notice") === "pin-cleared"
-              ? "\nThis clip was pinned as the species' best recording; the pin was cleared because it now belongs to a different species."
-              : "";
+            var notices = (this.getResponseHeader("X-BirdNET-Notice") || "").split(",");
+            var note = "";
+            if (notices.indexOf("pin-cleared") !== -1) {
+              note += "\nThis clip was pinned as the species' best recording; the pin was cleared because it now belongs to a different species.";
+            }
+            if (notices.indexOf("lock-not-carried") !== -1) {
+              note += "\nIts manual lock could not be carried over because disk cleanup was running - lock the renamed clip again if you want it kept.";
+            }
             if(copylink == true) {
               alert("Successfully converted" + note);
               window.top.close();
@@ -1133,7 +1146,7 @@ $url = $info_url['URL'];
 
       if(!in_array($filename_formatted, $disk_check_exclude_arr)) {
         $imageicon = "images/unlock.svg";
-        $title = "This file will be deleted when disk space needs to be freed (>95% usage).";
+        $title = "Not manually locked. Each species' best recordings and pinned clips are protected automatically; lock this file to keep it regardless.";
         $type = "add";
       } else {
         $imageicon = "images/lock.svg";
@@ -1234,17 +1247,13 @@ echo "</div>"; // close recording-detail-wrap
         $values = round((float)round($results['Confidence'],2) * 100 ) . '%';
         $filename_formatted = $date."/".$comname."/".$results['File_Name'];
 
-        // add disk_check_exclude.txt lines into an array for grepping
-        $fp = @fopen($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", 'r');
-        if ($fp) {
-          $disk_check_exclude_arr = explode("\n", fread($fp, filesize($home."/BirdNET-Pi/scripts/disk_check_exclude.txt")));
-        } else {
-          $disk_check_exclude_arr = [];
-        }
+        // The padlock reflects MANUAL locks only (same rule as the species
+        // list above); automatic best-recording protection is not a lock.
+        $disk_check_exclude_arr = purge_manual_lines();
 
           if(!in_array($filename_formatted, $disk_check_exclude_arr)) {
             $imageicon = "images/unlock.svg";
-            $title = "This file will be deleted when disk space needs to be freed (>95% usage).";
+            $title = "Not manually locked. Each species' best recordings and pinned clips are protected automatically; lock this file to keep it regardless.";
             $type = "add";
           } else {
             $imageicon = "images/lock.svg";

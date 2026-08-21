@@ -1275,6 +1275,9 @@ function purge_lock_release($fh) {
 function purge_exclude_sections() {
   $path = purge_exclude_path();
   $lines = is_file($path) ? (@file($path, FILE_IGNORE_NEW_LINES) ?: []) : [];
+  // A hand-edited file saved with CRLF would otherwise hide the markers and
+  // turn every stale managed line into a permanent manual one.
+  $lines = array_map(function ($l) { return rtrim($l, "\r"); }, $lines);
   $start = array_search('##start', $lines, true);
   $end = array_search('##end', $lines, true);
   if ($start === false || $end === false || $end < $start) {
@@ -1288,20 +1291,30 @@ function purge_exclude_sections() {
   ];
 }
 
-// In-place write (owner and mode survive; the web user cannot restore them
-// after a rename). Callers hold the purge lock. Blank lines are dropped:
-// with substring matching a blank pattern once excluded every file.
+// Temp file + rename, so a reader that does not hold the lock (a padlock
+// render in another tab) sees the old list or the new one, never a truncated
+// one, and a crash mid-write cannot lose every manual lock. The file is kept
+// mode 666 and scripts/ is group-writable, so it does not matter whether the
+// web user or the station user ends up owning the inode. Callers hold the
+// purge lock. Blank lines are dropped: with substring matching a blank
+// pattern once excluded every file.
 function purge_exclude_write_sections($s) {
   $path = purge_exclude_path();
   $out = array_merge($s['before'], ['##start'], $s['managed'], ['##end'], $s['after']);
   $out = array_values(array_filter($out, function ($l) { return $l !== ''; }));
-  $existed = file_exists($path);
-  if (@file_put_contents($path, implode("\n", $out) . "\n") === false) {
+  $tmp = $path . '.tmp.' . getmypid();
+  if (@file_put_contents($tmp, implode("\n", $out) . "\n") === false) {
     return false;
   }
-  if (!$existed) {
-    @chmod($path, 0666);
+  @chmod($tmp, 0666);
+  if (!@rename($tmp, $path)) {
+    // PHP on Windows (the dev harness) cannot rename over an existing file.
+    if (PHP_OS_FAMILY !== 'Windows' || !@unlink($path) || !@rename($tmp, $path)) {
+      @unlink($tmp);
+      return false;
+    }
   }
+  @chmod($path, 0666);
   return true;
 }
 
@@ -1529,6 +1542,34 @@ function purge_protect_remove($relative) {
   $keep = function ($line) use ($relative) { return $line !== $relative && $line !== $relative . '.png'; };
   $s['before'] = array_values(array_filter($s['before'], $keep));
   $s['after'] = array_values(array_filter($s['after'], $keep));
+  $ok = purge_exclude_write_sections($s);
+  purge_lock_release($lock);
+  return $ok;
+}
+
+// Carry a manual lock from one path to another (a renamed clip) as ONE locked
+// read-modify-write: separate remove + add could lose the lock if a cleanup
+// pass grabbed the lock in between. Returns true if there was nothing to carry
+// or the carry succeeded.
+function purge_protect_move($old_relative, $new_relative) {
+  $lock = purge_lock_acquire();
+  if ($lock === false) {
+    return false;
+  }
+  $s = purge_exclude_sections();
+  $manual = array_merge($s['before'], $s['after']);
+  if (!in_array($old_relative, $manual, true)) {
+    purge_lock_release($lock);
+    return true;
+  }
+  $keep = function ($line) use ($old_relative) { return $line !== $old_relative && $line !== $old_relative . '.png'; };
+  $s['before'] = array_values(array_filter($s['before'], $keep));
+  $s['after'] = array_values(array_filter($s['after'], $keep));
+  foreach ([$new_relative, $new_relative . '.png'] as $entry) {
+    if (!in_array($entry, array_merge($s['before'], $s['after']), true)) {
+      $s['after'][] = $entry;
+    }
+  }
   $ok = purge_exclude_write_sections($s);
   purge_lock_release($lock);
   return $ok;

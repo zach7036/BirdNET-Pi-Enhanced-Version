@@ -114,9 +114,11 @@ required; the custom header forces a CORS preflight as CSRF protection):
   `{status, note?, visit:{sci_name,date,from_time,to_time}}`; a visit review
   fans out to every member detection. `status: clear` removes reviews.
 - `POST /api/v1/species/prefs` — partial update of
-  `{favorite, muted, notify_mode, custom_threshold, crowned_clip}`. Setting
-  `crowned_clip` auto-adds the clip (and its .png) to
-  `disk_check_exclude.txt`; clearing it removes the protection.
+  `{favorite, muted, notify_mode, custom_threshold, crowned_clip}`. A pin
+  (`crowned_clip`) is stored in `species_prefs` only; `update_purge_protection.php`
+  writes pins and each species' best recordings into the managed
+  `##start/##end` section of `disk_check_exclude.txt` before every cleanup.
+  Lines outside the markers are manual Locks from the Recordings page.
 - `POST /api/v1/notes` — `{body, date?, sci_name?, file_name?}` or
   `{action:"delete", id}`.
 
