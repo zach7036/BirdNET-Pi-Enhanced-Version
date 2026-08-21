@@ -99,8 +99,8 @@ if ($is_csv_export) {
 // lookups a provider-less station had opted out of.
 list($image_provider, $fallback_provider) = make_image_provider($config);
 
-if ($image_provider && $image_provider->is_reset()) {
-    $_SESSION['species_portal_v8_cache'] = [];
+if (image_providers_reset($image_provider, $fallback_provider)) {
+    clear_session_image_caches();
 }
 
 function render_species_cards($species_list, $image_provider, $fallback_provider, $config) {

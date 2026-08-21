@@ -219,7 +219,8 @@
                         // undrawn until the next poll.
                         clearTimeout(window._heatmapTimer);
                         window._heatmapTimer = setTimeout(function () {
-                            if (lastData) renderHeatmap(canvas, lastData);
+                            var currentCanvas = document.getElementById('hourlyHeatmap');
+                            if (currentCanvas && lastData) renderHeatmap(currentCanvas, lastData);
                         }, 50);
                     };
                     img.onerror = function () {
@@ -239,7 +240,10 @@
                         clearTimeout(imageRetryTimers[s.image]);
                         imageRetryTimers[s.image] = setTimeout(function () {
                             delete imageRetryTimers[s.image];
-                            if (document.visibilityState === 'visible' && lastData) renderHeatmap(canvas, lastData);
+                            var currentCanvas = document.getElementById('hourlyHeatmap');
+                            if (document.visibilityState === 'visible' && currentCanvas && lastData) {
+                                renderHeatmap(currentCanvas, lastData);
+                            }
                         }, imageRetryDelay(count) + 1000);
                     };
                     img.src = s.image;
@@ -444,6 +448,7 @@
     // Cache last data for resize re-render
     var lastData = null;
     var refreshSeq = 0;
+    var successfulSeq = 0;
 
     // Public API
     window.DashboardCharts = {
@@ -452,13 +457,27 @@
 
             if (!heatCanvas) return;
 
-            // Refreshes can overlap (a poll plus a visibility change); only the
-            // newest request may replace the data and redraw, or an older,
-            // slower response would overwrite a newer one.
+            // Now replaces the canvas when switching Grid -> Heatmap. Draw
+            // cached data into that fresh canvas immediately so a failed
+            // refresh cannot leave it blank.
+            if (lastData && !heatCanvas.dataset.tooltipInit) {
+                renderHeatmap(heatCanvas, lastData);
+                addHeatmapTooltip(heatCanvas);
+                heatCanvas.dataset.tooltipInit = 'true';
+            }
+
+            // Refreshes can overlap (a poll plus a visibility change). A
+            // response may replace older successful data, but not newer
+            // successful data. Comparing successes instead of requests lets
+            // an older request remain useful when a newer request fails.
             var mySeq = ++refreshSeq;
             fetchChartData(function (data) {
-                if (mySeq !== refreshSeq) return;
+                if (mySeq < successfulSeq) return;
+                successfulSeq = mySeq;
                 lastData = data;
+                // Now can replace this canvas when switching between Grid and
+                // Heatmap while a request is in flight.
+                heatCanvas = document.getElementById('hourlyHeatmap');
                 if (heatCanvas) {
                     var heatmapError = document.getElementById('heatmapError');
                     if (heatmapError) heatmapError.innerHTML = '';
@@ -474,9 +493,9 @@
                     }
                 }
             }, function (message) {
-                // Same rule as the success path: a slow, failed older request
-                // must not paint an error over a newer successful render.
-                if (mySeq !== refreshSeq) return;
+                // A slow, failed older request must not paint an error over a
+                // newer success or a newer request that is still in flight.
+                if (mySeq < successfulSeq || mySeq !== refreshSeq) return;
                 var heatmapError = document.getElementById('heatmapError');
                 if (heatmapError && window.BirdNETUI) {
                     BirdNETUI.setMessage(heatmapError, 'error', 'Heatmap unavailable', message);

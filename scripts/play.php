@@ -140,18 +140,32 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
     $old_stmt->bindValue(':f', $oldname, SQLITE3_TEXT);
     $old_row = db_fetch_assoc_safe(db_execute_safe($db, $old_stmt, 'changefile old row'));
   }
+  if (!$old_row) {
+    echo "Error: the recording could not be read from the database - try again in a moment.";
+    die();
+  }
+
+  // Serialize the complete rename with both cleanup jobs. Taking the lock
+  // only after the file moved left a window where cleanup knew the protected
+  // old path but could delete the unlisted new path.
+  $rename_lock = purge_lock_acquire();
+  if ($rename_lock === false) {
+    echo "Error: disk cleanup is running - try the rename again in a moment.";
+    die();
+  }
 
   $output = [];
   exec("sudo -u ".escapeshellarg($user)." ".escapeshellarg($home."/BirdNET-Pi/scripts/birdnet_changeidentification.sh")." ".escapeshellarg($oldname)." ".escapeshellarg($newname)." log_errors 2>&1", $output, $status);
   if ($status === 0) {
     $rename_notices = [];
+    $metadata_failed = false;
     /* The rename script updates detections and moves the files, but two
        other places still reference the old name: detection_reviews (the
        trust-loop history) and disk_check_exclude.txt (crown purge
        protection - stale lines there would let the cleaner delete a
        protected clip). Carry both along. Any failure here degrades to the
        old orphaning behavior, never worse. */
-    if ($old_row && strpos($newname, '_') !== false) {
+    if (strpos($newname, '_') !== false) {
       $new_sci = substr($newname, 0, strpos($newname, '_'));
       $new_com = substr($newname, strpos($newname, '_') + 1);
       // Same sanitization and substitution the rename script applies
@@ -169,7 +183,11 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
           $upd->bindValue(':ns', $new_sci, SQLITE3_TEXT);
           $upd->bindValue(':nc', $new_com, SQLITE3_TEXT);
           $upd->bindValue(':of', $oldname, SQLITE3_TEXT);
-          db_execute_safe($rw, $upd, 'changefile review follow');
+          if (db_execute_safe($rw, $upd, 'changefile review follow') === false) {
+            $metadata_failed = true;
+          }
+        } else {
+          $metadata_failed = true;
         }
         // A pin named the OLD species' best recording; it does not survive a
         // reclassification. Clear it and say so (header, so callers that
@@ -177,13 +195,18 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
         $pin = $rw->prepare("UPDATE species_prefs SET crowned_clip = NULL, updated_at = datetime('now','localtime') WHERE crowned_clip = :of");
         if ($pin) {
           $pin->bindValue(':of', $oldname, SQLITE3_TEXT);
-          db_execute_safe($rw, $pin, 'changefile clear pin');
-          if ($rw->changes() > 0) {
+          $pin_result = db_execute_safe($rw, $pin, 'changefile clear pin');
+          if ($pin_result === false) {
+            $metadata_failed = true;
+          } elseif ($rw->changes() > 0) {
             $rename_notices[] = 'pin-cleared';
           }
+        } else {
+          $metadata_failed = true;
         }
-      } catch (Exception $e) {
+      } catch (Throwable $e) {
         error_log('changefile: review follow-up failed: ' . $e->getMessage());
+        $metadata_failed = true;
       }
       if ($rw) {
         $rw->close();
@@ -194,17 +217,22 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
       // next cleanup.
       $old_rel = detection_clip_relative_path($old_row['Date'], $old_row['Com_Name'], $oldname);
       $new_rel = detection_clip_relative_path($old_row['Date'], $new_com, $new_file);
-      if (!purge_protect_move($old_rel, $new_rel)) {
-        // The rename itself succeeded; only the lock could not be carried
-        // (cleanup held the lock). Say so rather than silently dropping it.
+      if (!purge_protect_move_locked($old_rel, $new_rel)) {
+        // The rename itself succeeded; say when the protection-list write did
+        // not, rather than silently leaving a stale manual lock.
         $rename_notices[] = 'lock-not-carried';
       }
+      if ($metadata_failed) {
+        $rename_notices[] = 'metadata-not-updated';
+      }
     }
+    purge_lock_release($rename_lock);
     if (!empty($rename_notices)) {
       header('X-BirdNET-Notice: ' . implode(',', $rename_notices));
     }
     echo "OK";
   } else {
+    purge_lock_release($rename_lock);
     echo "Error : " . implode(", ", $output) . "<br>";
   }
   die();
@@ -514,7 +542,10 @@ function changeDetection(filename,copylink=false) {
               note += "\nThis clip was pinned as the species' best recording; the pin was cleared because it now belongs to a different species.";
             }
             if (notices.indexOf("lock-not-carried") !== -1) {
-              note += "\nIts manual lock could not be carried over because disk cleanup was running - lock the renamed clip again if you want it kept.";
+              note += "\nIts manual lock could not be carried over - lock the renamed clip again if you want it kept.";
+            }
+            if (notices.indexOf("metadata-not-updated") !== -1) {
+              note += "\nThe recording was renamed, but a review or Pin follow-up could not be updated. Refresh and check this recording.";
             }
             if(copylink == true) {
               alert("Successfully converted" + note);
@@ -1081,6 +1112,10 @@ if(isset($_GET['species'])){ ?>
   // "unlocking" them appeared to work until the next cleanup regenerated
   // the list.
   $disk_check_exclude_arr = purge_manual_lines();
+  // The filter means every purge-protected recording, including the managed
+  // automatic-best and Pinned entries that intentionally do not show a manual
+  // padlock.
+  $all_purge_exclude_arr = purge_all_lines();
 
 $name = htmlspecialchars_decode($_GET['species'], ENT_QUOTES);
 $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 40;
@@ -1129,7 +1164,7 @@ $url = $info_url['URL'];
     if(!file_exists($home."/BirdSongs/Extracted/".$filename)) {
       continue;
     }
-    if(!in_array($filename_formatted, $disk_check_exclude_arr) && isset($_GET['only_excluded'])) {
+    if(!in_array($filename_formatted, $all_purge_exclude_arr) && isset($_GET['only_excluded'])) {
       continue;
     }
     $iter++;

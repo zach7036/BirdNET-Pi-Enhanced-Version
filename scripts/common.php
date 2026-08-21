@@ -466,6 +466,19 @@ function make_image_provider($config) {
 // hiccup blanked a species' picture for the life of the browser session.
 const SESSION_IMAGE_MISS_TTL = 600;
 
+// Image pages historically used different session-cache keys. Clear all of
+// them together after a blacklist change or provider database reset so an
+// invalid image cannot survive on another page for the rest of the session.
+function clear_session_image_caches() {
+  foreach (['images', 'species_portal_v8_cache', 'species_portal_v12_cache'] as $cache_key) {
+    $_SESSION[$cache_key] = [];
+  }
+}
+
+function image_providers_reset($primary, $fallback) {
+  return ($primary && $primary->is_reset()) || ($fallback && $fallback->is_reset());
+}
+
 function session_image_lookup($cache_key, $com_name) {
   if (!isset($_SESSION[$cache_key])) {
     $_SESSION[$cache_key] = [];
@@ -1324,6 +1337,13 @@ function purge_manual_lines() {
   return array_merge($s['before'], $s['after']);
 }
 
+// Every protected path, without the section markers. This is used for the
+// "Purge Excluded" filter; padlock icons deliberately use manual lines only.
+function purge_all_lines() {
+  $s = purge_exclude_sections();
+  return array_merge($s['before'], $s['managed'], $s['after']);
+}
+
 function purge_protect_add($relative) {
   $lock = purge_lock_acquire();
   if ($lock === false) {
@@ -1547,19 +1567,14 @@ function purge_protect_remove($relative) {
   return $ok;
 }
 
-// Carry a manual lock from one path to another (a renamed clip) as ONE locked
-// read-modify-write: separate remove + add could lose the lock if a cleanup
-// pass grabbed the lock in between. Returns true if there was nothing to carry
-// or the carry succeeded.
-function purge_protect_move($old_relative, $new_relative) {
-  $lock = purge_lock_acquire();
-  if ($lock === false) {
-    return false;
-  }
+// Carry a manual lock while the caller already owns the shared purge lock.
+// Kept separate so a rename can hold one lock across the filesystem move,
+// database follow-ups and protection-list update without trying to flock the
+// same file a second time.
+function purge_protect_move_locked($old_relative, $new_relative) {
   $s = purge_exclude_sections();
   $manual = array_merge($s['before'], $s['after']);
   if (!in_array($old_relative, $manual, true)) {
-    purge_lock_release($lock);
     return true;
   }
   $keep = function ($line) use ($old_relative) { return $line !== $old_relative && $line !== $old_relative . '.png'; };
@@ -1570,7 +1585,16 @@ function purge_protect_move($old_relative, $new_relative) {
       $s['after'][] = $entry;
     }
   }
-  $ok = purge_exclude_write_sections($s);
+  return purge_exclude_write_sections($s);
+}
+
+// Standalone wrapper for callers that do not already own the shared lock.
+function purge_protect_move($old_relative, $new_relative) {
+  $lock = purge_lock_acquire();
+  if ($lock === false) {
+    return false;
+  }
+  $ok = purge_protect_move_locked($old_relative, $new_relative);
   purge_lock_release($lock);
   return $ok;
 }

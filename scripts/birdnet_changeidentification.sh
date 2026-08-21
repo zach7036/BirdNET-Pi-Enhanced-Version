@@ -28,6 +28,13 @@ LABELS_FILE="$HOME/BirdNET-Pi/model/labels.txt"
 DB_FILE="$HOME/BirdNET-Pi/scripts/birds.db"
 DETECTIONS_TABLE="detections"
 
+# SQLite string literals escape an apostrophe by doubling it. Every value
+# below comes from a filename or labels file, so quote them consistently
+# before constructing the CLI statements.
+sql_escape() {
+  printf '%s' "$1" | sed "s/'/''/g"
+}
+
 ###################
 # VALIDITY CHECKS #
 ###################
@@ -48,7 +55,7 @@ elif [[ "$2" != *"_"* ]]; then
 fi
 
 # Check if $NEWNAME is found in the file $LABELS_FILE
-if ! grep -q "$NEWNAME" "$LABELS_FILE"; then
+if ! grep -Fqx -- "$NEWNAME" "$LABELS_FILE"; then
     echo "Error: $NEWNAME not found in $LABELS_FILE"
     exit 1
 fi
@@ -67,8 +74,14 @@ fi
 # Intro
 [[ "$OUTPUT_TYPE" == "debug" ]] && echo "Starting to modify $OLDNAME to $NEWNAME"
 
-# Get the line where the column "File_Name" matches exactly $OLDNAME
-IFS='|' read -r OLDNAME_sciname OLDNAME_comname OLDNAME_date < <(sqlite3 "$DB_FILE" "SELECT Sci_Name, Com_Name, Date FROM $DETECTIONS_TABLE WHERE File_Name = '$OLDNAME' LIMIT 1;")
+# Get the line where the column "File_Name" matches exactly $OLDNAME. Capture
+# sqlite3's status directly; process substitution previously hid lookup errors.
+OLDNAME_sql="$(sql_escape "$OLDNAME")"
+if ! old_row="$(sqlite3 -batch -bail -init /dev/null -noheader -list -cmd '.timeout 5000' -separator '|' "$DB_FILE" "SELECT Sci_Name, Com_Name, Date FROM $DETECTIONS_TABLE WHERE File_Name = '$OLDNAME_sql' LIMIT 1;")"; then
+    echo "Error: database lookup failed for $OLDNAME"
+    exit 1
+fi
+IFS='|' read -r OLDNAME_sciname OLDNAME_comname OLDNAME_date <<< "$old_row"
 
 if [[ -z "$OLDNAME_sciname" ]]; then
     echo "Error: No line matching $OLDNAME in $DB_FILE"
@@ -94,31 +107,95 @@ NEWNAME_filename="${OLDNAME//$OLDNAME_comname_safe/$NEWNAME_comname_safe}"
 
 # Check if the file exists
 FILE_PATH="$HOME/BirdSongs/Extracted/By_Date/$OLDNAME_date/$OLDNAME_comname_safe/$OLDNAME"
-if [[ -f $FILE_PATH ]]; then
-    # Ensure the new directory exists
-    NEW_DIR="$HOME/BirdSongs/Extracted/By_Date/$OLDNAME_date/$NEWNAME_comname_safe"
-    mkdir -p "$NEW_DIR"
-    
-    # Move and rename the file
-    mv "$FILE_PATH" "$NEW_DIR/$NEWNAME_filename"
-    mv "$FILE_PATH".png "$NEW_DIR/$NEWNAME_filename".png
-    
-    [[ "$OUTPUT_TYPE" == "debug" ]] && echo "Files moved!"
-else
+NEW_DIR="$HOME/BirdSongs/Extracted/By_Date/$OLDNAME_date/$NEWNAME_comname_safe"
+NEW_FILE_PATH="$NEW_DIR/$NEWNAME_filename"
+OLD_PNG_PATH="$FILE_PATH.png"
+NEW_PNG_PATH="$NEW_FILE_PATH.png"
+
+if [[ ! -f "$FILE_PATH" ]]; then
     echo "Error: File $FILE_PATH does not exist"
+    exit 1
 fi
+
+same_path=0
+if [[ "$FILE_PATH" == "$NEW_FILE_PATH" ]]; then
+    # Some names differ only by punctuation that filenames already strip
+    # (for example Coopers Hawk -> Cooper's Hawk). The database still needs
+    # updating, but moving a file onto itself would falsely fail.
+    same_path=1
+fi
+
+if [[ "$same_path" -eq 0 ]]; then
+    if [[ -e "$NEW_FILE_PATH" ]] || [[ -e "$NEW_PNG_PATH" ]]; then
+        echo "Error: destination file already exists for $NEWNAME_filename"
+        exit 1
+    fi
+fi
+
+if ! mkdir -p "$NEW_DIR"; then
+    echo "Error: could not create $NEW_DIR"
+    exit 1
+fi
+
+audio_moved=0
+png_moved=0
+rollback_files() {
+    local rollback_failed=0
+    if [[ "$png_moved" -eq 1 ]] && ! mv -- "$NEW_PNG_PATH" "$OLD_PNG_PATH"; then
+        rollback_failed=1
+    fi
+    if [[ "$audio_moved" -eq 1 ]] && ! mv -- "$NEW_FILE_PATH" "$FILE_PATH"; then
+        rollback_failed=1
+    fi
+    return "$rollback_failed"
+}
+
+if [[ "$same_path" -eq 0 ]]; then
+    if ! mv -- "$FILE_PATH" "$NEW_FILE_PATH"; then
+        echo "Error: could not move $FILE_PATH"
+        exit 1
+    fi
+    audio_moved=1
+
+    # A spectrogram can legitimately be absent (for example after a quarantine
+    # retry), but if it exists its move is part of the rename and must succeed.
+    if [[ -f "$OLD_PNG_PATH" ]]; then
+        if ! mv -- "$OLD_PNG_PATH" "$NEW_PNG_PATH"; then
+            echo "Error: could not move $OLD_PNG_PATH"
+            rollback_files || echo "Error: rollback of the audio file also failed"
+            exit 1
+        fi
+        png_moved=1
+    fi
+fi
+
+[[ "$OUTPUT_TYPE" == "debug" ]] && echo "Files moved!"
 
 ###################################
 # EXECUTE : UPDATE DATABASE FILES #
 ###################################
 
-# Update the database
-sqlite3 "$DB_FILE" "UPDATE $DETECTIONS_TABLE SET Sci_Name = '$NEWNAME_sciname', Com_Name = '$NEWNAME_comname', Confidence = '0', File_Name = '$NEWNAME_filename' WHERE File_Name = '$OLDNAME';"
+# Update the database and verify that at least one detection row changed. If
+# SQLite is busy or rejects a value, put the files back so the database and
+# filesystem cannot silently disagree.
+NEWNAME_sciname_sql="$(sql_escape "$NEWNAME_sciname")"
+NEWNAME_comname_sql="$(sql_escape "$NEWNAME_comname")"
+NEWNAME_filename_sql="$(sql_escape "$NEWNAME_filename")"
+if ! updated_rows="$(sqlite3 -batch -bail -init /dev/null -noheader -list -cmd '.timeout 5000' "$DB_FILE" "BEGIN IMMEDIATE; UPDATE $DETECTIONS_TABLE SET Sci_Name = '$NEWNAME_sciname_sql', Com_Name = '$NEWNAME_comname_sql', Confidence = 0, File_Name = '$NEWNAME_filename_sql' WHERE File_Name = '$OLDNAME_sql'; SELECT changes(); COMMIT;")"; then
+    echo "Error: database update failed; restoring the original files"
+    rollback_files || echo "Error: file rollback also failed"
+    exit 1
+fi
+updated_rows="$(printf '%s' "$updated_rows" | tr -d '[:space:]')"
+if [[ ! "$updated_rows" =~ ^[0-9]+$ ]] || [[ "$updated_rows" -lt 1 ]]; then
+    echo "Error: database update changed no rows; restoring the original files"
+    rollback_files || echo "Error: file rollback also failed"
+    exit 1
+fi
 
-[[ "$OUTPUT_TYPE" == "debug" ]] && echo "Database entry removed"
+[[ "$OUTPUT_TYPE" == "debug" ]] && echo "Database entry updated"
 
 [[ "$OUTPUT_TYPE" == "debug" ]] && echo "All done!"
 
-# A guarded echo as the last command returns 1 when the guard is false,
-# which made every successful non-debug run report failure to the web UI.
+# Return success only after both the files and database were updated.
 exit 0

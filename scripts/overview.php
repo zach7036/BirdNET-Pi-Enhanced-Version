@@ -117,7 +117,7 @@ if(isset($_GET['custom_image'])){
 }
 
 if(isset($_GET['clearcache'])) {
-  unset($_SESSION['images']);
+  clear_session_image_caches();
   header("Location: overview.php");
   die();
 }
@@ -128,7 +128,7 @@ if(isset($_GET['blacklistimage'])) {
   $file_handle = fopen($home."/BirdNET-Pi/scripts/blacklisted_images.txt", 'a+');
   fwrite($file_handle, $imageid . "\n");
   fclose($file_handle);
-  unset($_SESSION['images']);
+  clear_session_image_caches();
   die("OK");
 }
 
@@ -164,6 +164,9 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
 
     // For image fetching
     list($image_provider, $fallback_provider) = make_image_provider($config);
+    if (image_providers_reset($image_provider, $fallback_provider)) {
+      clear_session_image_caches();
+    }
 
     $species = [];
     foreach ($species_rows as $row) {
@@ -235,6 +238,9 @@ if(isset($_GET['ajax_new_species_details']) && $_GET['ajax_new_species_details']
   }
 
   list($image_provider, $fallback_provider) = make_image_provider($config);
+  if (image_providers_reset($image_provider, $fallback_provider)) {
+    clear_session_image_caches();
+  }
 
   $details = [];
   foreach ($new_rows as $row) {
@@ -295,8 +301,8 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true" && isse
       if (!empty($config["IMAGE_PROVIDER"])) {
         if ($image_provider === null) {
           list($image_provider, $fallback_provider) = make_image_provider($config);
-          if ($image_provider->is_reset()) {
-            $_SESSION['images'] = [];
+          if (image_providers_reset($image_provider, $fallback_provider)) {
+            clear_session_image_caches();
           }
         }
 

@@ -12,9 +12,8 @@
 // Fails closed. Anything that prevents a trustworthy list (database error,
 // clip directory missing, nothing found although clips exist) exits non-zero
 // WITHOUT touching the file, and the callers skip their destructive pass.
-// The file is rewritten in place under a lock so its owner and mode survive
-// (php-fpm writes pins and manual protections to the same file), and every
-// line outside ##start/##end is preserved.
+// The file is published with an atomic temp-file rename under a shared lock,
+// and every manual line outside ##start/##end is preserved.
 //
 // Usage: php scripts/update_purge_protection.php   (any working directory)
 if (PHP_SAPI !== 'cli') {
@@ -85,7 +84,17 @@ if ($species_count > 0 && !$lines && glob($base . '/*', GLOB_ONLYDIR)) {
 }
 
 $pins = 0;
-if (spine_table_exists($db, 'species_prefs')) {
+// Unlike the general boolean table helper, preserve the distinction between
+// "confirmed absent" (a supported legacy database) and "could not check".
+// Treating a schema-query error as absent would silently omit Pins and let a
+// destructive cleanup continue with an incomplete protection list.
+$prefs_table = db_query_one_safe($db,
+  "SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='species_prefs'",
+  'purge protection prefs table check');
+if ($prefs_table === null || !array_key_exists('table_count', $prefs_table)) {
+  fail('could not determine whether species_prefs exists');
+}
+if ((int)$prefs_table['table_count'] > 0) {
   $pin_sql = 'SELECT d.Date, d.Com_Name, d.File_Name FROM species_prefs p JOIN detections d'
            . ' ON d.File_Name = p.crowned_clip AND d.Sci_Name = p.sci_name'
            . " WHERE p.crowned_clip IS NOT NULL AND p.crowned_clip != ''" . and_review_exclusion($db, 'd.File_Name');

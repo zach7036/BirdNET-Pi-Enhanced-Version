@@ -1539,16 +1539,38 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   // so nothing is written to that file here - and nothing is reported as
   // saved until the row actually landed (see the upsert check below).
   $crowned = $existing['crowned_clip'];
+  $pin_lock = null;
   if (array_key_exists('crowned_clip', $body)) {
+    // Cleanup holds this same lock from snapshot generation through deletion.
+    // Take it before changing the database so the next cleanup snapshot must
+    // see the new Pin (or this request asks the user to retry).
+    $pin_lock = purge_lock_acquire();
+    if ($pin_lock === false) {
+      $db_rw->close();
+      api_error('Disk cleanup is running - try the Pin change again in a moment.', 503);
+    }
     $new_crown = trim((string)($body['crowned_clip'] === null ? '' : $body['crowned_clip']));
     if ($new_crown === '') {
       $crowned = null;
     } else {
       $clip_stmt = $db->prepare('SELECT Date, Com_Name FROM detections WHERE File_Name = :f AND Sci_Name = :sci LIMIT 1');
+      if ($clip_stmt === false) {
+        purge_lock_release($pin_lock);
+        $db_rw->close();
+        api_error('Could not validate crowned_clip - the station database is busy, try again in a moment.', 503);
+      }
       $clip_stmt->bindValue(':f', $new_crown, SQLITE3_TEXT);
       $clip_stmt->bindValue(':sci', $sci, SQLITE3_TEXT);
-      $clip = db_fetch_assoc_safe(db_execute_safe($db, $clip_stmt, 'crown clip lookup'));
+      $clip_result = db_execute_safe($db, $clip_stmt, 'crown clip lookup');
+      if ($clip_result === false) {
+        purge_lock_release($pin_lock);
+        $db_rw->close();
+        api_error('Could not validate crowned_clip - the station database is busy, try again in a moment.', 503);
+      }
+      $clip = db_fetch_assoc_safe($clip_result);
       if (!$clip) {
+        purge_lock_release($pin_lock);
+        $db_rw->close();
         api_error('crowned_clip not found for this species', 404);
       }
       $crowned = $new_crown;
@@ -1558,6 +1580,11 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   $up = $db_rw->prepare("INSERT INTO species_prefs (sci_name, com_name, favorite, muted, notify_mode, custom_threshold, crowned_clip, updated_at)
     VALUES (:sci, :com, :fav, :mut, :nm, :th, :crown, datetime('now','localtime'))
     ON CONFLICT(sci_name) DO UPDATE SET com_name = :com, favorite = :fav, muted = :mut, notify_mode = :nm, custom_threshold = :th, crowned_clip = :crown, updated_at = datetime('now','localtime')");
+  if ($up === false) {
+    purge_lock_release($pin_lock);
+    $db_rw->close();
+    api_error('Could not save preferences - the station database is busy, try again in a moment.', 503);
+  }
   $up->bindValue(':sci', $sci, SQLITE3_TEXT);
   $up->bindValue(':com', $com, SQLITE3_TEXT);
   $up->bindValue(':fav', $favorite, SQLITE3_INTEGER);
@@ -1574,10 +1601,12 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     $up->bindValue(':crown', $crowned, SQLITE3_TEXT);
   }
   if (db_execute_safe($db_rw, $up, 'prefs upsert') === false) {
+    purge_lock_release($pin_lock);
     $db_rw->close();
     api_error('Could not save preferences - the station database is busy, try again in a moment.', 503);
   }
   $db_rw->close();
+  purge_lock_release($pin_lock);
 
   api_json([
     'status' => 'ok',

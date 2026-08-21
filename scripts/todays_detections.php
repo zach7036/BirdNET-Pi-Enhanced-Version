@@ -191,8 +191,8 @@ if(isset($_GET['ajax_detections']) && $_GET['ajax_detections'] == "true"  ) {
     if (!empty($config["IMAGE_PROVIDER"])) {
       if ($image_provider === null) {
         list($image_provider, $fallback_provider) = make_image_provider($config);
-        if ($image_provider->is_reset()) {
-          $_SESSION['images'] = [];
+        if (image_providers_reset($image_provider, $fallback_provider)) {
+          clear_session_image_caches();
         }
       }
 
