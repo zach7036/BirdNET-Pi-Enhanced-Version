@@ -13,6 +13,7 @@
     // delay doubles with each consecutive failure (30s, 60s, ... 10 min) so an
     // unreachable image provider is not hammered forever.
     var imageFailures = {};
+    var imageRetryTimers = {};
     var IMAGE_RETRY_MS = 30000;
     var IMAGE_RETRY_MAX_MS = 600000;
     function imageRetryDelay(count) {
@@ -212,13 +213,13 @@
                     img.onload = function () {
                         img.onload = img.onerror = null; // release the captured data set
                         delete imageFailures[s.image];
-                        // Only re-render if this data set is still the most recent one
-                        if (data !== lastData) return;
-
-                        // Debounce re-render to avoid spamming
+                        // Redraw against whatever data is newest by now. A
+                        // refresh that landed while this image was loading
+                        // used to make the redraw bail, leaving the thumbnail
+                        // undrawn until the next poll.
                         clearTimeout(window._heatmapTimer);
                         window._heatmapTimer = setTimeout(function () {
-                            renderHeatmap(canvas, data);
+                            if (lastData) renderHeatmap(canvas, lastData);
                         }, 50);
                     };
                     img.onerror = function () {
@@ -228,13 +229,16 @@
                         // of the page - blank until a manual refresh. Forget it
                         // and schedule one redraw, against whatever data is
                         // current by then, so the row self-heals without waiting
-                        // for a poll. Hidden tabs wait for their next poll.
+                        // for a poll. Hidden tabs wait for their next poll. One
+                        // timer per image, so one failure cannot postpone
+                        // another species' retry.
                         img.onload = img.onerror = null;
                         delete imageCache[s.image];
                         var count = (imageFailures[s.image] ? imageFailures[s.image].count : 0) + 1;
                         imageFailures[s.image] = { at: Date.now(), count: count };
-                        clearTimeout(window._heatmapRetryTimer);
-                        window._heatmapRetryTimer = setTimeout(function () {
+                        clearTimeout(imageRetryTimers[s.image]);
+                        imageRetryTimers[s.image] = setTimeout(function () {
+                            delete imageRetryTimers[s.image];
                             if (document.visibilityState === 'visible' && lastData) renderHeatmap(canvas, lastData);
                         }, imageRetryDelay(count) + 1000);
                     };
@@ -439,6 +443,7 @@
 
     // Cache last data for resize re-render
     var lastData = null;
+    var refreshSeq = 0;
 
     // Public API
     window.DashboardCharts = {
@@ -447,7 +452,12 @@
 
             if (!heatCanvas) return;
 
+            // Refreshes can overlap (a poll plus a visibility change); only the
+            // newest request may replace the data and redraw, or an older,
+            // slower response would overwrite a newer one.
+            var mySeq = ++refreshSeq;
             fetchChartData(function (data) {
+                if (mySeq !== refreshSeq) return;
                 lastData = data;
                 if (heatCanvas) {
                     var heatmapError = document.getElementById('heatmapError');
