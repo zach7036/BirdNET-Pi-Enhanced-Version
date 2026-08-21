@@ -151,11 +151,22 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
   $stmt1 = $db->prepare("SELECT Com_Name, Sci_Name, COUNT(*) as cnt, MAX(Confidence) as maxConf FROM detections WHERE Date = DATE('now','localtime')" . and_review_exclusion($db) . " GROUP BY Sci_Name ORDER BY cnt DESC");
   ensure_db_ok_json($stmt1);
   $res1 = db_execute_safe($db, $stmt1, 'overview chart species');
+    // Read every row BEFORE any image lookup. A lookup can block for the
+    // provider's HTTP timeout, and an open read cursor on birds.db for that
+    // long can push the analyzer's write past its retry window.
+    $species_rows = [];
+    while ($row = db_fetch_assoc_safe($res1)) {
+      $species_rows[] = $row;
+    }
+    if ($res1) {
+      $res1->finalize();
+    }
+
     // For image fetching
     list($image_provider, $fallback_provider) = make_image_provider($config);
 
     $species = [];
-    while ($row = db_fetch_assoc_safe($res1)) {
+    foreach ($species_rows as $row) {
       $img_url = "";
       if ($image_provider) {
         $img_url = session_image_get('species_portal_v12_cache', trim($row['Com_Name']), $row['Sci_Name'], $image_provider, $fallback_provider)[1];
@@ -214,10 +225,19 @@ if(isset($_GET['ajax_new_species_details']) && $_GET['ajax_new_species_details']
   ensure_db_ok_json($stmt);
   $res = db_execute_safe($db, $stmt, 'overview new species details');
 
+  // Rows first, image lookups after - see the chart-data branch above.
+  $new_rows = [];
+  while ($row = db_fetch_assoc_safe($res)) {
+    $new_rows[] = $row;
+  }
+  if ($res) {
+    $res->finalize();
+  }
+
   list($image_provider, $fallback_provider) = make_image_provider($config);
 
   $details = [];
-  while ($row = db_fetch_assoc_safe($res)) {
+  foreach ($new_rows as $row) {
     $img_url = "";
     if ($image_provider) {
       $img_url = session_image_get('species_portal_v12_cache', trim($row['Com_Name']), $row['Sci_Name'], $image_provider, $fallback_provider)[1];
