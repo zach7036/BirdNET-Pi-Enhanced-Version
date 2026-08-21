@@ -395,7 +395,7 @@ if ($is_species_ajax) {
                 </div>
                 <div class="filter-group search-group">
                     <label>Search Species</label>
-                    <input type="text" name="search" id="species-search-input" class="styled-input" data-ui-persist="species-search" placeholder="Search by name..." value="<?php echo htmlspecialchars($search); ?>">
+                    <input type="text" name="search" id="species-search-input" class="styled-input" placeholder="Search by name..." value="<?php echo htmlspecialchars($search); ?>">
                 </div>
             </div>
             <div class="filter-footer">
@@ -423,7 +423,12 @@ if ($is_species_ajax) {
 (function() {
     var urlParams = new URLSearchParams(window.location.search);
     var filterForm = document.getElementById('species-filters');
-    var shouldAutoApplyPersistedFilters = filterForm && !urlParams.has('time_period') && !urlParams.has('sort_by') && !urlParams.has('search');
+    var searchInput = document.getElementById('species-search-input');
+    var arrivedWithSearch = urlParams.has('search');
+    var shouldAutoApplyPersistedFilters = filterForm && !urlParams.has('time_period') && !urlParams.has('sort_by') && !arrivedWithSearch;
+    // Browsers can restore form text during a reload even when it is absent
+    // from the URL. Only an explicit search in this request may start filled.
+    if (!arrivedWithSearch && searchInput) searchInput.value = '';
     var persistedFilterTimer;
     document.addEventListener('birdnet:restored', function(event) {
         if (!shouldAutoApplyPersistedFilters || !filterForm || !filterForm.contains(event.target)) return;
@@ -453,18 +458,32 @@ if ($is_species_ajax) {
         });
         return params;
     }
+    // A search is temporary page state. Keep a submitted/deep-linked search
+    // for this render, but remove it from the address so refresh starts clean.
+    // Include the rendered time/sort values so saved preferences cannot make
+    // the controls disagree with these server-rendered results.
+    if (arrivedWithSearch) {
+        var cleanUrlParams = filterParams();
+        cleanUrlParams.delete('search');
+        history.replaceState(null, '', '?' + cleanUrlParams.toString());
+    }
+    var appliedFilterParams = filterParams();
 
     // Filters update the grid in place - a full reload would blank the page
     // and drop focus out of the search box mid-thought. Enter and the Apply
     // button still do a normal submit, so everything works without JS too.
     var lastFilterQuery = null;
+    var filterRequestId = 0;
     window.refreshSpecies = function() {
         if (!grid || !filterForm) { if (filterForm) filterForm.submit(); return; }
         var params = filterParams();
         var query = params.toString();
         if (query === lastFilterQuery) return;
         lastFilterQuery = query;
-        history.replaceState(null, '', '?' + query);
+        var requestId = ++filterRequestId;
+        var historyParams = new URLSearchParams(params);
+        historyParams.delete('search');
+        history.replaceState(null, '', '?' + historyParams.toString());
 
         var fetchParams = new URLSearchParams(params);
         fetchParams.set('ajax_species_batch', 'true');
@@ -478,7 +497,8 @@ if ($is_species_ajax) {
                 return response.json();
             })
             .then(function(data) {
-                if (params.toString() !== lastFilterQuery) return; // superseded
+                if (requestId !== filterRequestId) return; // superseded
+                appliedFilterParams = new URLSearchParams(params);
                 grid.innerHTML = data.html || '';
                 total = data.total;
                 if (countLabel) countLabel.textContent = 'Showing ' + fmtNum(Math.min(data.total, data.next_offset)) + ' of ' + fmtNum(data.total) + ' species';
@@ -490,26 +510,41 @@ if ($is_species_ajax) {
                 if (kpiConf) kpiConf.textContent = fmtNum(data.kpi_conf) + '%';
                 var wrap = document.getElementById('species-load-more-wrap');
                 if (wrap) wrap.hidden = !data.has_more;
-                if (btn) btn.dataset.nextOffset = data.next_offset;
+                if (btn) {
+                    btn.dataset.nextOffset = data.next_offset;
+                }
             })
             .catch(function() {
+                if (requestId !== filterRequestId) return;
                 if (window.BirdNETUI && errorBox) {
                     BirdNETUI.setMessage(errorBox, 'error', 'Filter failed', 'Results could not be refreshed. Use Apply Filters to reload.');
                 }
             })
             .finally(function() {
+                if (requestId !== filterRequestId) return;
                 grid.style.opacity = '';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Load 50 More';
+                }
             });
     };
 
     // Search applies as you type; the debounce waits for a pause so we
     // don't refetch mid-word.
-    var searchInput = document.getElementById('species-search-input');
     if (searchInput && filterForm) {
         var searchTimer;
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimer);
             searchTimer = setTimeout(window.refreshSpecies, 500);
+        });
+        window.addEventListener('pageshow', function(event) {
+            // Browsers may restore a departed page from memory without
+            // reloading it. Treat that return like every other fresh visit.
+            if (searchInput.value !== '' && (event.persisted || !arrivedWithSearch)) {
+                searchInput.value = '';
+                window.refreshSpecies();
+            }
         });
     }
 
@@ -517,7 +552,11 @@ if ($is_species_ajax) {
 
     btn.addEventListener('click', function() {
         var nextOffset = parseInt(btn.dataset.nextOffset || '0', 10);
-        var params = new URLSearchParams(window.location.search);
+        var requestId = filterRequestId;
+        // Search is intentionally absent from the visible URL, so continue with
+        // the last applied filters rather than rebuilding them from location.
+        var params = new URLSearchParams(appliedFilterParams);
+        var requestFilterQuery = appliedFilterParams.toString();
         params.set('view', 'Species');
         params.set('ajax_species_batch', 'true');
         params.set('limit', pageSize);
@@ -532,6 +571,7 @@ if ($is_species_ajax) {
                 return response.json();
             })
             .then(function(data) {
+                if (requestId !== filterRequestId || requestFilterQuery !== appliedFilterParams.toString()) return;
                 grid.insertAdjacentHTML('beforeend', data.html || '');
                 btn.dataset.nextOffset = data.next_offset;
                 total = data.total;
@@ -541,11 +581,13 @@ if ($is_species_ajax) {
                 }
             })
             .catch(function() {
+                if (requestId !== filterRequestId || requestFilterQuery !== appliedFilterParams.toString()) return;
                 if (window.BirdNETUI && errorBox) {
                     BirdNETUI.setMessage(errorBox, 'error', 'Species load failed', 'More species could not be loaded. Try again.');
                 }
             })
             .finally(function() {
+                if (requestId !== filterRequestId || requestFilterQuery !== appliedFilterParams.toString()) return;
                 btn.disabled = false;
                 btn.textContent = 'Load 50 More';
             });
