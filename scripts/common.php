@@ -455,6 +455,43 @@ function make_image_provider($config) {
       : [$wikipedia, $flickr];
 }
 
+// Per-session image cache shared by the species surfaces. Entries are
+// [com_name, image_url, title, photos_url, author_url, license_url]; a species
+// whose lookup failed is stored with an empty image_url so it is not
+// re-queried on every poll - but a failed lookup is only trusted for
+// SESSION_IMAGE_MISS_TTL seconds. Without the expiry one transient provider
+// hiccup blanked a species' picture for the life of the browser session.
+const SESSION_IMAGE_MISS_TTL = 600;
+
+function session_image_lookup($cache_key, $com_name) {
+  if (!isset($_SESSION[$cache_key])) {
+    $_SESSION[$cache_key] = [];
+  }
+  $key = array_search($com_name, array_column($_SESSION[$cache_key], 0));
+  if ($key === false) {
+    return null;
+  }
+  $entry = $_SESSION[$cache_key][$key];
+  if ($entry[1] === '' && time() - ($entry[6] ?? 0) > SESSION_IMAGE_MISS_TTL) {
+    unset($_SESSION[$cache_key][$key]);
+    // array_column() returns a packed list, so the cache must stay packed for
+    // the lookup index to line up with the stored keys.
+    $_SESSION[$cache_key] = array_values($_SESSION[$cache_key]);
+    return null;
+  }
+  return $entry;
+}
+
+function session_image_store($cache_key, $com_name, $cached_image) {
+  if ($cached_image && !empty($cached_image['image_url'])) {
+    $entry = [$com_name, $cached_image['image_url'], $cached_image['title'], $cached_image['photos_url'], $cached_image['author_url'], $cached_image['license_url']];
+  } else {
+    $entry = [$com_name, '', 'Not Found', '', '', '', time()];
+  }
+  $_SESSION[$cache_key][] = $entry;
+  return $entry;
+}
+
 class Flickr extends ImageProvider {
 
   protected $db_path = __ROOT__ . '/scripts/flickr_v4.db';
