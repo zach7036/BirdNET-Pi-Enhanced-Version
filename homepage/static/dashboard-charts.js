@@ -520,4 +520,17 @@
         }, 300);
     });
 
+    // Canvas pixels do not respond to CSS theme changes. Redraw from the
+    // already-cached data when the app theme changes; no new request is needed.
+    var themeObserver = new MutationObserver(function () {
+        var heatCanvas = document.getElementById('hourlyHeatmap');
+        if (heatCanvas && lastData) {
+            renderHeatmap(heatCanvas, lastData);
+        }
+    });
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme']
+    });
+
 })();
