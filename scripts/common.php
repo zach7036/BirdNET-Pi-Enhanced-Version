@@ -1231,29 +1231,105 @@ function purge_exclude_path() {
   return __ROOT__ . '/scripts/disk_check_exclude.txt';
 }
 
-function purge_protect_add($relative) {
-  $path = purge_exclude_path();
-  if (!file_exists($path)) {
-    if (@file_put_contents($path, "##start\n##end\n") === false) {
+function purge_lock_path() {
+  return __ROOT__ . '/scripts/disk_check_exclude.lock';
+}
+
+// One lock shared by the cleanup scripts (flock -w on the same file), the
+// protection generator and the web Lock/Pin writers, so nothing reads or
+// rewrites the list while a deletion pass is using it. The web side waits
+// only briefly: a cleanup pass can hold the lock for minutes, and a request
+// that cannot get it must say so rather than hang.
+function purge_lock_acquire($wait_seconds = 5) {
+  $path = purge_lock_path();
+  $fh = @fopen($path, 'c');
+  if ($fh === false) {
+    return false;
+  }
+  @chmod($path, 0666);
+  $deadline = microtime(true) + $wait_seconds;
+  while (!flock($fh, LOCK_EX | LOCK_NB)) {
+    if (microtime(true) >= $deadline) {
+      fclose($fh);
       return false;
     }
+    usleep(100000);
   }
-  $lines = @file($path, FILE_IGNORE_NEW_LINES) ?: [];
-  foreach ([$relative, $relative . '.png'] as $entry) {
-    if (!in_array($entry, $lines, true)) {
-      @file_put_contents($path, $entry . "\n", FILE_APPEND);
-    }
+  return $fh;
+}
+
+function purge_lock_release($fh) {
+  if ($fh) {
+    flock($fh, LOCK_UN);
+    fclose($fh);
+  }
+}
+
+// The list holds two kinds of entries. Lines between ##start and ##end are
+// the MANAGED section: each species' best recordings plus database pins,
+// rewritten from scratch by update_purge_protection.php before every
+// cleanup. Lines outside the markers are MANUAL locks from the Recordings
+// page, which nothing regenerates. The helpers below therefore touch only
+// the outside lines - an unpin or unlock can never remove automatic
+// protection, and a lock on an auto-protected clip is simply an extra line.
+function purge_exclude_sections() {
+  $path = purge_exclude_path();
+  $lines = is_file($path) ? (@file($path, FILE_IGNORE_NEW_LINES) ?: []) : [];
+  $start = array_search('##start', $lines, true);
+  $end = array_search('##end', $lines, true);
+  if ($start === false || $end === false || $end < $start) {
+    // No usable markers (legacy file): everything present is manual.
+    return ['before' => $lines, 'managed' => [], 'after' => []];
+  }
+  return [
+    'before' => array_slice($lines, 0, $start),
+    'managed' => array_slice($lines, $start + 1, $end - $start - 1),
+    'after' => array_slice($lines, $end + 1),
+  ];
+}
+
+// In-place write (owner and mode survive; the web user cannot restore them
+// after a rename). Callers hold the purge lock. Blank lines are dropped:
+// with substring matching a blank pattern once excluded every file.
+function purge_exclude_write_sections($s) {
+  $path = purge_exclude_path();
+  $out = array_merge($s['before'], ['##start'], $s['managed'], ['##end'], $s['after']);
+  $out = array_values(array_filter($out, function ($l) { return $l !== ''; }));
+  $existed = file_exists($path);
+  if (@file_put_contents($path, implode("\n", $out) . "\n") === false) {
+    return false;
+  }
+  if (!$existed) {
+    @chmod($path, 0666);
   }
   return true;
 }
 
-function purge_protected($relative) {
-  $path = purge_exclude_path();
-  if (!file_exists($path)) {
+// Manual lock entries only (outside the markers).
+function purge_manual_lines() {
+  $s = purge_exclude_sections();
+  return array_merge($s['before'], $s['after']);
+}
+
+function purge_protect_add($relative) {
+  $lock = purge_lock_acquire();
+  if ($lock === false) {
     return false;
   }
-  $lines = @file($path, FILE_IGNORE_NEW_LINES) ?: [];
-  return in_array($relative, $lines, true);
+  $s = purge_exclude_sections();
+  $manual = array_merge($s['before'], $s['after']);
+  foreach ([$relative, $relative . '.png'] as $entry) {
+    if (!in_array($entry, $manual, true)) {
+      $s['after'][] = $entry;
+    }
+  }
+  $ok = purge_exclude_write_sections($s);
+  purge_lock_release($lock);
+  return $ok;
+}
+
+function purge_protected($relative) {
+  return in_array($relative, purge_manual_lines(), true);
 }
 
 /* ===== Best recordings: one definition shared by the Birds page, the
@@ -1445,17 +1521,15 @@ function species_best_recording($db, $sci_name, $prefs) {
 }
 
 function purge_protect_remove($relative) {
-  $path = purge_exclude_path();
-  if (!file_exists($path)) {
-    return;
+  $lock = purge_lock_acquire();
+  if ($lock === false) {
+    return false;
   }
-  $lines = @file($path, FILE_IGNORE_NEW_LINES) ?: [];
-  $keep = [];
-  foreach ($lines as $line) {
-    if ($line === $relative || $line === $relative . '.png') {
-      continue;
-    }
-    $keep[] = $line;
-  }
-  @file_put_contents($path, implode("\n", $keep) . "\n");
+  $s = purge_exclude_sections();
+  $keep = function ($line) use ($relative) { return $line !== $relative && $line !== $relative . '.png'; };
+  $s['before'] = array_values(array_filter($s['before'], $keep));
+  $s['after'] = array_values(array_filter($s['after'], $keep));
+  $ok = purge_exclude_write_sections($s);
+  purge_lock_release($lock);
+  return $ok;
 }

@@ -106,31 +106,12 @@ if(isset($_GET['excludefile'])) {
     echo "Error";
     die();
   }
-  if(!file_exists($home."/BirdNET-Pi/scripts/disk_check_exclude.txt")) {
-    file_put_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", "##start\n##end\n");
-  }
-  if(isset($_GET['exclude_add'])) {
-    $myfile = fopen($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", "a") or die("Unable to open file!");
-    $txt = $relative_file;
-    fwrite($myfile, $txt."\n");
-    fwrite($myfile, $txt.".png\n");
-    fclose($myfile);
-    echo "OK";
-    die();
-  } else {
-    $lines  = file($home."/BirdNET-Pi/scripts/disk_check_exclude.txt");
-    $search = $relative_file;
-
-    $result = '';
-    foreach($lines as $line) {
-      if(stripos($line, $search) === false && stripos($line, $search.".png") === false) {
-        $result .= $line;
-      }
-    }
-    file_put_contents($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", $result);
-    echo "OK";
-    die();
-  }
+  // Manual locks live outside the ##start/##end markers; the managed section
+  // (automatic best recordings and pins) belongs to update_purge_protection.php
+  // and is never touched here. Both helpers take the shared cleanup lock.
+  $ok = isset($_GET['exclude_add']) ? purge_protect_add($relative_file) : purge_protect_remove($relative_file);
+  echo $ok ? "OK" : "Error: disk cleanup is running - try again in a moment.";
+  die();
 }
 
 if(isset($_GET['getlabels'])) {
@@ -334,6 +315,7 @@ function deleteDetection(filename,copylink=false) {
 
 function toggleLock(filename, type, elem) {
   const xhttp = new XMLHttpRequest();
+  const previousIcon = elem.getAttribute("src");
   xhttp.onload = function() {
     if(this.responseText == "OK"){
       if(type == "add") {
@@ -345,7 +327,15 @@ function toggleLock(filename, type, elem) {
         elem.setAttribute("title", "This file will be deleted when disk space needs to be freed.");
         elem.setAttribute("onclick", elem.getAttribute("onclick").replace("del","add"));
       }
+    } else {
+      // e.g. the cleanup lock was busy: put the icon back and say why
+      elem.setAttribute("src", previousIcon);
+      alert(this.responseText || "The lock could not be changed.");
     }
+  }
+  xhttp.onerror = function() {
+    elem.setAttribute("src", previousIcon);
+    alert("The lock could not be changed (no response from the station).");
   }
   if(type == "add") {
     xhttp.open("GET", "play.php?excludefile="+encodeURIComponent(filename)+"&exclude_add=true", true);
@@ -1056,12 +1046,11 @@ if(isset($_GET['species'])){ ?>
     </div>
 
 <?php
-  $fp = @fopen($home."/BirdNET-Pi/scripts/disk_check_exclude.txt", 'r'); 
-if ($fp) {
-  $disk_check_exclude_arr = explode("\n", fread($fp, filesize($home."/BirdNET-Pi/scripts/disk_check_exclude.txt")));
-} else {
-  $disk_check_exclude_arr = [];
-}
+  // The padlock reflects MANUAL locks only. Automatically protected best
+  // recordings (the managed section) used to show as locked too, and
+  // "unlocking" them appeared to work until the next cleanup regenerated
+  // the list.
+  $disk_check_exclude_arr = purge_manual_lines();
 
 $name = htmlspecialchars_decode($_GET['species'], ENT_QUOTES);
 $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 40;
