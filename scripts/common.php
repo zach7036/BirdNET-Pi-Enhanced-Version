@@ -475,8 +475,12 @@ function clear_session_image_caches() {
   }
 }
 
+// Only the primary provider decides, as before: the Flickr constructor
+// rebuilds its table on EVERY request while FLICKR_FILTER_EMAIL cannot be
+// resolved (no API key, unknown email, offline), so consulting the fallback
+// would wipe the session caches on every poll for those stations.
 function image_providers_reset($primary, $fallback) {
-  return ($primary && $primary->is_reset()) || ($fallback && $fallback->is_reset());
+  return $primary && $primary->is_reset();
 }
 
 function session_image_lookup($cache_key, $com_name) {

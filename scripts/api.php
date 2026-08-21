@@ -1568,6 +1568,11 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
         api_error('Could not validate crowned_clip - the station database is busy, try again in a moment.', 503);
       }
       $clip = db_fetch_assoc_safe($clip_result);
+      // Release the read statement's SHARED lock now: kept open, it would
+      // block the upsert on the separate read-write connection below
+      // (rollback-journal mode) until busyTimeout expires - "database is locked".
+      $clip_result->finalize();
+      $clip_stmt->close();
       if (!$clip) {
         purge_lock_release($pin_lock);
         $db_rw->close();
