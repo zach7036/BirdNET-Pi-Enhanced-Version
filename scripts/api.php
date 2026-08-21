@@ -1534,17 +1534,14 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     api_error('custom_threshold must be between 0 and 1');
   }
 
+  // Pins live in the database only. update_purge_protection.php writes them
+  // into the managed section of disk_check_exclude.txt before every cleanup,
+  // so nothing is written to that file here - and nothing is reported as
+  // saved until the row actually landed (see the upsert check below).
   $crowned = $existing['crowned_clip'];
-  $crown_protected = null;
   if (array_key_exists('crowned_clip', $body)) {
     $new_crown = trim((string)($body['crowned_clip'] === null ? '' : $body['crowned_clip']));
     if ($new_crown === '') {
-      if (!empty($existing['crowned_clip'])) {
-        $old_rel = clip_relative_for_file($db, $existing['crowned_clip']);
-        if ($old_rel !== null) {
-          purge_protect_remove($old_rel);
-        }
-      }
       $crowned = null;
     } else {
       $clip_stmt = $db->prepare('SELECT Date, Com_Name FROM detections WHERE File_Name = :f AND Sci_Name = :sci LIMIT 1');
@@ -1554,13 +1551,6 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
       if (!$clip) {
         api_error('crowned_clip not found for this species', 404);
       }
-      if (!empty($existing['crowned_clip']) && $existing['crowned_clip'] !== $new_crown) {
-        $old_rel = clip_relative_for_file($db, $existing['crowned_clip']);
-        if ($old_rel !== null) {
-          purge_protect_remove($old_rel);
-        }
-      }
-      $crown_protected = purge_protect_add(detection_clip_relative_path($clip['Date'], $clip['Com_Name'], $new_crown));
       $crowned = $new_crown;
     }
   }
@@ -1583,7 +1573,10 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   } else {
     $up->bindValue(':crown', $crowned, SQLITE3_TEXT);
   }
-  db_execute_safe($db_rw, $up, 'prefs upsert');
+  if (db_execute_safe($db_rw, $up, 'prefs upsert') === false) {
+    $db_rw->close();
+    api_error('Could not save preferences - the station database is busy, try again in a moment.', 503);
+  }
   $db_rw->close();
 
   api_json([
@@ -1597,7 +1590,9 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
       'custom_threshold' => $threshold,
       'crowned_clip' => $crowned
     ],
-    'crown_protected' => $crown_protected,
+    // Kept for API compatibility: a pin recorded here is protected from the
+    // next cleanup run onward.
+    'crown_protected' => $crowned !== null,
     // The recomputed best-recording block, so a pin/unpin can re-render
     // without re-running the whole species/detail handler.
     'best' => species_best_recording($db, $sci, ['crowned_clip' => $crowned])
