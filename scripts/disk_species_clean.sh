@@ -5,11 +5,20 @@
 source /etc/birdnet/birdnet.conf
 base_dir="$HOME/BirdSongs/Extracted/By_Date"
 max_files_species="${MAX_FILES_SPECIES:-1000}"
-cd "$base_dir" || true
+cd "$base_dir" || { echo "disk_species_clean: cannot enter $base_dir" >&2; exit 1; }
 
 # If max_files_species is not higher than 1, exit
 if [[ "$max_files_species" -lt 1 ]]; then
     exit 0
+fi
+
+# One lock shared with disk_check.sh, the protection generator and the web
+# Lock/Pin writers - the two cleanup jobs can genuinely overlap at 02:00.
+# Held until the script exits.
+exec 9>"$HOME/BirdNET-Pi/scripts/disk_check_exclude.lock"
+if ! flock -w 600 9; then
+    echo "disk_species_clean: cleanup lock busy, skipping cleanup" >&2
+    exit 1
 fi
 
 # Refresh purge protection (each species' best recordings + pinned clips) from
@@ -17,7 +26,7 @@ fi
 # happened to contain - a list only the disk-full purge refreshed - so a new
 # best recording that postdated the last refresh could be deleted here.
 # Fail closed: without a fresh list, deleting anything risks the best clips.
-if ! php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" >/dev/null; then
+if ! PURGE_LOCK_HELD=1 php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" >/dev/null; then
     echo "disk_species_clean: purge protection refresh failed, skipping cleanup" >&2
     exit 1
 fi

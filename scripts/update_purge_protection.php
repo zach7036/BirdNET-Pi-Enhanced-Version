@@ -28,6 +28,17 @@ function fail($message) {
   exit(1);
 }
 
+// The cleanup scripts call this while already holding the shared cleanup lock
+// (PURGE_LOCK_HELD=1); a standalone run (the updater, a manual invocation)
+// takes it here so it cannot race a cleanup pass or a web Lock/Pin write.
+$lock = null;
+if (getenv('PURGE_LOCK_HELD') !== '1') {
+  $lock = purge_lock_acquire(120);
+  if ($lock === false) {
+    fail('could not acquire the cleanup lock (a cleanup pass is running)');
+  }
+}
+
 try {
   $db = new SQLite3(__ROOT__ . '/scripts/birds.db', SQLITE3_OPEN_READONLY);
 } catch (Throwable $e) {
@@ -91,51 +102,31 @@ if (spine_table_exists($db, 'species_prefs')) {
 }
 $lines = array_values(array_unique($lines));
 
-// In-place rewrite under an exclusive lock: the inode, owner and mode stay as
-// they are, and the cleanup scripts never observe a half-written list.
+// Manual locks (the lines outside the markers) are preserved verbatim; only
+// the managed section is replaced. Written to a temp file and renamed over
+// the target, so a reader that does not hold the lock (the web page's
+// padlock rendering) sees the old list or the new one, never a partial one.
+// The file is mode 666 (installer/updater), so ownership moving to whoever
+// ran this - the station user from cron - costs the web user nothing.
+$sections = purge_exclude_sections();
+$out = array_merge($sections['before'], ['##start'], $lines, ['##end'], $sections['after']);
+$out = array_values(array_filter($out, function ($l) { return $l !== ''; }));
+$content = implode(PHP_EOL, $out) . PHP_EOL;
+
 $path = purge_exclude_path();
-$created = !file_exists($path);
-$fh = @fopen($path, 'c+');
-if ($fh === false) {
-  fail("cannot open $path for writing");
+$tmp = $path . '.tmp.' . getmypid();
+if (@file_put_contents($tmp, $content) === false) {
+  fail("cannot write $tmp");
 }
-if (!flock($fh, LOCK_EX)) {
-  fclose($fh);
-  fail("cannot lock $path");
-}
-$existing = stream_get_contents($fh);
-$before = '';
-$after = '';
-$start = strpos($existing, '##start');
-$end = strpos($existing, '##end');
-if ($start !== false && $end !== false && $end > $start) {
-  $before = substr($existing, 0, $start);
-  $after = substr($existing, $end + strlen('##end'));
-} else {
-  // No usable markers: keep whatever is there (manual protections) intact
-  // above a fresh managed section.
-  $before = $existing;
-  if ($before !== '' && substr($before, -1) !== PHP_EOL) {
-    $before .= PHP_EOL;
+@chmod($tmp, 0666);
+if (!@rename($tmp, $path)) {
+  // PHP on Windows (the dev harness) cannot rename over an existing file.
+  if (PHP_OS_FAMILY !== 'Windows' || !@unlink($path) || !@rename($tmp, $path)) {
+    @unlink($tmp);
+    fail("cannot replace $path");
   }
-  $after = PHP_EOL;
 }
-$managed = '##start' . PHP_EOL . ($lines ? implode(PHP_EOL, $lines) . PHP_EOL : '') . '##end';
-$content = $before . $managed . $after;
-if (substr($content, -1) !== PHP_EOL) {
-  $content .= PHP_EOL;
-}
-if (rewind($fh) === false || ftruncate($fh, 0) === false || fwrite($fh, $content) === false || fflush($fh) === false) {
-  flock($fh, LOCK_UN);
-  fclose($fh);
-  fail("write to $path failed");
-}
-flock($fh, LOCK_UN);
-fclose($fh);
-if ($created) {
-  // Match the updater's "chmod 666 scripts/*.txt": the web user must be able
-  // to add pins and manual protections to this file too.
-  @chmod($path, 0666);
-}
+@chmod($path, 0666);
+purge_lock_release($lock);
 
 echo 'Protected ' . (count($lines) / 2) . " clips across $species_count species (keep $keep per species, $pins pinned)" . PHP_EOL;
