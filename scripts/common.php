@@ -694,7 +694,7 @@ class Wikipedia extends ImageProvider {
         if ($data != false && isset($data['originalimage'])) {
           $image_url = trim($data['originalimage']['source'], " \t\n\r\0\x0B\"");
           $title = $data['title'];
-          $image_name = urldecode(substr($image_url, strrpos($image_url, '/') + 1));
+          $image_name = wikipedia_commons_file_name($image_url);
           
           $author_url = $this->get_external_link($image_url);
           $license_url = $this->get_external_link($image_url);
@@ -747,15 +747,36 @@ class Wikipedia extends ImageProvider {
   }
 
   private function get_external_link($image_url) {
-    if (strpos($image_url, '/commons/thumb/') !== false) {
-      $parts = explode('/', $image_url);
-      $image_name = $parts[count($parts) - 2];
-    } else {
-      $image_name = substr($image_url, strrpos($image_url, '/') + 1);
-    }
-    $photo_url = "https://en.wikipedia.org/wiki/File:$image_name";
+    $image_name = wikipedia_commons_file_name($image_url);
+    $photo_url = "https://en.wikipedia.org/wiki/File:" . rawurlencode($image_name);
     return $photo_url;
   }
+}
+
+// The Commons file name behind an upload.wikimedia.org image URL. Wikipedia's
+// summary API appends a tracking query string (?utm_source=...) to every image
+// URL, and for large originals it returns a pre-scaled thumbnail
+// (.../commons/thumb/c/cb/Name.png/3840px-Name.png) whose last path segment is
+// not the file name. Taking the raw tail of the URL made the Commons imageinfo
+// lookup fail, so the full-size original (tens of MB for Killdeer) was stored
+// instead of the intended ~1280px thumbnail.
+function wikipedia_commons_file_name($image_url) {
+  $path = parse_url(trim((string)$image_url), PHP_URL_PATH);
+  if (!is_string($path) || $path === '') {
+    return '';
+  }
+  $parts = array_values(array_filter(explode('/', $path), function ($p) { return $p !== ''; }));
+  if (!$parts) {
+    return '';
+  }
+  $thumb = array_search('thumb', $parts, true);
+  if ($thumb !== false && count($parts) >= $thumb + 5) {
+    // .../thumb/<h1>/<h2>/<File name>/<WIDTHpx-File name>
+    $name = $parts[count($parts) - 2];
+  } else {
+    $name = $parts[count($parts) - 1];
+  }
+  return rawurldecode($name);
 }
 
 /* Wikipedia link in the user's DATABASE_LANG edition (the setting that
