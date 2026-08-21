@@ -116,31 +116,58 @@ function nav_icon($name) {
   <?php } ?>
 </head>
 <body>
-<div id="live-audio-panel" onmouseleave="startCloseTimer()" onmouseenter="cancelCloseTimer()">
-  <button type="button" id="live-audio-tab" onclick="toggleAudioPanel()" aria-label="Toggle live audio stream player" aria-expanded="false">
-    🎙️ Live
+<div id="live-audio-panel">
+  <button type="button" id="live-audio-tab" onclick="toggleAudioPanel()" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
+    <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
+    <span>Live</span>
+    <span class="live-audio-status-dot" aria-hidden="true"></span>
   </button>
-  <div id="live-audio-content">
-    <audio id="live-audio-player" controls preload="none">
-      <source src="/stream">
-    </audio>
+  <div id="live-audio-content" role="region" aria-labelledby="live-audio-title" aria-hidden="true">
+    <div class="live-audio-heading">
+      <div class="live-audio-title-wrap">
+        <span class="live-audio-status-dot" aria-hidden="true"></span>
+        <strong id="live-audio-title">Live Audio</strong>
+      </div>
+      <button type="button" id="live-audio-close" onclick="closeAudioPanel()" aria-label="Close live audio player">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="live-audio-player-wrap">
+      <audio id="live-audio-player" controls preload="none">
+        <source src="/stream" type="audio/mpeg">
+      </audio>
+    </div>
+    <div class="live-audio-listening">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"></path>
+      </svg>
+      <span>Listening for bird sounds in real time</span>
+    </div>
   </div>
 </div>
 <script>
-  let audioPanelTimer;
+  function setAudioPanelOpen(isOpen) {
+    const panel = document.getElementById('live-audio-panel');
+    const tab = document.getElementById('live-audio-tab');
+    const content = document.getElementById('live-audio-content');
+    panel.classList.toggle('open', isOpen);
+    tab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    tab.setAttribute('aria-label', isOpen ? 'Close live audio player' : 'Open live audio player');
+    content.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+  }
   function toggleAudioPanel() {
     const panel = document.getElementById('live-audio-panel');
-    const isOpen = panel.classList.toggle('open');
-    document.getElementById('live-audio-tab').setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    setAudioPanelOpen(!panel.classList.contains('open'));
   }
-  function startCloseTimer() {
-    audioPanelTimer = setTimeout(() => {
-      document.getElementById('live-audio-panel').classList.remove('open');
-    }, 2000);
+  function closeAudioPanel() {
+    setAudioPanelOpen(false);
+    document.getElementById('live-audio-tab').focus();
   }
-  function cancelCloseTimer() {
-    clearTimeout(audioPanelTimer);
-  }
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && document.getElementById('live-audio-panel').classList.contains('open')) {
+      closeAudioPanel();
+    }
+  });
 </script>
 <div class="mobile-header">
   <div class="sidebar-logo">
