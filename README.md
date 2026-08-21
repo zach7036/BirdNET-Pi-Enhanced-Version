@@ -199,7 +199,7 @@ falling back to Open-Meteo if the sensor goes stale.
 - **Station Doctor** — health checks for the live stream, disk space, last detection, weather sync, local temperature sensor, location, and admin password, with one-click fixes
 - **Installable on a phone** as a progressive web app, with a mobile tab bar
 - **Command palette** — <kbd>Ctrl</kbd>+<kbd>K</kbd> to jump to any view or species
-- **Dark mode** across every page, following your system preference
+- **Dark mode** across every page, remembered after you choose it; new visitors start in light mode
 - **Your units** — Celsius or Fahrenheit, 12- or 24-hour time, number formats
 - **37 languages** for species names
 - **RTSP streams** as an audio source, in addition to a local microphone
