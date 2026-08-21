@@ -363,6 +363,20 @@ html:not([data-theme="dark"]) .theme-when-dark {
   background: var(--bg-card);
 }
 
+/* On shorter desktop screens, let the secondary live feed yield space before
+   the primary navigation. The nav keeps its existing scrollbar for genuinely
+   short viewports or an expanded Insights menu. */
+@media (min-width: 1001px) {
+  .sidebar-nav {
+    min-height: 0;
+  }
+
+  .sidebar-feed {
+    flex: 1 1 0;
+    min-height: clamp(6rem, 18vh, 10rem);
+  }
+}
+
 .sidebar-feed h3 {
   margin: 0 0 10px 0;
   font-size: 0.9em;
