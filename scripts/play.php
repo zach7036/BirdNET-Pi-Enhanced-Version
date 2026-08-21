@@ -170,6 +170,17 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
           $upd->bindValue(':of', $oldname, SQLITE3_TEXT);
           db_execute_safe($rw, $upd, 'changefile review follow');
         }
+        // A pin named the OLD species' best recording; it does not survive a
+        // reclassification. Clear it and say so (header, so callers that
+        // compare the body to "OK" keep working).
+        $pin = $rw->prepare("UPDATE species_prefs SET crowned_clip = NULL, updated_at = datetime('now','localtime') WHERE crowned_clip = :of");
+        if ($pin) {
+          $pin->bindValue(':of', $oldname, SQLITE3_TEXT);
+          db_execute_safe($rw, $pin, 'changefile clear pin');
+          if ($rw->changes() > 0) {
+            header('X-BirdNET-Notice: pin-cleared');
+          }
+        }
       } catch (Exception $e) {
         error_log('changefile: review follow-up failed: ' . $e->getMessage());
       }
@@ -177,6 +188,9 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
         $rw->close();
       }
 
+      // A manual lock follows the renamed clip. Automatic protection is not
+      // carried: the generator recomputes it for the new species on the
+      // next cleanup.
       $old_rel = detection_clip_relative_path($old_row['Date'], $old_row['Com_Name'], $oldname);
       $new_rel = detection_clip_relative_path($old_row['Date'], $new_com, $new_file);
       if (purge_protected($old_rel)) {
@@ -486,11 +500,14 @@ function changeDetection(filename,copylink=false) {
         const xhttp2 = new XMLHttpRequest();
         xhttp2.onload = function() {
           if(this.responseText == "OK"){
+            var note = this.getResponseHeader("X-BirdNET-Notice") === "pin-cleared"
+              ? "\nThis clip was pinned as the species' best recording; the pin was cleared because it now belongs to a different species."
+              : "";
             if(copylink == true) {
-              alert("Successfully converted");
+              alert("Successfully converted" + note);
               window.top.close();
             } else {
-              alert("Successfully converted");
+              alert("Successfully converted" + note);
               location.reload();
             }
           } else {
