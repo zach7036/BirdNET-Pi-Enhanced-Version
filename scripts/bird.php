@@ -1,6 +1,6 @@
 <?php
 // Birds detail page (Phase 3): one page per species - photo, stats, year
-// calendar heatmap, hourly pattern, best (crownable) recording, recent
+// calendar heatmap, hourly pattern, best (pinnable) recording, recent
 // visits, notes, and notification preferences. Data comes from
 // /api/v1/species/detail; preference writes go to POST /api/v1/species/prefs.
 error_reporting(E_ERROR);
@@ -211,29 +211,45 @@ if ($bird_sci === '') {
       '<div class="spark bird-spark">' + bars + '</div><div class="spark-axis">' + axis + '</div>';
   }
 
+  // The server already picked the best recording that still exists on disk
+  // (the pinned clip first, then the shared best-recording definition), so a
+  // purged clip is replaced quietly. It only gets a mention when it scored
+  // higher than what is shown - or when nothing survived at all.
+  function purgedNote(d) {
+    if (!d.purged_best) return '';
+    return '<div class="bird-best-purged visit-empty">A ' + Math.round(d.purged_best.confidence * 100) + '% recording from ' +
+      esc(d.purged_best.date) + ' was removed by disk cleanup.</div>';
+  }
+
   function renderBest(d) {
     var box = document.getElementById('birdBest');
     if (!d.best_recording) {
-      box.innerHTML = '<div class="visit-empty">No recordings on disk for this species.</div>';
+      box.innerHTML = '<div class="visit-empty">No recordings on disk for this species' +
+        (d.purged_best ? ' - its clips were removed by disk cleanup.' : '.') + '</div>';
       return;
     }
     var b = d.best_recording;
-    var crowned = d.prefs && d.prefs.crowned_clip === b.file;
+    var pinned = !!b.pinned;
     box.innerHTML =
       '<img class="bird-best-spec" loading="lazy" src="' + clipUrl(b.clip_path, '.png') + '" alt="Spectrogram" onerror="this.style.display=\'none\'">' +
-      '<audio controls preload="none" src="' + clipUrl(b.clip_path) + '" style="width:100%" onerror="this.style.display=\'none\'"></audio>' +
+      '<audio controls preload="none" src="' + clipUrl(b.clip_path) + '" style="width:100%" onerror="this.parentNode.querySelector(\'.bird-best-meta\').innerHTML += \' <span class=&quot;visit-empty&quot;>(clip could not be loaded)</span>\'; this.remove();"></audio>' +
       '<div class="bird-best-meta">' + esc(b.date) + ' ' + esc(b.time) + ' &middot; ' + Math.round(b.confidence * 100) + '%' +
-      (crowned
-        ? ' <span class="crowned-tag" title="Protected from disk cleanup">&#128081; Crowned</span> <button type="button" class="ui-button-link" id="crownBtn" data-mode="uncrown">Remove crown</button>'
-        : ' <button type="button" class="ui-button-link" id="crownBtn" data-mode="crown" title="Mark as this species\' best recording and protect it from disk cleanup">&#128081; Crown this recording</button>') +
-      '</div>';
+      (pinned
+        ? ' <span class="crowned-tag" title="Your pick: shown as the best recording and always kept by disk cleanup">&#128204; Pinned</span> <button type="button" class="ui-button-link" id="crownBtn" data-mode="uncrown">Unpin</button>'
+        : ' <button type="button" class="ui-button-link" id="crownBtn" data-mode="crown" title="Feature this clip as the species\' best recording and always keep it. The highest-scoring clips are protected automatically; pinning overrides that pick.">&#128204; Pin as best recording</button>') +
+      '</div>' + purgedNote(d);
     document.getElementById('crownBtn').addEventListener('click', function () {
       var mode = this.getAttribute('data-mode');
       postJson('api/v1/species/prefs', { sci_name: sci, crowned_clip: mode === 'crown' ? b.file : '' })
-        .then(function (j) {
-          detail.prefs = j.prefs;
+        .then(function () {
+          // Re-fetch: after an unpin the automatic best may be a different clip.
+          return fetch('api/v1/species/detail?sci_name=' + encodeURIComponent(sci) + '&_=' + Date.now(), { headers: { 'Accept': 'application/json' } });
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d2) {
+          detail = d2;
           renderBest(detail);
-          showActionResult(mode === 'crown' ? 'Crowned - this clip is now protected from cleanup.' : 'Crown removed.');
+          showActionResult(mode === 'crown' ? 'Pinned - this clip is now the featured best recording and will always be kept.' : 'Unpinned - back to the automatic best recording.');
         })
         .catch(function (e) { showActionResult(e.message, true); });
     });

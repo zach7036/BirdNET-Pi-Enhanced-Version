@@ -73,6 +73,10 @@ check "timeline api has weather" 200 "/api/v1/detections/timeline"
 check_contains "timeline weather key" '"weather"'
 check "species detail has calendar" 200 "/api/v1/species/detail?sci_name=Cardinalis%20cardinalis"
 check_contains "calendar key present" '"calendar"'
+# best_recording is the best clip still on disk (null when none survive) and
+# purged_best reports a higher-scoring clip that cleanup removed
+check_contains "best recording key present" '"best_recording"'
+check_contains "purged best key present" '"purged_best"'
 check "queue has member clips" 200 "/api/v1/reviews/queue?days=7&limit=2"
 check_contains "member_clips present" '"member_clips"'
 check "labels endpoint" 200 "/play.php?getlabels=true"
