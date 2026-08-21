@@ -9,6 +9,9 @@
 
     var heatmapChart = null;
     var imageCache = {};
+    // Thumbnails that failed to load, keyed by URL -> timestamp of the failure.
+    var imageFailedAt = {};
+    var IMAGE_RETRY_MS = 30000;
 
     function fetchChartData(callback, errorCallback, attempt) {
         attempt = attempt || 1;
@@ -196,22 +199,38 @@
             // Thumbnail
             if (s.image) {
                 var img = imageCache[s.image];
-                if (!img) {
+                // A failed load is not retried for IMAGE_RETRY_MS so a flaky
+                // connection cannot hammer the image CDN on every redraw.
+                var failedAt = imageFailedAt[s.image] || 0;
+                if (!img && Date.now() - failedAt > IMAGE_RETRY_MS) {
                     img = new Image();
-                img.onload = function () {
-                    // Only re-render if this data set is still the most recent one
-                    if (data !== lastData) return;
-                    
-                    // Debounce re-render to avoid spamming
-                    clearTimeout(window._heatmapTimer);
-                    window._heatmapTimer = setTimeout(function () {
-                        renderHeatmap(canvas, data);
-                    }, 50);
-                };
+                    img.onload = function () {
+                        // Only re-render if this data set is still the most recent one
+                        if (data !== lastData) return;
+
+                        // Debounce re-render to avoid spamming
+                        clearTimeout(window._heatmapTimer);
+                        window._heatmapTimer = setTimeout(function () {
+                            renderHeatmap(canvas, data);
+                        }, 50);
+                    };
+                    img.onerror = function () {
+                        // Without this, a thumbnail that failed once (network
+                        // still reconnecting after the machine wakes, a CDN
+                        // timeout) stayed cached as a broken image for the life
+                        // of the page - blank until a manual refresh. Forget it
+                        // and schedule one redraw so the row self-heals.
+                        delete imageCache[s.image];
+                        imageFailedAt[s.image] = Date.now();
+                        clearTimeout(window._heatmapRetryTimer);
+                        window._heatmapRetryTimer = setTimeout(function () {
+                            if (data === lastData) renderHeatmap(canvas, data);
+                        }, IMAGE_RETRY_MS + 1000);
+                    };
                     img.src = s.image;
                     imageCache[s.image] = img;
                 }
-                if (img.complete && img.naturalWidth > 0) {
+                if (img && img.complete && img.naturalWidth > 0) {
                     var imgSize = 24;
                     var imgX = 10;
                     var imgY = y + (cellHeight - imgSize) / 2;
