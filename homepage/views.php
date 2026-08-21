@@ -61,9 +61,8 @@ function nav_icon($name) {
   <script>
     (function () {
       var theme = localStorage.getItem('birdnet-theme');
-      if (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        theme = 'dark';
-      }
+      // A first-time visitor always starts in light mode. Dark mode is only
+      // applied after the visitor explicitly selects and saves it.
       if (theme === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
