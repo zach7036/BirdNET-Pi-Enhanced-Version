@@ -4,7 +4,10 @@ if (!defined('__ROOT__')) {
   define('__ROOT__', dirname(dirname(__FILE__)));
 }
 
-if (session_status() !== PHP_SESSION_ACTIVE)
+// CLI runs (cleanup helpers, seeders) have no session to resume and would
+// leave an orphan session file behind on every run; $_SESSION still works as
+// a plain array for the per-request caches.
+if (PHP_SAPI !== 'cli' && session_status() !== PHP_SESSION_ACTIVE)
   session_start();
 
 function h($value) {
@@ -489,6 +492,16 @@ function session_image_store($cache_key, $com_name, $cached_image) {
     $entry = [$com_name, '', 'Not Found', '', '', '', time()];
   }
   $_SESSION[$cache_key][] = $entry;
+  return $entry;
+}
+
+// Cached entry for a species, querying the provider on a miss. The one place
+// that owns the lookup -> fetch -> store order for every species surface.
+function session_image_get($cache_key, $com_name, $sci_name, $image_provider, $fallback_provider) {
+  $entry = session_image_lookup($cache_key, $com_name);
+  if ($entry === null) {
+    $entry = session_image_store($cache_key, $com_name, $image_provider->get_image($sci_name, $fallback_provider));
+  }
   return $entry;
 }
 
@@ -1252,17 +1265,36 @@ function purge_protected($relative) {
 // what the page shows is exactly what cleanup protects.
 const BEST_RECORDING_ORDER = 'Confidence DESC, Date DESC, Time DESC, File_Name DESC';
 
-// How many of each species' best recordings survive disk cleanup (1-3).
+// How many of each species' best recordings survive disk cleanup. The
+// allowed values live here only; config.php's save and render use them too.
+const PROTECTED_RECORDINGS_CHOICES = ['1', '2', '3'];
+const PROTECTED_RECORDINGS_DEFAULT = '2';
+
 function protected_recordings_per_species() {
   $config = get_config();
-  $n = (int)($config['PROTECTED_RECORDINGS_PER_SPECIES'] ?? 2);
-  return ($n >= 1 && $n <= 3) ? $n : 2;
+  $n = (string)($config['PROTECTED_RECORDINGS_PER_SPECIES'] ?? PROTECTED_RECORDINGS_DEFAULT);
+  return (int)(in_array($n, PROTECTED_RECORDINGS_CHOICES, true) ? $n : PROTECTED_RECORDINGS_DEFAULT);
+}
+
+// Where extracted clips live. Resolved once per request: the existence
+// filter calls this for every candidate of every species.
+function clip_base_dir() {
+  static $base = null;
+  if ($base === null) {
+    $config = get_config();
+    $extracted = $config['EXTRACTED'] ?? '';
+    // Only trust an absolute, already-expanded path; anything else (empty, a
+    // relative path, an unexpanded "$HOME/...") falls back to the default.
+    if ($extracted === '' || $extracted[0] !== '/' || strpos($extracted, '$') !== false) {
+      $extracted = get_home() . '/BirdSongs/Extracted';
+    }
+    $base = rtrim($extracted, '/') . '/By_Date';
+  }
+  return $base;
 }
 
 function clip_absolute_path($relative) {
-  $config = get_config();
-  $extracted = !empty($config['EXTRACTED']) ? $config['EXTRACTED'] : get_home() . '/BirdSongs/Extracted';
-  return rtrim($extracted, '/') . '/By_Date/' . $relative;
+  return clip_base_dir() . '/' . $relative;
 }
 
 function clip_exists($relative) {
@@ -1282,14 +1314,20 @@ function clip_relative_for_file($db, $file_name) {
 // Best-first candidates for one species. Detections reviewed as false
 // positives or hidden are excluded: a confidently wrong detection must never
 // become a featured, permanently protected "best recording".
-function species_best_candidates($db, $sci_name, $limit = 50) {
-  $stmt = $db->prepare('SELECT Date, Time, Confidence, Com_Name, File_Name FROM detections WHERE Sci_Name = :sci' . and_review_exclusion($db) . ' ORDER BY ' . BEST_RECORDING_ORDER . ' LIMIT ' . (int)$limit);
+// Returns false on a query failure - callers that delete things must be able
+// to tell "nothing found" from "could not look".
+function species_best_candidates($db, $sci_name, $limit = 50, $offset = 0) {
+  $stmt = $db->prepare('SELECT Date, Time, Confidence, Com_Name, File_Name FROM detections WHERE Sci_Name = :sci' . and_review_exclusion($db) . ' ORDER BY ' . BEST_RECORDING_ORDER . ' LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset);
   if ($stmt === false) {
-    return [];
+    db_log_error($db, 'species best candidates prepare');
+    return false;
   }
   $stmt->bindValue(':sci', $sci_name, SQLITE3_TEXT);
-  $rows = [];
   $res = db_execute_safe($db, $stmt, 'species best candidates');
+  if ($res === false) {
+    return false;
+  }
+  $rows = [];
   while ($row = db_fetch_assoc_safe($res)) {
     $row['clip_path'] = detection_clip_relative_path($row['Date'], $row['Com_Name'], $row['File_Name']);
     $rows[] = $row;
@@ -1298,23 +1336,28 @@ function species_best_candidates($db, $sci_name, $limit = 50) {
 }
 
 // Best-first candidates for every species in one pass (purge protection).
-// Returns Sci_Name => rows, each capped at $per_species candidates.
+// Returns Sci_Name => rows, each capped at $per_species candidates, or false
+// on a query failure.
 function all_species_best_candidates($db, $per_species = 50) {
   $sql = 'SELECT Sci_Name, Date, Time, Confidence, Com_Name, File_Name FROM ('
        . 'SELECT Sci_Name, Date, Time, Confidence, Com_Name, File_Name, '
        . 'ROW_NUMBER() OVER (PARTITION BY Sci_Name ORDER BY ' . BEST_RECORDING_ORDER . ') AS rn '
        . 'FROM detections WHERE 1=1' . and_review_exclusion($db) . ') WHERE rn <= ' . (int)$per_species
        . ' ORDER BY Sci_Name, rn';
+  $res = db_query_safe($db, $sql, 'all species best candidates');
+  if ($res === false) {
+    return false;
+  }
   $by_species = [];
-  foreach (db_query_all_safe($db, $sql, 'all species best candidates') as $row) {
+  while ($row = db_fetch_assoc_safe($res)) {
     $row['clip_path'] = detection_clip_relative_path($row['Date'], $row['Com_Name'], $row['File_Name']);
     $by_species[$row['Sci_Name']][] = $row;
   }
   return $by_species;
 }
 
-// The first $keep candidates whose audio still exists on disk.
-function surviving_best_recordings($candidates, $keep) {
+// The first $keep of $candidates whose audio still exists on disk.
+function filter_surviving_clips($candidates, $keep) {
   $found = [];
   foreach ($candidates as $row) {
     if (clip_exists($row['clip_path'])) {
@@ -1325,6 +1368,80 @@ function surviving_best_recordings($candidates, $keep) {
     }
   }
   return $found;
+}
+
+// A species' best $keep recordings that still exist on disk, paging through
+// candidates from $offset until enough survive or $max_scan rows have been
+// examined. A fixed window was not enough: on a long-running station a common
+// species' top-50 clips can all be purged while hundreds of others remain.
+// Returns false on a query failure.
+function species_best_surviving($db, $sci_name, $keep, $offset = 0, $max_scan = 2000) {
+  $found = [];
+  $page = 50;
+  while (count($found) < $keep && $offset < $max_scan) {
+    $batch = species_best_candidates($db, $sci_name, $page, $offset);
+    if ($batch === false) {
+      return false;
+    }
+    foreach (filter_surviving_clips($batch, $keep - count($found)) as $row) {
+      $found[] = $row;
+    }
+    if (count($batch) < $page) {
+      break;
+    }
+    $offset += $page;
+  }
+  return $found;
+}
+
+// The single answer to "what is this species' best recording": the pinned
+// clip if it still exists (and was not reviewed away), else the best
+// surviving candidate. purged_best names a higher-scoring clip that cleanup
+// removed - the page stays quiet about purged clips otherwise.
+function species_best_recording($db, $sci_name, $prefs) {
+  $top = species_best_candidates($db, $sci_name, 1);
+  $all_time_best = ($top !== false && $top) ? $top[0] : null;
+
+  $best = null;
+  $pinned = false;
+  if (!empty($prefs['crowned_clip'])) {
+    $stmt = $db->prepare('SELECT Date, Time, Confidence, Com_Name, File_Name FROM detections WHERE File_Name = :f AND Sci_Name = :sci' . and_review_exclusion($db) . ' LIMIT 1');
+    if ($stmt !== false) {
+      $stmt->bindValue(':f', $prefs['crowned_clip'], SQLITE3_TEXT);
+      $stmt->bindValue(':sci', $sci_name, SQLITE3_TEXT);
+      $pin = db_fetch_assoc_safe(db_execute_safe($db, $stmt, 'species pinned clip'));
+      if ($pin) {
+        $pin['clip_path'] = detection_clip_relative_path($pin['Date'], $pin['Com_Name'], $pin['File_Name']);
+        if (clip_exists($pin['clip_path'])) {
+          $best = $pin;
+          $pinned = true;
+        }
+      }
+    }
+  }
+  if ($best === null) {
+    $surviving = species_best_surviving($db, $sci_name, 1);
+    $best = ($surviving !== false && $surviving) ? $surviving[0] : null;
+  }
+
+  $purged_best = null;
+  if ($all_time_best && !clip_exists($all_time_best['clip_path'])
+      && (!$best || (float)$all_time_best['Confidence'] > (float)$best['Confidence'])) {
+    $purged_best = ['date' => $all_time_best['Date'], 'confidence' => round((float)$all_time_best['Confidence'], 4)];
+  }
+
+  return [
+    'best_confidence' => $all_time_best ? round((float)$all_time_best['Confidence'], 4) : null,
+    'best_recording' => $best ? [
+      'date' => $best['Date'],
+      'time' => $best['Time'],
+      'confidence' => round((float)$best['Confidence'], 4),
+      'file' => $best['File_Name'],
+      'clip_path' => $best['clip_path'],
+      'pinned' => $pinned
+    ] : null,
+    'purged_best' => $purged_best
+  ];
 }
 
 function purge_protect_remove($relative) {

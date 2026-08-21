@@ -16,7 +16,11 @@ fi
 # the database first. This script used to trust whatever disk_check_exclude.txt
 # happened to contain - a list only the disk-full purge refreshed - so a new
 # best recording that postdated the last refresh could be deleted here.
-php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" >/dev/null 2>&1
+# Fail closed: without a fresh list, deleting anything risks the best clips.
+if ! php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" >/dev/null; then
+    echo "disk_species_clean: purge protection refresh failed, skipping cleanup" >&2
+    exit 1
+fi
 
 # Get unique species
 bird_names=$(
@@ -45,6 +49,8 @@ fi
 # For all That are not *.png (as the objective is to limit the number of audio files)
 # That were not taken in the past 7 days (= that don't contain the date from that past 7 days). $dateformat is configured as a different variables, as ubuntu accepts "5 days" while alpine accepts only "5"
 # That are not included in the file disk_check_exclude.txt that lists files protected from purge
+#   (exact line match, like disk_check.sh; blank lines and the ##start/##end markers are not patterns -
+#   with substring matching a blank line excluded every file)
 # If the specie name had a "-" in it, it must be converted to "=" to ensure that we have always the same number of "-" separated fields in the filename
 # Sort by confidence level (field 4 separated by -)
 # Sort by date (1 for year, 2 for month, 3 for days)
@@ -70,7 +76,7 @@ while read -r species; do
         -not -name "*$(date -d "-2$dateformat" '+%Y-%m-%d')*" \
         -not -name "*$(date -d "-1$dateformat" '+%Y-%m-%d')*" \
         -not -name "*$(date '+%Y-%m-%d')*" |
-        grep -vFf "$HOME/BirdNET-Pi/scripts/disk_check_exclude.txt" |
+        grep -vxFf <(grep -v -e '^$' -e '^##' "$HOME/BirdNET-Pi/scripts/disk_check_exclude.txt") |
         sed "s|$species|$species_san|g" |
         sort -t'-' -k4,4nr -k1,1nr -k2,2nr -k3,3nr |
         tail -n +"$((max_files_species + 1))" |

@@ -145,6 +145,8 @@ if [ -f "$HOME/BirdNET-Pi/scripts/birds.db" ]; then
   sudo_with_user sqlite3 "$HOME/BirdNET-Pi/scripts/birds.db" <<'EOF'
 CREATE INDEX IF NOT EXISTS "detections_Sci_Name_Date" ON "detections" ("Sci_Name", "Date");
 CREATE INDEX IF NOT EXISTS "detections_Date_Sci_Name" ON "detections" ("Date", "Sci_Name");
+CREATE INDEX IF NOT EXISTS "detections_Sci_Name_Confidence" ON "detections" ("Sci_Name", "Confidence");
+CREATE INDEX IF NOT EXISTS "detections_File_Name" ON "detections" ("File_Name");
 EOF
 fi
 
@@ -365,7 +367,9 @@ if ! grep -E '^PROTECTED_RECORDINGS_PER_SPECIES=' /etc/birdnet/birdnet.conf &>/d
 fi
 # Protect each species' current best recordings right away rather than at the
 # next cleanup run - the old page-render mechanism left stale lists behind.
-sudo_with_user php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" || true
+# A failure here is not fatal to the update: the cleanup scripts refresh (and
+# fail closed) before they delete anything.
+sudo_with_user php "$HOME/BirdNET-Pi/scripts/update_purge_protection.php" || echo "WARNING: purge protection refresh failed; cleanup will retry before deleting"
 
 # Data spine tables (Phase 1): reviews, species prefs, notes. Additive only -
 # the detections table is never altered. Keep in sync with createdb.sh and
