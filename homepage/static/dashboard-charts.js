@@ -9,9 +9,15 @@
 
     var heatmapChart = null;
     var imageCache = {};
-    // Thumbnails that failed to load, keyed by URL -> timestamp of the failure.
-    var imageFailedAt = {};
+    // Thumbnails that failed to load, keyed by URL -> {at, count}. The retry
+    // delay doubles with each consecutive failure (30s, 60s, ... 10 min) so an
+    // unreachable image provider is not hammered forever.
+    var imageFailures = {};
     var IMAGE_RETRY_MS = 30000;
+    var IMAGE_RETRY_MAX_MS = 600000;
+    function imageRetryDelay(count) {
+        return Math.min(IMAGE_RETRY_MS * Math.pow(2, Math.max(0, count - 1)), IMAGE_RETRY_MAX_MS);
+    }
 
     function fetchChartData(callback, errorCallback, attempt) {
         attempt = attempt || 1;
@@ -199,12 +205,13 @@
             // Thumbnail
             if (s.image) {
                 var img = imageCache[s.image];
-                // A failed load is not retried for IMAGE_RETRY_MS so a flaky
-                // connection cannot hammer the image CDN on every redraw.
-                var failedAt = imageFailedAt[s.image] || 0;
-                if (!img && Date.now() - failedAt > IMAGE_RETRY_MS) {
+                var failure = imageFailures[s.image];
+                var retryDue = !failure || Date.now() - failure.at > imageRetryDelay(failure.count);
+                if (!img && retryDue) {
                     img = new Image();
                     img.onload = function () {
+                        img.onload = img.onerror = null; // release the captured data set
+                        delete imageFailures[s.image];
                         // Only re-render if this data set is still the most recent one
                         if (data !== lastData) return;
 
@@ -219,13 +226,17 @@
                         // still reconnecting after the machine wakes, a CDN
                         // timeout) stayed cached as a broken image for the life
                         // of the page - blank until a manual refresh. Forget it
-                        // and schedule one redraw so the row self-heals.
+                        // and schedule one redraw, against whatever data is
+                        // current by then, so the row self-heals without waiting
+                        // for a poll. Hidden tabs wait for their next poll.
+                        img.onload = img.onerror = null;
                         delete imageCache[s.image];
-                        imageFailedAt[s.image] = Date.now();
+                        var count = (imageFailures[s.image] ? imageFailures[s.image].count : 0) + 1;
+                        imageFailures[s.image] = { at: Date.now(), count: count };
                         clearTimeout(window._heatmapRetryTimer);
                         window._heatmapRetryTimer = setTimeout(function () {
-                            if (data === lastData) renderHeatmap(canvas, data);
-                        }, IMAGE_RETRY_MS + 1000);
+                            if (document.visibilityState === 'visible' && lastData) renderHeatmap(canvas, lastData);
+                        }, imageRetryDelay(count) + 1000);
                     };
                     img.src = s.image;
                     imageCache[s.image] = img;
