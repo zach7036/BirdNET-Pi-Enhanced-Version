@@ -41,6 +41,14 @@ ensure_apt_updated () {
   [[ $APT_UPDATED != "UPDATED" ]] && apt-get update && APT_UPDATED="UPDATED"
 }
 
+# Purge-protection list and its lock, owned by the station user and writable
+# by the web user - see install_services.sh. The ownership pass above already
+# reclaims a list that a web request created as caddy; this covers stations
+# that have never had one.
+[ -f "$my_dir/disk_check_exclude.txt" ] || sudo_with_user bash -c "printf '##start\n##end\n' > '$my_dir/disk_check_exclude.txt'"
+sudo_with_user touch "$my_dir/disk_check_exclude.lock"
+chmod 666 "$my_dir/disk_check_exclude.txt" "$my_dir/disk_check_exclude.lock"
+
 ensure_pip_updated () {
   [[ $PIP_UPDATED != "UPDATED" ]] && sudo_with_user $HOME/BirdNET-Pi/birdnet/bin/pip3 install -U pip && PIP_UPDATED="UPDATED"
 }

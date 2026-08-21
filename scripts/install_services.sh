@@ -63,6 +63,13 @@ create_necessary_dirs() {
   [ -d ${PROCESSED} ] || sudo -u ${USER} mkdir -p ${PROCESSED}
   [ -d $RECS_DIR/StreamData ] || sudo -u ${USER} mkdir -p $RECS_DIR/StreamData
   [ -L ${EXTRACTED}/spectrogram.png ] || sudo -u ${USER} ln -sf ${RECS_DIR}/StreamData/spectrogram.png ${EXTRACTED}/spectrogram.png
+  # Purge-protection list and its lock: owned by the station user (the
+  # cleanup cron needs to rewrite them) and writable by the web user (php-fpm
+  # runs as caddy and records manual Locks). Created here so a web request is
+  # never the one to create them with the wrong owner.
+  [ -f $my_dir/scripts/disk_check_exclude.txt ] || sudo -u ${USER} bash -c "printf '##start\n##end\n' > $my_dir/scripts/disk_check_exclude.txt"
+  sudo -u ${USER} touch $my_dir/scripts/disk_check_exclude.lock
+  chmod 666 $my_dir/scripts/disk_check_exclude.txt $my_dir/scripts/disk_check_exclude.lock
 
   sudo -u ${USER} ln -fs $my_dir/exclude_species_list.txt $my_dir/scripts
   sudo -u ${USER} ln -fs $my_dir/confirmed_species_list.txt $my_dir/scripts

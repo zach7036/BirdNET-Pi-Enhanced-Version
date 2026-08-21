@@ -36,6 +36,7 @@ Birders_Guide_Installer_Configuration.txt
 birdnet/
 templates/*.service
 scripts/*.txt
+scripts/disk_check_exclude.lock
 scripts/*.db
 scripts/seasonal_cache.json
 analyzing_now.txt
