@@ -83,6 +83,13 @@
   outline-offset: 2px;
 }
 
+/* Some hardware media keys make Chromium expose :focus-visible on the last
+   clicked control. During playback the animated halo already supplies a clear
+   state indicator, so do not let that static outline cover the animation. */
+.live-audio-trigger.is-playing:focus-visible {
+  outline: none;
+}
+
 .live-audio-trigger:active {
   transform: translateY(0);
 }
