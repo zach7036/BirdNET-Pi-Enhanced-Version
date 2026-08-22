@@ -7,8 +7,8 @@
 /* ===== Floating live audio panel ===== */
 #live-audio-panel {
   position: fixed;
-  top: 18px;
-  right: 18px;
+  top: 8px;
+  right: 10px;
   z-index: 999999;
   display: flex;
   flex-direction: column;
@@ -18,13 +18,13 @@
 
 #live-audio-tab {
   align-self: flex-end;
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   background: linear-gradient(135deg, #5a4cf4 0%, #4b2ee8 100%);
   border: 0;
   border-radius: 50%;
-  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.3), 0 3px 8px rgba(49, 46, 129, 0.2);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28), 0 2px 5px rgba(49, 46, 129, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,7 +38,7 @@
 
 #live-audio-tab:hover {
   background: linear-gradient(135deg, #6255fa 0%, #5135ed 100%);
-  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.36), 0 4px 10px rgba(49, 46, 129, 0.24);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.34), 0 3px 7px rgba(49, 46, 129, 0.22);
   transform: translateY(-1px);
 }
 
@@ -47,9 +47,9 @@
 }
 
 .live-audio-mic {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
   stroke-width: 2;
 }
 
@@ -193,26 +193,26 @@
 
 @media (max-width: 1000px) {
   #live-audio-panel {
-    top: 68px;
-    right: 14px;
+    top: 62px;
+    right: 10px;
   }
 }
 
 @media (max-width: 480px) {
   #live-audio-panel {
-    right: 12px;
+    right: 8px;
   }
 
   #live-audio-tab {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     padding: 0;
   }
 
   .live-audio-mic {
-    width: 20px;
-    height: 20px;
-    flex-basis: 20px;
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
   }
 
   #live-audio-content {
