@@ -142,6 +142,23 @@ function nav_icon($name) {
 </div>
 <script>
   let activeAudioTrigger = null;
+  const liveAudioPlayer = document.getElementById('live-audio-player');
+
+  function setLiveAudioPlaying(isPlaying) {
+    document.querySelectorAll('.live-audio-trigger').forEach(function (button) {
+      button.classList.toggle('is-playing', isPlaying);
+    });
+  }
+
+  liveAudioPlayer.addEventListener('playing', function () {
+    setLiveAudioPlaying(true);
+  });
+  ['pause', 'ended', 'waiting', 'stalled', 'error', 'emptied', 'abort'].forEach(function (eventName) {
+    liveAudioPlayer.addEventListener(eventName, function () {
+      setLiveAudioPlaying(false);
+    });
+  });
+
   function setAudioPanelOpen(isOpen, trigger) {
     const panel = document.getElementById('live-audio-panel');
     const content = document.getElementById('live-audio-content');

@@ -13,6 +13,7 @@
 }
 
 .live-audio-trigger {
+  position: relative;
   width: 34px;
   height: 34px;
   flex: 0 0 34px;
@@ -32,14 +33,48 @@
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.live-audio-trigger:hover,
+.live-audio-trigger::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .live-audio-trigger:focus-visible,
-.live-audio-trigger[aria-expanded="true"] {
+.live-audio-trigger[aria-expanded="true"],
+.live-audio-trigger.is-playing {
   background: linear-gradient(135deg, #6255fa 0%, #5135ed 100%);
   border-color: transparent;
   color: #fff;
   box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3), 0 2px 5px rgba(49, 46, 129, 0.2);
-  transform: translateY(-1px);
+}
+
+.live-audio-trigger.is-playing::after {
+  animation: live-audio-playing-pulse 2.4s ease-out infinite;
+}
+
+@keyframes live-audio-playing-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.24);
+    opacity: 1;
+  }
+  72%,
+  100% {
+    box-shadow: 0 0 0 8px rgba(79, 70, 229, 0);
+    opacity: 0;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .live-audio-trigger:hover {
+    background: linear-gradient(135deg, #6255fa 0%, #5135ed 100%);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3), 0 2px 5px rgba(49, 46, 129, 0.2);
+    transform: translateY(-1px);
+  }
 }
 
 .live-audio-trigger:focus-visible {
@@ -254,13 +289,22 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
 }
 
-[data-theme="dark"] .live-audio-trigger:hover,
 [data-theme="dark"] .live-audio-trigger:focus-visible,
-[data-theme="dark"] .live-audio-trigger[aria-expanded="true"] {
+[data-theme="dark"] .live-audio-trigger[aria-expanded="true"],
+[data-theme="dark"] .live-audio-trigger.is-playing {
   background: linear-gradient(135deg, #6255fa 0%, #5135ed 100%);
   border-color: transparent;
   color: #fff;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.32);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-theme="dark"] .live-audio-trigger:hover {
+    background: linear-gradient(135deg, #6255fa 0%, #5135ed 100%);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.32);
+  }
 }
 
 [data-theme="dark"] .live-audio-listening {
@@ -288,6 +332,12 @@
 
   .live-audio-listening {
     font-size: 0.88rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-audio-trigger.is-playing::after {
+    animation: none;
   }
 }
 
