@@ -117,9 +117,6 @@ function nav_icon($name) {
 </head>
 <body>
 <div id="live-audio-panel">
-  <button type="button" id="live-audio-tab" onclick="toggleAudioPanel()" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
-    <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
-  </button>
   <div id="live-audio-content" role="region" aria-labelledby="live-audio-title" aria-hidden="true">
     <div class="live-audio-heading">
       <div class="live-audio-title-wrap">
@@ -144,27 +141,40 @@ function nav_icon($name) {
   </div>
 </div>
 <script>
-  function setAudioPanelOpen(isOpen) {
+  let activeAudioTrigger = null;
+  function setAudioPanelOpen(isOpen, trigger) {
     const panel = document.getElementById('live-audio-panel');
-    const tab = document.getElementById('live-audio-tab');
     const content = document.getElementById('live-audio-content');
+    if (trigger) activeAudioTrigger = trigger;
+    const anchor = activeAudioTrigger;
+    const isMobileAnchor = !!(anchor && anchor.classList.contains('live-audio-trigger-mobile'));
+    const sidebar = document.getElementById('mySidebar');
+    panel.classList.toggle('mobile-anchor', isMobileAnchor);
+    panel.classList.toggle('collapsed-anchor', !isMobileAnchor && !!(sidebar && sidebar.classList.contains('collapsed')));
     panel.classList.toggle('open', isOpen);
-    tab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    tab.setAttribute('aria-label', isOpen ? 'Close live audio player' : 'Open live audio player');
+    document.querySelectorAll('.live-audio-trigger').forEach(function (button) {
+      const isActive = isOpen && button === anchor;
+      button.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+      button.setAttribute('aria-label', isActive ? 'Close live audio player' : 'Open live audio player');
+    });
     content.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
   }
-  function toggleAudioPanel() {
+  function toggleAudioPanel(trigger) {
     const panel = document.getElementById('live-audio-panel');
-    setAudioPanelOpen(!panel.classList.contains('open'));
+    const shouldOpen = !panel.classList.contains('open') || activeAudioTrigger !== trigger;
+    setAudioPanelOpen(shouldOpen, trigger);
   }
-  function closeAudioPanel() {
+  function closeAudioPanel(restoreFocus) {
     setAudioPanelOpen(false);
-    document.getElementById('live-audio-tab').focus();
+    if (restoreFocus !== false && activeAudioTrigger) activeAudioTrigger.focus();
   }
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape' && document.getElementById('live-audio-panel').classList.contains('open')) {
       closeAudioPanel();
     }
+  });
+  window.addEventListener('resize', function () {
+    if (document.getElementById('live-audio-panel').classList.contains('open')) closeAudioPanel(false);
   });
 </script>
 <div class="mobile-header">
@@ -172,6 +182,9 @@ function nav_icon($name) {
     <img src="images/bnp.png" alt="BirdNET-Pi logo">
   </div>
   <button type="button" class="icon palette-launch-mobile" onclick="window.BirdNETPalette && BirdNETPalette.show()" aria-label="Search pages and species"><?php echo nav_icon('search'); ?></button>
+  <button type="button" class="live-audio-trigger live-audio-trigger-mobile" onclick="toggleAudioPanel(this)" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
+    <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
+  </button>
   <button type="button" class="icon" onclick="myFunction()" aria-label="Toggle navigation menu"><img src="images/menu.png" alt=""></button>
 </div>
 <div class="sidebar" id="mySidebar">
@@ -190,7 +203,12 @@ function nav_icon($name) {
       }
       ?>
     </div>
-    <button type="button" class="sidebar-toggle" onclick="myFunction()" aria-label="Toggle sidebar">«</button>
+    <div class="sidebar-header-actions">
+      <button type="button" class="live-audio-trigger live-audio-trigger-desktop" onclick="toggleAudioPanel(this)" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
+        <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
+      </button>
+      <button type="button" class="sidebar-toggle" onclick="myFunction()" aria-label="Toggle sidebar">«</button>
+    </div>
   </div>
   <button type="button" class="palette-launch" onclick="window.BirdNETPalette && BirdNETPalette.show()" aria-label="Search pages and species">
     <?php echo nav_icon('search'); ?> <span>Search&hellip;</span> <kbd>Ctrl K</kbd>
@@ -738,6 +756,7 @@ if(isset($_GET['view'])){
 function myFunction() {
   var sidebar = document.getElementById("mySidebar");
   var content = document.querySelector(".views");
+  if (document.getElementById('live-audio-panel').classList.contains('open')) closeAudioPanel(false);
   
   if (window.innerWidth <= 1000) {
     // Mobile: Toggle drawer
