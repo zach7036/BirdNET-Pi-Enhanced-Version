@@ -176,10 +176,14 @@ function nav_icon($name) {
     });
     content.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
   }
-  function toggleAudioPanel(trigger) {
+  function toggleAudioPanel(trigger, activationEvent) {
     const panel = document.getElementById('live-audio-panel');
     const shouldOpen = !panel.classList.contains('open') || activeAudioTrigger !== trigger;
     setAudioPanelOpen(shouldOpen, trigger);
+    // Pointer and touch activation should not leave a latent focus ring that
+    // appears when the user next presses a hardware key (such as volume).
+    // Keyboard activation has detail === 0 and intentionally keeps focus.
+    if (activationEvent && activationEvent.detail > 0) trigger.blur();
   }
   function closeAudioPanel(restoreFocus) {
     setAudioPanelOpen(false);
@@ -199,7 +203,7 @@ function nav_icon($name) {
     <img src="images/bnp.png" alt="BirdNET-Pi logo">
   </div>
   <button type="button" class="icon palette-launch-mobile" onclick="window.BirdNETPalette && BirdNETPalette.show()" aria-label="Search pages and species"><?php echo nav_icon('search'); ?></button>
-  <button type="button" class="live-audio-trigger live-audio-trigger-mobile" onclick="toggleAudioPanel(this)" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
+  <button type="button" class="live-audio-trigger live-audio-trigger-mobile" onclick="toggleAudioPanel(this, event)" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
     <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
   </button>
   <button type="button" class="icon" onclick="myFunction()" aria-label="Toggle navigation menu"><img src="images/menu.png" alt=""></button>
@@ -221,7 +225,7 @@ function nav_icon($name) {
       ?>
     </div>
     <div class="sidebar-header-actions">
-      <button type="button" class="live-audio-trigger live-audio-trigger-desktop" onclick="toggleAudioPanel(this)" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
+      <button type="button" class="live-audio-trigger live-audio-trigger-desktop" onclick="toggleAudioPanel(this, event)" aria-label="Open live audio player" aria-expanded="false" aria-controls="live-audio-content">
         <svg class="live-audio-mic" aria-hidden="true" focusable="false"><use href="static/icons.svg#mic"></use></svg>
       </button>
       <button type="button" class="sidebar-toggle" onclick="myFunction()" aria-label="Toggle sidebar">«</button>
