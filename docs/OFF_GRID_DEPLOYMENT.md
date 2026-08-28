@@ -1,15 +1,55 @@
-# Off-grid and remote deployment
+# Off-grid deployment guide
 
-BirdNET-Pi's recording, identification, database, and local dashboard do not require an internet
-connection after installation. Remote operation is still a system-design problem: Wi-Fi
-credentials change, clocks drift, storage fills, power fails, and a process can be alive without
-producing new audio. Build and test the exact finished station before taking it into the field.
+BirdNET-Pi can record, identify, store detections, and serve its local dashboard without an internet
+connection after installation. An off-grid station still needs a dependable plan for networking,
+timekeeping, storage, power, environmental protection, maintenance, and recovery. This guide applies
+to any installation that will operate with limited, intermittent, or no internet access.
 
-This guide deliberately keeps risky behavior out of the BirdNET-Pi installer. It does not enable a
-hotspot, hardware watchdog, scheduled reboot, or new model, and installing an update does not
-change any of the existing defaults described below.
+## Quick guide
 
-## Before leaving
+Use this checklist when you need the short version. Complete it on the exact Pi, microphone, storage,
+power system, and network equipment that will be deployed.
+
+1. **Prepare while online.** Install BirdNET-Pi and all intended updates using the supported 64-bit
+   Raspberry Pi OS release. Set the station coordinates, timezone, a non-blank BirdNET-Pi admin
+   password, and a strong Raspberry Pi/SSH password.
+2. **Plan local access.** Save and test every Wi-Fi network the station may use, including an optional
+   phone hotspot or local-router recovery network. Keep Ethernet or a keyboard and display available
+   when practical. Never expose the dashboard directly to the internet or forward port 80 to the Pi.
+3. **Choose outbound features.** Weather syncing and Wikipedia bird images are enabled by default.
+   To reduce routine outbound requests, turn off **Enable weather syncing**
+   under **Settings → Location & Weather** and select **None** under **Species Images**.
+   Leave BirdWeather, Apprise, and heartbeat settings blank unless you intend to use and have tested
+   them; leave automatic updates off for an unattended station.
+4. **Verify the complete bird-detection path.** Confirm that the station records new audio, analyzes
+   it, writes the detection to the database, extracts a playable clip, and creates a spectrogram.
+5. **Prepare power and storage.** Use high-endurance storage, choose and test the desired disk policy,
+   measure the complete station's real power draw, provide regulated power with adequate reserve,
+   and protect the equipment without blocking the microphone or trapping heat.
+6. **Create a real recovery path.** Make and test a full SD-card image, keep it off the station, and
+   preferably keep a second imaged card available. Keep a separate BirdNET-Pi application backup for
+   data.
+7. **Test the failure modes.** Disconnect the internet, remove the primary Wi-Fi network, reboot, and
+   perform a fully offline cold start. Verify local access, timestamps, recording, analysis, and
+   recovery. Test abrupt power loss and disk cleanup only on a cloned or disposable card.
+8. **Add optional resilience only after testing.** Depending on the site, consider a recovery hotspot,
+   a real-time clock or backup battery, disabling unneeded optional services, or a hardware watchdog.
+   Test each one on a clone before relying on it.
+9. **Review privacy and site rules.** The human-voice filter cannot guarantee removal of all speech.
+   BirdWeather can upload full analyzed audio plus timestamps, species, confidence, and coordinates,
+   so confirm consent, recording laws, and wildlife-location sensitivity before enabling it.
+
+If the station passes those checks, the normal detection pipeline can continue locally even when
+weather, image, update-status, or other optional internet requests fail.
+
+## Detailed guide
+
+The sections below explain each decision and its tradeoffs. They deliberately keep risky behavior
+out of the BirdNET-Pi installer: the guide does not automatically enable a hotspot, hardware
+watchdog, scheduled reboot, or different model, and installing an update does not change the
+existing defaults described below.
+
+### Before deployment
 
 1. Use the supported 64-bit Raspberry Pi OS release and finish all installation and updates while
    you still have dependable internet access.
@@ -23,20 +63,21 @@ change any of the existing defaults described below.
 5. Keep a full, tested SD-card image and preferably a second imaged card. Also copy the BirdNET-Pi
    backup somewhere other than the station.
 
-## Wi-Fi recovery
+### Wi-Fi recovery
 
 BirdNET-Pi does not include its own Wi-Fi manager or captive portal. The least invasive approach is
 to let Raspberry Pi OS NetworkManager handle Wi-Fi and save every known network before deployment.
-For example, temporarily enable the phone hotspot you will carry, connect the Pi to it once, and
-verify that the saved connection reconnects after the primary access point disappears. Ethernet or
-a local keyboard and display remain the most dependable rescue routes.
+For example, temporarily enable a phone hotspot or other recovery network that will be available at
+the site, connect the Pi to it once, and verify that the saved connection reconnects after the
+primary access point disappears. Ethernet or a local keyboard and display remain the most
+dependable rescue routes.
 
 [Comitup](https://davesteele.github.io/comitup/) is an optional third-party project that can expose a
 temporary setup hotspot when no saved network works. It is not installed, configured, or supported
-by BirdNET-Pi. If you evaluate it, test it repeatedly on the exact finished OS image before travel.
-Do not flash Comitup's standalone SD image over the only BirdNET-Pi card; that would replace the
-installation and its data. Evaluate the package on a cloned or spare card, because it takes over
-Wi-Fi management.
+by BirdNET-Pi. If you evaluate it, test it repeatedly on the exact finished OS image before
+deployment. Do not flash Comitup's standalone SD image over the only BirdNET-Pi card; that would
+replace the installation and its data. Evaluate the package on a cloned or spare card, because it
+takes over Wi-Fi management.
 
 Because Caddy normally owns port 80, review Comitup's `web_service` integration and configure a
 strong `ap_password`. The relevant `/etc/comitup.conf` entries are:
@@ -52,7 +93,7 @@ or local-console fallback in case the hotspot transition fails.
 
 Do not expose the dashboard directly to the internet or forward router port 80 to the Pi.
 
-## Network traffic
+### Network traffic
 
 Detection stays local. The following features and status checks can contact another system:
 
@@ -60,11 +101,11 @@ Detection stays local. The following features and status checks can contact anot
   values are configured.
 - Automatic updates are off by default. Opening an authenticated dashboard or System Controls can
   still perform an update-status `git fetch`; that check is time-bounded so an offline network does
-  not leave it running indefinitely. Leave automatic updates off for an unattended field station
+  not leave it running indefinitely. Leave automatic updates off for an unattended off-grid station
   and update while someone has local access and a rollback card.
-- Wikipedia is the default species-image provider. Select **None** under **Settings → Settings →
-  Species Images** for a station that should not request images.
-- Weather syncing is enabled by default. Under **Settings → Settings → Location & Weather**, turn
+- Wikipedia is the default species-image provider. Select **None** under **Settings → Species
+  Images** for a station that should not request images.
+- Weather syncing is enabled by default. Under **Settings → Location & Weather**, turn
   off **Enable weather syncing** to stop both Open-Meteo and configured Home Assistant requests.
   Existing weather history is kept, and turning syncing back on resumes the normal hourly process.
 - While weather syncing is enabled, a configured Home Assistant temperature sensor does not make
@@ -76,10 +117,10 @@ Detection stays local. The following features and status checks can contact anot
 Default weather, image, and update-status failures do not stop local analysis. Configured reporting
 integrations are different: slow BirdWeather or notification requests can delay the reporting queue,
 so leave BirdWeather, Apprise, and heartbeat values blank unless they have been tested under the
-field network conditions. A strict no-outbound-network installation should also enforce that policy
-at its router or firewall.
+deployment network conditions. A strict no-outbound-network installation should also enforce that
+policy at its router or firewall.
 
-## Power and optional services
+### Power and optional services
 
 Continuous identification has to keep the microphone and inference process awake. Raising the
 confidence threshold can reduce stored clips and notifications, but it does not stop the model from
@@ -92,11 +133,11 @@ that viewer unavailable; it does not disable recording or analysis. BirdNET-Pi w
 explicitly disabled optional service during later settings saves and restarts.
 
 Measure the complete station—Pi, USB microphone, storage, network equipment, and conversion
-losses—over several real days. Size the battery and solar supply for the worst expected weather,
-not the panel's advertised peak output. Provide regulated power and a safe shutdown or sufficient
-reserve rather than relying on scheduled reboots.
+losses—over several real days. Size batteries, solar panels, generators, or other supplies for the
+site's worst expected conditions rather than their advertised peak output. Provide regulated power
+and a safe shutdown or sufficient reserve rather than relying on scheduled reboots.
 
-## Recovery and watchdogs
+### Recovery and watchdogs
 
 The recording and analysis systemd services already restart when their processes crash. That does
 not prove the microphone is still producing new files: a process can remain running while audio is
@@ -110,7 +151,7 @@ test power-loss and recovery cycles on a clone of the finished station, and reta
 card from another computer. An external heartbeat service also requires internet, so it cannot
 supervise a fully offline site.
 
-## Clock, storage, and environment
+### Clock, storage, and environment
 
 - A Raspberry Pi 5 has a real-time clock, but it needs a compatible rechargeable backup battery to
   retain time through a total power loss. Charging is disabled by default, so follow Raspberry Pi's
@@ -120,13 +161,14 @@ supervise a fully offline site.
   fully offline cold start.
 - Use high-endurance storage and configure Disk Management for the failure mode you prefer: purge
   old material at the threshold or stop services instead. Confirm cleanup behavior on test data.
-- Protect the Pi, connectors, and microphone from rain, condensation, insects, heat, and cable
-  strain without sealing the microphone acoustically or trapping excessive heat.
+- Protect the Pi, connectors, and microphone from the site's likely rain, snow, dust, condensation,
+  humidity, insects or other wildlife, heat, cold, and cable strain without sealing the microphone
+  acoustically or trapping excessive heat.
 - A full card image is the recovery plan for OS files, packages, systemd units, permissions, and
   boot configuration. The application backup is useful for data, but is not a complete machine
   image.
 
-## Privacy in a remote or shared location
+### Privacy and sensitive locations
 
 The human-voice filter is available under **Advanced Settings**. The default threshold `0` still
 checks the model's top 10 predictions for a Human label; raising the percentage checks more of the
@@ -139,15 +181,16 @@ species, confidence, and coordinates. That audio can contain sounds—including 
 present in the locally extracted bird clip. Obtain any consent required at the site, review local
 recording law, and consider whether precise wildlife locations are sensitive before enabling it.
 
-## Model limits
+### Model limits
 
 The bundled model has 6,522 labels, including 101 generic or non-bird classes. That does not make it
-a general wildlife survey model. It contains only one primate label (`Alouatta pigra`, Mexican
-Black Howler Monkey), which is not useful coverage for an Amazon mammal survey, and it has no bat
-classes.
+a general wildlife survey model. Its non-bird coverage is uneven: it contains only one primate label
+(`Alouatta pigra`, Mexican Black Howler Monkey), offers no broad mammal coverage, and has no bat
+classes. Check the shipped labels before relying on BirdNET-Pi for any target other than birds.
 
 The normal recorder samples at 48 kHz, which cannot capture much ultrasonic bat echolocation, and
 the supplied bird model is not trained as a bat detector. Bat monitoring needs suitable ultrasonic
 hardware and specialized software. Projects such as
 [BattyBirdNET-Pi](https://github.com/rdz-oss/BattyBirdNET-Pi) can be evaluated separately, but they
-are not a drop-in model for this installation and do not provide a supported Amazon mammal model.
+are not a drop-in model for this installation and do not provide a supported general-purpose mammal
+detector.
