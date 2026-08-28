@@ -779,6 +779,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
       'analysis' => api_format_service('birdnet_analysis.service')
     ],
     'new_today' => $new_today,
+    'story' => get_todays_story($db),
     'review_worthy' => $review_worthy,
     'gap_seconds' => get_visit_gap_seconds(),
     'generated_at' => date('c')

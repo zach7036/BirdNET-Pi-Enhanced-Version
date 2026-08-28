@@ -10,117 +10,10 @@ require_once 'scripts/common.php';
 $db = new SQLite3('./scripts/birds.db', SQLITE3_OPEN_READONLY);
 $db->busyTimeout(1000);
 
-function build_todays_story($db) {
-  $lines = [];
-  $now_time = date('H:i:s');
-
-  // Baseline: average detections up to this time of day over the previous 14 days
-  $baseline = (float) db_query_single_safe($db,
-    "SELECT AVG(c) FROM (SELECT COUNT(*) AS c FROM detections WHERE Date >= DATE('now','localtime','-14 days') AND Date < DATE('now','localtime') AND Time <= '" . SQLite3::escapeString($now_time) . "' GROUP BY Date)",
-    0, 'story baseline');
-  // Bounded to the current time so it compares like-for-like with the baseline
-  $today_count = (int) db_query_single_safe($db,
-    "SELECT COUNT(*) FROM detections WHERE Date = DATE('now','localtime') AND Time <= '" . SQLite3::escapeString($now_time) . "'", 0, 'story today');
-
-  // Brand-new lifetime species today (reviewed false positives never make news)
-  $fp_excl = and_review_exclusion($db);
-  $new_species = [];
-  $res = db_query_safe($db, "SELECT Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl AND Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date < DATE('now','localtime')) GROUP BY Sci_Name LIMIT 3", 'story new species');
-  while ($row = db_fetch_assoc_safe($res)) {
-    $new_species[] = $row['Com_Name'];
-  }
-  if (!empty($new_species)) {
-    $lines[] = ['icon' => 'bird', 'text' => count($new_species) === 1
-      ? 'A brand new species for your station: ' . $new_species[0] . '!'
-      : 'New species for your station today: ' . implode(', ', $new_species) . '!'];
-  }
-
-  // Species returning after at least two weeks away
-  $returns = [];
-  $res = db_query_safe($db, "SELECT Com_Name, CAST(JULIANDAY(DATE('now','localtime')) - JULIANDAY(MAX(Date)) AS INTEGER) AS gap FROM detections WHERE Date < DATE('now','localtime') AND Sci_Name IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl) GROUP BY Sci_Name HAVING gap >= 14 ORDER BY gap DESC LIMIT 3", 'story returns');
-  while ($row = db_fetch_assoc_safe($res)) {
-    $returns[] = $row['Com_Name'] . ' (last heard ' . $row['gap'] . ' days ago)';
-  }
-  if (!empty($returns)) {
-    $lines[] = ['icon' => 'send', 'text' => 'Back after time away: ' . implode('; ', $returns) . '.'];
-  }
-
-  // Rare visitors: heard today, five or fewer lifetime detections, not new today
-  $rare = [];
-  $res = db_query_safe($db, "SELECT Com_Name, COUNT(*) AS lifetime FROM detections WHERE Sci_Name IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl) GROUP BY Sci_Name HAVING lifetime <= 5 AND MIN(Date) < DATE('now','localtime') LIMIT 3", 'story rare');
-  while ($row = db_fetch_assoc_safe($res)) {
-    $rare[] = $row['Com_Name'];
-  }
-  if (!empty($rare)) {
-    $lines[] = ['icon' => 'search', 'text' => 'Rare visitor' . (count($rare) > 1 ? 's' : '') . ' today: ' . implode(', ', $rare) . ' — worth a listen in Review.'];
-  }
-
-  // Region-rare: the location model expects almost none of these here right now
-  if (!empty(seasonal_expected_scores())) {
-    $region_rare = [];
-    $res = db_query_safe($db, "SELECT DISTINCT Sci_Name, Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl", 'story region rare');
-    while ($row = db_fetch_assoc_safe($res)) {
-      if (is_region_rare($row['Sci_Name'])) {
-        $region_rare[] = $row['Com_Name'];
-        if (count($region_rare) >= 3) {
-          break;
-        }
-      }
-    }
-    if (!empty($region_rare)) {
-      $lines[] = ['icon' => 'send', 'text' => 'Unusual for your area at this time of year: ' . implode(', ', $region_rare) . ' — a notable record if it holds up in Review.'];
-    }
-  }
-
-  // Cadence breaks: regulars (heard on 10+ of the last 14 days) that have
-  // suddenly fallen silent for 2+ days and are still absent today.
-  $cadence = [];
-  $res = db_query_safe($db, "SELECT Com_Name,
-      COUNT(DISTINCT Date) AS days_present,
-      CAST(JULIANDAY(DATE('now','localtime')) - JULIANDAY(MAX(Date)) AS INTEGER) AS gap
-    FROM detections
-    WHERE Date >= DATE('now','localtime','-14 days') AND Date < DATE('now','localtime')
-      AND Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl)
-    GROUP BY Sci_Name
-    HAVING days_present >= 10 AND gap >= 2
-    ORDER BY days_present DESC LIMIT 3", 'story cadence');
-  while ($row = db_fetch_assoc_safe($res)) {
-    $cadence[] = $row['Com_Name'] . ' (usually daily, silent for ' . $row['gap'] . ' days)';
-  }
-  if (!empty($cadence)) {
-    $lines[] = ['icon' => 'clock', 'text' => 'Breaking routine: ' . implode('; ', $cadence) . '.'];
-  }
-
-  // Volume: only speak when the baseline is meaningful AND deviation is large
-  if ($baseline >= 20) {
-    $ratio = $today_count / max(1, $baseline);
-    if ($ratio >= 1.3) {
-      $lines[] = ['icon' => 'trending-up', 'text' => 'A busy day: activity is ' . round(($ratio - 1) * 100) . '% above your two-week average for this time of day.'];
-    } elseif ($ratio <= 0.7 && (int)date('G') >= 8) {
-      $lines[] = ['icon' => 'cloud', 'text' => 'Quieter than usual: activity is ' . round((1 - $ratio) * 100) . '% below your two-week average for this time of day.'];
-    }
-  }
-
-  if (empty($lines)) {
-    if ($baseline < 5) {
-      $lines[] = ['icon' => 'home', 'text' => 'Your station is still learning what a normal day sounds like here.'];
-    } else {
-      $lines[] = ['icon' => 'home', 'text' => 'A typical day so far — steady activity, nothing unusual to report.'];
-    }
-  }
-  return $lines;
-}
-
-// Story is cached in 10-minute buckets so dawn-rush detections don't force a
-// recompute on every page load.
-$story_key = birdnet_cache_key('todays_story', date('Y-m-d'), date('G'), intdiv((int)date('i'), 10), filemtime(__FILE__));
-$story_html = birdnet_cache_get($story_key, 900);
-if ($story_html === false) {
-  $story_html = '';
-  foreach (build_todays_story($db) as $line) {
-    $story_html .= '<li>' . nav_icon($line['icon']) . '<span>' . h($line['text']) . '</span></li>';
-  }
-  birdnet_cache_put($story_key, $story_html);
+$story_lines = get_todays_story($db);
+$story_html = '';
+foreach ($story_lines as $line) {
+  $story_html .= '<li>' . nav_icon($line['icon']) . '<span>' . h($line['text']) . '</span></li>';
 }
 
 $summary = get_summary();
@@ -183,7 +76,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
   <?php } ?>
   <section class="now-story ui-card" aria-label="Today's story">
     <h3><?php echo nav_icon('zap'); ?> Today's Story</h3>
-    <ul class="story-lines"><?php echo $story_html; ?></ul>
+    <ul class="story-lines" id="todayStoryLines"><?php echo $story_html; ?></ul>
   </section>
 
   <div class="now-main">
@@ -228,7 +121,11 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
 <script>
 (function () {
   'use strict';
-  var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) { return String(s == null ? '' : s); };
+  var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[c];
+    });
+  };
   var visitExplainer = <?php echo js_arg($visit_explainer); ?>;
   // Pristine server-rendered hero state, restored when the day rolls over
   // while the page is open and there are no detections yet.
@@ -354,12 +251,34 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     document.getElementById('heroReviewLink').style.display = data.review_worthy > 0 ? '' : 'none';
   }
 
+  function renderStory(lines) {
+    if (!Array.isArray(lines) || lines.length === 0) return;
+    var box = document.getElementById('todayStoryLines');
+    if (!box) return;
+    var allowedIcons = {
+      bird: true,
+      send: true,
+      search: true,
+      clock: true,
+      'trending-up': true,
+      cloud: true,
+      home: true
+    };
+    box.innerHTML = lines.map(function (line) {
+      var icon = line && allowedIcons[line.icon] ? line.icon : 'home';
+      var text = line && line.text != null ? line.text : '';
+      return '<li><svg class="nav-icon" aria-hidden="true" focusable="false">' +
+        '<use href="static/icons.svg#' + icon + '"></use></svg><span>' + esc(text) + '</span></li>';
+    }).join('');
+  }
+
   function refreshNow() {
     fetch('api/v1/dashboard/now?_=' + Date.now(), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { if (!r.ok) throw new Error('now failed'); return r.json(); })
       .then(function (data) {
         renderHero(data);
         renderKpis(data);
+        renderStory(data.story);
       })
       .catch(function () {});
   }
@@ -496,5 +415,11 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
   refreshSpeciesGrid();
   setInterval(refreshNow, 30000);
   setInterval(refreshSpeciesGrid, 120000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      refreshNow();
+      refreshSpeciesGrid();
+    }
+  });
 })();
 </script>

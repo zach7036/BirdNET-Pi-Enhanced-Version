@@ -56,6 +56,8 @@ check "default route is Now" 200 "/"
 check_contains "default shows Today's Story" "Today's Story"
 check "now page hero" 200 "/?view=Now"
 check_contains "now has hero" "LAST HEARD"
+check_contains "now has live story target" 'id="todayStoryLines"'
+check_contains "now refreshes story" 'renderStory(data.story)'
 check "doctor weather sync unauthenticated" 401 "/scripts/doctor.php?sync_weather=true"
 check "doctor support bundle unauthenticated" 401 "/scripts/doctor.php?support_bundle=true"
 check "timeline page" 200 "/?view=Timeline"
@@ -147,6 +149,9 @@ check "visits csv" 200 "/api/v1/detections/visits?format=csv"
 check "dashboard now" 200 "/api/v1/dashboard/now"
 check_contains "now has latest_visit" '"latest_visit"'
 check_contains "now has review_worthy" '"review_worthy"'
+check_contains "now has story" '"story"'
+check_contains "story has icons" '"icon"'
+check_contains "story has text" '"text"'
 check "analytics bundle" 200 "/api/v1/analytics/bundle?days=7"
 check_contains "bundle has top_species" '"top_species"'
 check "reviews queue" 200 "/api/v1/reviews/queue?days=7"

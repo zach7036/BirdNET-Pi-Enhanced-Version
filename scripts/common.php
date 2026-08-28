@@ -1279,6 +1279,137 @@ function is_region_rare($sci_name, $date = null) {
   return $score < REGION_RARE_THRESHOLD && $score < 0.25 * $annual_max;
 }
 
+/* ===== Today's Story =====
+   Shared by the server-rendered Today page and its live dashboard endpoint so
+   a tab left open across midnight receives the same current story as a fresh
+   page load. */
+function build_todays_story($db) {
+  $lines = [];
+  $now_time = date('H:i:s');
+
+  // Baseline: average detections up to this time of day over the previous 14 days
+  $baseline = (float) db_query_single_safe($db,
+    "SELECT AVG(c) FROM (SELECT COUNT(*) AS c FROM detections WHERE Date >= DATE('now','localtime','-14 days') AND Date < DATE('now','localtime') AND Time <= '" . SQLite3::escapeString($now_time) . "' GROUP BY Date)",
+    0, 'story baseline');
+  // Bounded to the current time so it compares like-for-like with the baseline
+  $today_count = (int) db_query_single_safe($db,
+    "SELECT COUNT(*) FROM detections WHERE Date = DATE('now','localtime') AND Time <= '" . SQLite3::escapeString($now_time) . "'", 0, 'story today');
+
+  // Brand-new lifetime species today (reviewed false positives never make news)
+  $fp_excl = and_review_exclusion($db);
+  $new_species = [];
+  $res = db_query_safe($db, "SELECT Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl AND Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date < DATE('now','localtime')) GROUP BY Sci_Name LIMIT 3", 'story new species');
+  while ($row = db_fetch_assoc_safe($res)) {
+    $new_species[] = $row['Com_Name'];
+  }
+  if (!empty($new_species)) {
+    $lines[] = ['icon' => 'bird', 'text' => count($new_species) === 1
+      ? 'A brand new species for your station: ' . $new_species[0] . '!'
+      : 'New species for your station today: ' . implode(', ', $new_species) . '!'];
+  }
+
+  // Species returning after at least two weeks away
+  $returns = [];
+  $res = db_query_safe($db, "SELECT Com_Name, CAST(JULIANDAY(DATE('now','localtime')) - JULIANDAY(MAX(Date)) AS INTEGER) AS gap FROM detections WHERE Date < DATE('now','localtime') AND Sci_Name IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl) GROUP BY Sci_Name HAVING gap >= 14 ORDER BY gap DESC LIMIT 3", 'story returns');
+  while ($row = db_fetch_assoc_safe($res)) {
+    $returns[] = $row['Com_Name'] . ' (last heard ' . $row['gap'] . ' days ago)';
+  }
+  if (!empty($returns)) {
+    $lines[] = ['icon' => 'send', 'text' => 'Back after time away: ' . implode('; ', $returns) . '.'];
+  }
+
+  // Rare visitors: heard today, five or fewer lifetime detections, not new today
+  $rare = [];
+  $res = db_query_safe($db, "SELECT Com_Name, COUNT(*) AS lifetime FROM detections WHERE Sci_Name IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl) GROUP BY Sci_Name HAVING lifetime <= 5 AND MIN(Date) < DATE('now','localtime') LIMIT 3", 'story rare');
+  while ($row = db_fetch_assoc_safe($res)) {
+    $rare[] = $row['Com_Name'];
+  }
+  if (!empty($rare)) {
+    $lines[] = ['icon' => 'search', 'text' => 'Rare visitor' . (count($rare) > 1 ? 's' : '') . ' today: ' . implode(', ', $rare) . ' — worth a listen in Review.'];
+  }
+
+  // Region-rare: the location model expects almost none of these here right now
+  if (!empty(seasonal_expected_scores())) {
+    $region_rare = [];
+    $res = db_query_safe($db, "SELECT DISTINCT Sci_Name, Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl", 'story region rare');
+    while ($row = db_fetch_assoc_safe($res)) {
+      if (is_region_rare($row['Sci_Name'])) {
+        $region_rare[] = $row['Com_Name'];
+        if (count($region_rare) >= 3) {
+          break;
+        }
+      }
+    }
+    if (!empty($region_rare)) {
+      $lines[] = ['icon' => 'send', 'text' => 'Unusual for your area at this time of year: ' . implode(', ', $region_rare) . ' — a notable record if it holds up in Review.'];
+    }
+  }
+
+  // Cadence breaks: regulars (heard on 10+ of the last 14 days) that have
+  // suddenly fallen silent for 2+ days and are still absent today.
+  $cadence = [];
+  $res = db_query_safe($db, "SELECT Com_Name,
+      COUNT(DISTINCT Date) AS days_present,
+      CAST(JULIANDAY(DATE('now','localtime')) - JULIANDAY(MAX(Date)) AS INTEGER) AS gap
+    FROM detections
+    WHERE Date >= DATE('now','localtime','-14 days') AND Date < DATE('now','localtime')
+      AND Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl)
+    GROUP BY Sci_Name
+    HAVING days_present >= 10 AND gap >= 2
+    ORDER BY days_present DESC LIMIT 3", 'story cadence');
+  while ($row = db_fetch_assoc_safe($res)) {
+    $cadence[] = $row['Com_Name'] . ' (usually daily, silent for ' . $row['gap'] . ' days)';
+  }
+  if (!empty($cadence)) {
+    $lines[] = ['icon' => 'clock', 'text' => 'Breaking routine: ' . implode('; ', $cadence) . '.'];
+  }
+
+  // Volume: only speak when the baseline is meaningful AND deviation is large
+  if ($baseline >= 20) {
+    $ratio = $today_count / max(1, $baseline);
+    if ($ratio >= 1.3) {
+      $lines[] = ['icon' => 'trending-up', 'text' => 'A busy day: activity is ' . round(($ratio - 1) * 100) . '% above your two-week average for this time of day.'];
+    } elseif ($ratio <= 0.7 && (int)date('G') >= 8) {
+      $lines[] = ['icon' => 'cloud', 'text' => 'Quieter than usual: activity is ' . round((1 - $ratio) * 100) . '% below your two-week average for this time of day.'];
+    }
+  }
+
+  if (empty($lines)) {
+    if ($baseline < 5) {
+      $lines[] = ['icon' => 'home', 'text' => 'Your station is still learning what a normal day sounds like here.'];
+    } else {
+      $lines[] = ['icon' => 'home', 'text' => 'A typical day so far — steady activity, nothing unusual to report.'];
+    }
+  }
+  return $lines;
+}
+
+function get_todays_story($db) {
+  // Ten-minute buckets keep the multi-query story inexpensive while the date
+  // component guarantees that yesterday's result is never reused after midnight.
+  $story_key = birdnet_cache_key(
+    'todays_story_v2',
+    date('Y-m-d'),
+    date('G'),
+    intdiv((int)date('i'), 10),
+    filemtime(__FILE__)
+  );
+  $cached = birdnet_cache_get($story_key, 900);
+  if ($cached !== false) {
+    $decoded = json_decode($cached, true);
+    if (is_array($decoded)) {
+      return $decoded;
+    }
+  }
+
+  $lines = build_todays_story($db);
+  $encoded = json_encode($lines, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  if ($encoded !== false) {
+    birdnet_cache_put($story_key, $encoded);
+  }
+  return $lines;
+}
+
 /* ===== Crowned clips: purge protection =====
    Extracted clips live at By_Date/<date>/<species dir>/<file>; the species
    dir strips apostrophes and replaces spaces with underscores (classes.py).
