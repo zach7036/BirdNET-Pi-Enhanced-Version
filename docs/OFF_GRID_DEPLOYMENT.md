@@ -64,10 +64,11 @@ Detection stays local. The following features and status checks can contact anot
   and update while someone has local access and a rollback card.
 - Wikipedia is the default species-image provider. Select **None** under **Settings → Settings →
   Species Images** for a station that should not request images.
-- Weather is fetched from Open-Meteo by an hourly job, and the dashboard may request a refresh when
-  stored weather is stale. There is currently no weather-off switch in Settings.
-- A configured Home Assistant temperature sensor does not make weather fully local; online weather
-  remains the fallback and supplies the other conditions.
+- Weather syncing is enabled by default. Under **Settings → Settings → Location & Weather**, turn
+  off **Enable weather syncing** to stop both Open-Meteo and configured Home Assistant requests.
+  Existing weather history is kept, and turning syncing back on resumes the normal hourly process.
+- While weather syncing is enabled, a configured Home Assistant temperature sensor does not make
+  weather fully local; Open-Meteo remains the fallback and supplies the other conditions.
 - Opening **System Info** performs a public-IP lookup, and a few optional admin tools load interface
   assets from public CDNs. These do not run the detection pipeline, but they matter to a strict
   outbound-network policy.

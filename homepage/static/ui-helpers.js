@@ -107,11 +107,14 @@
         formatBytes(health.disk.free_bytes) + ' free of ' + formatBytes(health.disk.total_bytes) + ' on the BirdNET-Pi home disk.' :
         'Disk usage could not be read.';
       var lastDetection = health.last_detection_at || 'No detections';
+      var weatherSyncEnabled = weather.sync_enabled !== false;
       var weatherIsCurrent = weather.status === 'current';
-      var weatherLabel = weatherIsCurrent ? (Math.round(Number(weather.temp)) + (weather.temp_unit || '\u00b0F') + ' ' + (weather.condition || '')) : 'Missing current hour';
-      var weatherTooltip = weatherIsCurrent ?
-        'Current-hour weather from the weather sync table. This should match Live Activity. Synced row: ' + (weather.last_synced_at || 'unknown') + '.' :
-        'Current-hour weather is missing. Last synced row: ' + (weather.last_synced_at || 'none') + '.';
+      var weatherLabel = !weatherSyncEnabled ? 'Disabled' : (weatherIsCurrent ? (Math.round(Number(weather.temp)) + (weather.temp_unit || '\u00b0F') + ' ' + (weather.condition || '')) : 'Missing current hour');
+      var weatherTooltip = !weatherSyncEnabled ?
+        'Weather syncing is disabled in Settings. Existing weather history is kept.' :
+        (weatherIsCurrent ?
+          'Current-hour weather from the weather sync table. This should match Live Activity. Synced row: ' + (weather.last_synced_at || 'unknown') + '.' :
+          'Current-hour weather is missing. Last synced row: ' + (weather.last_synced_at || 'none') + '.');
 
       strip.innerHTML =
         renderHealthItem('Recording', health.services.recording.status, health.services.recording.ok ? 'active' : 'inactive', 'Current systemd status for birdnet_recording.service.') +
@@ -119,7 +122,7 @@
         renderHealthItem('Disk', diskUsed, health.disk && health.disk.used_percent !== null && health.disk.used_percent > 90 ? 'warning' : 'active', diskTooltip) +
         renderHealthItem('Database', dbSize, 'complete', 'Current size of scripts/birds.db.') +
         renderHealthItem('Last Detection', lastDetection, health.last_detection_at ? 'active' : 'warning', 'Newest detection timestamp in the database. This refreshes automatically while this page is open.') +
-        renderHealthItem('Weather', weatherLabel, weatherIsCurrent ? 'current' : 'warning', weatherTooltip);
+        renderHealthItem('Weather', weatherLabel, !weatherSyncEnabled ? 'complete' : (weatherIsCurrent ? 'current' : 'warning'), weatherTooltip);
 
       if (errorTarget) errorTarget.innerHTML = '';
       if (updatedTarget) updatedTarget.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });

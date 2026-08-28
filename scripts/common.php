@@ -122,6 +122,20 @@ function normalize_image_provider($provider) {
   return strcasecmp($provider, 'NONE') === 0 ? '' : $provider;
 }
 
+// Weather syncing is enabled by default so existing configurations that do
+// not yet contain WEATHER_ENABLED keep their current behavior. Only an
+// explicit WEATHER_ENABLED=0 stops the sync process.
+function weather_sync_enabled($config = null) {
+  if ($config === null) {
+    $config = get_config();
+  }
+  if (!is_array($config) || !array_key_exists('WEATHER_ENABLED', $config)) {
+    return true;
+  }
+
+  return trim((string)$config['WEATHER_ENABLED']) !== '0';
+}
+
 function get_config($force_reload = false) {
   $mtime = stat('/etc/birdnet/birdnet.conf')["mtime"];
   if (isset($_SESSION['my_config_version']) && $_SESSION['my_config_version'] !== $mtime) {

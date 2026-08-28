@@ -123,6 +123,11 @@ if(isset($_GET["latitude"])){
   }
 
   # Local temperature sensor (Home Assistant); values live in quotes in the conf
+  // The presence marker distinguishes an intentionally unchecked new control
+  // from a Settings form that was opened before this option existed.
+  $weather_enabled = isset($_GET['weather_enabled_present'])
+    ? (isset($_GET['weather_enabled']) ? 1 : 0)
+    : (weather_sync_enabled($config) ? 1 : 0);
   $ha_url = isset($_GET['ha_url']) ? trim(str_replace('"', '', $_GET['ha_url'])) : '';
   $ha_token = isset($_GET['ha_token']) ? trim(str_replace('"', '', $_GET['ha_token'])) : '';
   $ha_temp_entity = isset($_GET['ha_temp_entity']) ? trim(str_replace('"', '', $_GET['ha_temp_entity'])) : '';
@@ -195,6 +200,13 @@ if(isset($_GET["latitude"])){
   $contents = preg_replace("/TIME_FORMAT=.*/", "TIME_FORMAT=$time_format", $contents);
   $contents = preg_replace("/PROTECTED_RECORDINGS_PER_SPECIES=.*/", "PROTECTED_RECORDINGS_PER_SPECIES=$protected_recordings", $contents);
   $contents = preg_replace("/NUMBER_FORMAT=.*/", "NUMBER_FORMAT=$number_format_pref", $contents);
+  if (preg_match('/^WEATHER_ENABLED=.*$/m', $contents)) {
+    $contents = preg_replace('/^WEATHER_ENABLED=.*$/m', "WEATHER_ENABLED=$weather_enabled", $contents);
+  } else {
+    // Older restored configs may predate this setting; append it rather than
+    // silently leaving the checkbox unable to save.
+    $contents = rtrim($contents) . "\nWEATHER_ENABLED=$weather_enabled\n";
+  }
   $contents = preg_replace("/HA_URL=.*/", "HA_URL=\"$ha_url\"", $contents);
   $contents = preg_replace("/HA_TOKEN=.*/", "HA_TOKEN=\"$ha_token\"", $contents);
   $contents = preg_replace("/HA_TEMP_ENTITY=.*/", "HA_TEMP_ENTITY=\"$ha_temp_entity\"", $contents);
@@ -478,6 +490,12 @@ function runProcess() {
         </tr>
       </table>
       <p>Set your Latitude and Longitude to 4 decimal places. Get your coordinates <a href="https://latlong.net" target="_blank">here</a>.</p>
+      <input name="weather_enabled_present" type="hidden" value="1"/>
+      <label for="weather_enabled">
+        <input name="weather_enabled" id="weather_enabled" type="checkbox" value="1" <?php if (weather_sync_enabled($config)) echo 'checked'; ?>/>
+        Enable weather syncing
+      </label>
+      <p>Enabled by default. Turning this off stops all Open-Meteo and Home Assistant weather requests. Stored weather history is kept.</p>
       <h3>Local temperature sensor (optional)</h3>
       <table class="settingstable plaintable">
         <tr>
@@ -493,7 +511,7 @@ function runProcess() {
           <td><input name="ha_temp_entity" type="text" placeholder="sensor.backyard_temperature" value="<?php print(htmlspecialchars($config['HA_TEMP_ENTITY'] ?? '')); ?>"/></td>
         </tr>
       </table>
-      <p>Leave blank to use online weather. When set, the current hour's temperature comes from your own sensor,
+      <p>Leave blank to use online weather. When weather syncing is enabled and these fields are set, the current hour's temperature comes from your own sensor,
       and falls back to online weather automatically if the sensor is unreachable or its reading hasn't changed
       in over an hour. Create a long-lived access token in Home Assistant under your profile &rarr; Security.</p>
       </td></tr></table><br>
@@ -654,7 +672,7 @@ https://discordapp.com/api/webhooks/{WebhookID}/{WebhookToken}
             <?php } ?>
           </select>
         </li>
-        <li><strong>Outbound connections:</strong> BirdWeather, Apprise, and heartbeat uploads require configuration; weather and the default Wikipedia image provider do make outbound requests.</li>
+        <li><strong>Outbound connections:</strong> BirdWeather, Apprise, and heartbeat uploads require configuration; weather (while syncing is enabled) and the default Wikipedia image provider do make outbound requests.</li>
       </ul>
       </td></tr></table><br>
       <table class="settingstable"><tr><td>

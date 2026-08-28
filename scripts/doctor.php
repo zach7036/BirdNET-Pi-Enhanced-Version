@@ -16,6 +16,11 @@ $user = get_user();
 
 if (isset($_GET['sync_weather']) && $_GET['sync_weather'] == 'true') {
   ensure_authenticated('You must be authenticated to sync weather.');
+  if (!weather_sync_enabled($config)) {
+    http_response_code(409);
+    echo "DISABLED\nWeather syncing is disabled in Settings. No sync was started.";
+    die();
+  }
   $python = $home . '/BirdNET-Pi/birdnet/bin/python3';
   $script = $home . '/BirdNET-Pi/scripts/utils/weather.py';
   if (!is_readable($script)) {
@@ -69,7 +74,7 @@ if (isset($_GET['support_bundle']) && $_GET['support_bundle'] == 'true') {
       <a class="ui-button-link" href="index.php?submit=<?php echo rawurlencode('sudo systemctl restart birdnet_analysis.service'); ?>">Restart analysis</a>
       <a class="ui-button-link" href="index.php?submit=<?php echo rawurlencode('sudo systemctl restart icecast2.service && sudo systemctl restart livestream.service'); ?>">Restart livestream</a>
       <a class="ui-button-link" href="index.php?submit=<?php echo rawurlencode('restart_services.sh'); ?>">Restart core services</a>
-      <button type="button" class="ui-button-link" id="syncWeatherBtn">Sync weather now</button>
+      <button type="button" class="ui-button-link" id="syncWeatherBtn" <?php if (!weather_sync_enabled($config)) echo 'disabled title="Weather syncing is disabled in Settings."'; ?>><?php echo weather_sync_enabled($config) ? 'Sync weather now' : 'Weather sync disabled'; ?></button>
       <button type="button" class="ui-button-link" id="supportBundleBtn">Support bundle</button>
     </div>
     <div id="doctorActionOutput"></div>

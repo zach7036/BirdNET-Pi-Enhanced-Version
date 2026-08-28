@@ -26,6 +26,14 @@ PAST_DAYS = 7
 HA_MAX_AGE_SECONDS = 3600
 HA_TIMEOUT_SECONDS = 10
 
+
+def weather_sync_enabled(conf):
+    """Return False only for an explicit WEATHER_ENABLED=0 setting."""
+    if 'WEATHER_ENABLED' not in conf:
+        return True
+    return str(conf.get('WEATHER_ENABLED', '')).strip() != '0'
+
+
 def fetch_hourly(lat, lon):
     url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
            "&hourly=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m"
@@ -156,6 +164,10 @@ def ensure_weather_schema():
 
 def update_weather():
     conf = get_settings()
+    if not weather_sync_enabled(conf):
+        log.info("Weather syncing is disabled in Settings.")
+        return
+
     lat = conf.get('LATITUDE', None)
     lon = conf.get('LONGITUDE', None)
 

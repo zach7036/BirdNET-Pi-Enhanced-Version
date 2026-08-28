@@ -38,6 +38,10 @@ SITE_NAME="$HOSTNAME"
 LATITUDE=$LATITUDE
 LONGITUDE=$LONGITUDE
 
+## Master switch for Open-Meteo and optional Home Assistant weather syncing.
+## 1 keeps weather syncing enabled (the default); 0 disables all weather sync.
+WEATHER_ENABLED=1
+
 #--------------------------------- Model --------------------------------------#
 #_____________The variable below configures which BirdNET model is_____________#
 #______________________used for detecting bird audio.__________________________#

@@ -198,7 +198,7 @@ if(isset($_GET['ajax_chart_data']) && $_GET['ajax_chart_data'] == "true") {
   $today = date('Y-m-d');
   $currentHour = (int)date('G');
   $weather = get_overview_weather($db, $today);
-  if ((empty($weather) || !isset($weather[$currentHour])) && !weather_sync_cooldown_active()) {
+  if (weather_sync_enabled($config) && (empty($weather) || !isset($weather[$currentHour])) && !weather_sync_cooldown_active()) {
       $db->close();
       sync_overview_weather($home, get_user());
       $db = new SQLite3('./scripts/birds.db', SQLITE3_OPEN_READONLY);

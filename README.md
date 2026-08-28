@@ -185,7 +185,9 @@ frequency shift are adjustable, and there's a fullscreen kiosk mode.
 Hourly weather from [Open-Meteo](https://open-meteo.com/) is recorded alongside your detections
 and appears wherever activity does — species charts, the timeline, the dashboard hero, and a
 dedicated analysis page. **No API key and no plugin**: it starts automatically once your
-coordinates are set, syncs hourly, and backfills up to seven days after an outage.
+coordinates are set, syncs hourly, and backfills up to seven days after an outage. Weather syncing
+is enabled by default and can be turned off under **Settings → Location & Weather** without removing
+weather history already stored by the station.
 
 If you run [Home Assistant](https://www.home-assistant.io/), you can point the station at a
 temperature entity and it will use your own garden reading instead of the regional forecast,
@@ -446,7 +448,7 @@ BirdNET-Pi records audio around your home, so review its privacy controls for yo
 
 - **Human-voice filtering** — checks at least the top 10 predictions even at the default threshold `0`; raising the Advanced Settings threshold checks more predictions, and a detection near predicted speech is discarded rather than saved
 - **Only short clips are normally kept** — during normal detection processing, full analysis segments are deleted after successful reporting; extracted clips remain
-- **Uploads are opt-in** — BirdWeather, Apprise, and heartbeat integrations require configuration; weather and the default Wikipedia image provider do make outbound requests
+- **Uploads are opt-in** — BirdWeather, Apprise, and heartbeat integrations require configuration; weather (while syncing is enabled) and the default Wikipedia image provider do make outbound requests
 
 ## Contributing and support
 

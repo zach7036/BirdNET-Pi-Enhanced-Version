@@ -18,6 +18,7 @@ $dawn_chorus = []; $hourly_labels_json = '[]'; $hourly_values_json = '[]'; $peak
 $nocturnal = []; $activity_windows = []; $new_arrivals = []; $gone_quiet = []; $yoy_comparison = []; $seasonal_top = [];
 $monthly_stats = []; $month_labels = '[]'; $month_div = '[]'; $month_det = '[]'; $shannon_index = 0; $diversity_score_text = 'N/A'; $yoy_diversity_diff = 0;
 $temp_brackets = []; $condition_impact = []; $species_ideal = []; $temp_trend_labels = '[]'; $temp_trend_temps = '[]'; $temp_trend_dets = '[]'; $has_weather = false;
+$weather_sync_on = weather_sync_enabled();
 $confidence_trend = []; $conf_labels_json = '[]'; $conf_values_json = '[]'; $overall_avg_conf = 0; $phantom_species = []; $burst_days = []; $silent_days = [];
 $high_conf_count = 0; $med_conf_count = 0; $low_conf_count = 0; $expected_today = []; $peak_species = [];
 // Peak weeks come from SQLite's %W (weeks from the first Monday, 00-based);
@@ -197,7 +198,7 @@ $reports_mtime = @filemtime(__ROOT__ . '/scripts/reports.php');
 $insights_cache_key = birdnet_cache_key(
     'insights', $subview, $seasonal_species_offset, $migration_list_limit,
     $report_type, $report_date, $reports_mtime,
-    date('Y-m-d'), date('G'), detections_watermark(), filemtime(__FILE__)
+    date('Y-m-d'), date('G'), $weather_sync_on ? 1 : 0, detections_watermark(), filemtime(__FILE__)
 );
 $insights_cached = birdnet_cache_get($insights_cache_key);
 if ($insights_cached !== false) {
@@ -662,7 +663,9 @@ if ($subview == 'dashboard') {
     }
 } elseif ($subview == 'environmental') {
     if (!$has_weather) {
-        $takeaways[] = 'No weather data yet — the station syncs hourly from Open-Meteo once it has internet access.';
+        $takeaways[] = $weather_sync_on
+            ? 'No weather data yet — the station syncs hourly from Open-Meteo once it has internet access.'
+            : 'Weather syncing is disabled in Settings. Existing weather history is preserved.';
     } else {
         $best_bracket = null;
         foreach ((array)$temp_brackets as $tb) {
@@ -1385,8 +1388,13 @@ $db->close();
         <div style="text-align: center; padding: 100px 20px; color: var(--text-muted);">
             <div style="font-size: 4em; margin-bottom: 20px;">🌤️</div>
             <h2>No weather data yet</h2>
+            <?php if ($weather_sync_on): ?>
             <p>Weather syncs automatically every hour once your station's latitude and longitude are set in <a href="?view=Settings">Settings</a>.</p>
             <p style="font-size: 0.9em;">First data usually appears within the hour &mdash; <a href="?view=Doctor">Station Doctor</a> shows the sync status. Correlations get more interesting after a few days of history.</p>
+            <?php else: ?>
+            <p>Weather syncing is disabled in <a href="?view=Settings#settings-weather">Settings</a>. Turn it on there to begin collecting weather data.</p>
+            <p style="font-size: 0.9em;">Disabling weather does not remove any weather history already stored by the station.</p>
+            <?php endif; ?>
         </div>
     <?php else: ?>
     <!-- ====== PHASE 4: Weather Correlations ====== -->

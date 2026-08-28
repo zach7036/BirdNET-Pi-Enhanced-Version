@@ -85,9 +85,10 @@ function api_open_rw_db() {
 }
 
 function api_current_weather($db) {
+  $sync_enabled = weather_sync_enabled();
   $has_weather = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'api current weather table') > 0;
   if (!$has_weather) {
-    return ['status' => 'missing', 'message' => 'Weather table has not been created yet.'];
+    return ['status' => 'missing', 'sync_enabled' => $sync_enabled, 'message' => 'Weather table has not been created yet.'];
   }
 
   $has_is_day = false;
@@ -109,6 +110,7 @@ function api_current_weather($db) {
   if (!$current) {
     return [
       'status' => 'missing',
+      'sync_enabled' => $sync_enabled,
       'today_rows' => (int)$today_rows,
       'last_synced_at' => $latest ? $latest['Date'] . ' ' . sprintf('%02d:00', (int)$latest['Hour']) : null,
       'message' => 'Current-hour weather is missing.'
@@ -118,6 +120,7 @@ function api_current_weather($db) {
   $code = (int)$current['ConditionCode'];
   return [
     'status' => 'current',
+    'sync_enabled' => $sync_enabled,
     'date' => $current['Date'],
     'hour' => (int)$current['Hour'],
     'temp' => display_temp($current['Temp']),
@@ -1314,17 +1317,22 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'action' => $det_status === 'ok' ? null : 'Quiet periods are normal at night; if this persists in daytime, check the microphone and services.'
   ];
 
-  $has_weather_table = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'doctor weather table') > 0;
-  $weather_status = 'warn';
-  $weather_message = 'Weather table has not been created yet.';
-  if ($has_weather_table) {
-    $latest_weather = db_query_one_safe($db, 'SELECT Date, Hour FROM weather WHERE Temp IS NOT NULL ORDER BY Date DESC, Hour DESC LIMIT 1', 'doctor weather');
-    if ($latest_weather) {
-      $weather_age = round((time() - strtotime($latest_weather['Date'] . ' ' . sprintf('%02d:00', (int)$latest_weather['Hour']))) / 3600, 1);
-      $weather_status = $weather_age <= 3 ? 'ok' : 'warn';
-      $weather_message = 'Latest weather data is ' . $weather_age . 'h old.';
-    } else {
-      $weather_message = 'No weather rows synced yet.';
+  $weather_enabled = weather_sync_enabled($config);
+  $weather_status = 'ok';
+  $weather_message = 'Weather syncing is disabled in Settings. Existing weather history is still available.';
+  if ($weather_enabled) {
+    $has_weather_table = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'doctor weather table') > 0;
+    $weather_status = 'warn';
+    $weather_message = 'Weather table has not been created yet.';
+    if ($has_weather_table) {
+      $latest_weather = db_query_one_safe($db, 'SELECT Date, Hour FROM weather WHERE Temp IS NOT NULL ORDER BY Date DESC, Hour DESC LIMIT 1', 'doctor weather');
+      if ($latest_weather) {
+        $weather_age = round((time() - strtotime($latest_weather['Date'] . ' ' . sprintf('%02d:00', (int)$latest_weather['Hour']))) / 3600, 1);
+        $weather_status = $weather_age <= 3 ? 'ok' : 'warn';
+        $weather_message = 'Latest weather data is ' . $weather_age . 'h old.';
+      } else {
+        $weather_message = 'No weather rows synced yet.';
+      }
     }
   }
   $checks[] = [
@@ -1332,7 +1340,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'label' => 'Weather sync',
     'status' => $weather_status,
     'message' => $weather_message,
-    'action' => $weather_status === 'ok' ? null : 'Weather syncs hourly; check internet connectivity if it stays stale.'
+    'action' => !$weather_enabled || $weather_status === 'ok' ? null : 'Weather syncs hourly; check internet connectivity if it stays stale.'
   ];
 
   // Local temperature sensor (only checked when configured): a live probe
@@ -1341,7 +1349,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   $ha_url = rtrim(trim((string)($config['HA_URL'] ?? '')), '/');
   $ha_token = trim((string)($config['HA_TOKEN'] ?? ''));
   $ha_entity = trim((string)($config['HA_TEMP_ENTITY'] ?? ''));
-  if ($ha_url !== '' && $ha_token !== '' && $ha_entity !== '') {
+  if ($weather_enabled && $ha_url !== '' && $ha_token !== '' && $ha_entity !== '') {
     $ha_status = 'warn';
     $ha_message = 'Sensor could not be reached; the current hour uses online weather.';
     $ctx = stream_context_create(['http' => [
