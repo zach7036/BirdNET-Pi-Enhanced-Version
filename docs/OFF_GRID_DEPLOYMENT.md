@@ -118,7 +118,7 @@ Continuous identification has to keep the microphone and inference process awake
 confidence threshold can reduce stored clips and notifications, but it does not stop the model from
 analyzing the audio, so it is not a major CPU-power control.
 
-Raspberry Pi OS Lite and avoiding unnecessary live views are the safest savings. Under **Tools →
+Raspberry Pi OS Lite and avoiding unnecessary live views are the safest savings. Under **Settings →
 Services**, you may disable features you do not use, such as Live Audio Stream, Web Terminal,
 BirdNET Log, Streamlit Statistics, Chart Viewer, and Spectrogram Viewer. Disabling a viewer makes
 that viewer unavailable; it does not disable recording or analysis. BirdNET-Pi will preserve an
