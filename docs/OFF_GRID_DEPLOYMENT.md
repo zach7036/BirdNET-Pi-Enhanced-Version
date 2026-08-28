@@ -5,51 +5,43 @@ connection after installation. An off-grid station still needs a dependable plan
 timekeeping, storage, power, environmental protection, maintenance, and recovery. This guide applies
 to any installation that will operate with limited, intermittent, or no internet access.
 
-## Quick guide
+## Basic setup — enough for most people
 
-Use this checklist when you need the short version. Complete it on the exact Pi, microphone, storage,
-power system, and network equipment that will be deployed.
+If the station will remain reasonably accessible and brief downtime would be manageable, these five
+steps are generally enough:
 
-1. **Prepare while online.** Install BirdNET-Pi and all intended updates using the supported 64-bit
-   Raspberry Pi OS release. Set the station coordinates, timezone, a non-blank BirdNET-Pi admin
-   password, and a strong Raspberry Pi/SSH password.
-2. **Plan local access.** Save and test every Wi-Fi network the station may use, including an optional
-   phone hotspot or local-router recovery network. Keep Ethernet or a keyboard and display available
-   when practical. Never expose the dashboard directly to the internet or forward port 80 to the Pi.
-3. **Choose outbound features.** Weather syncing and Wikipedia bird images are enabled by default.
-   To reduce routine outbound requests, turn off **Enable weather syncing**
-   under **Settings → Location & Weather** and select **None** under **Species Images**.
-   Leave BirdWeather, Apprise, and heartbeat settings blank unless you intend to use and have tested
-   them; leave automatic updates off for an unattended station.
-4. **Verify the complete bird-detection path.** Confirm that the station records new audio, analyzes
-   it, writes the detection to the database, extracts a playable clip, and creates a spectrogram.
-5. **Prepare power and storage.** Use high-endurance storage, choose and test the desired disk policy,
-   measure the complete station's real power draw, provide regulated power with adequate reserve,
-   and protect the equipment without blocking the microphone or trapping heat.
-6. **Create a real recovery path.** Make and test a full SD-card image, keep it off the station, and
-   preferably keep a second imaged card available. Keep a separate BirdNET-Pi application backup for
-   data.
-7. **Test the failure modes.** Disconnect the internet, remove the primary Wi-Fi network, reboot, and
-   perform a fully offline cold start. Verify local access, timestamps, recording, analysis, and
-   recovery. Test abrupt power loss and disk cleanup only on a cloned or disposable card.
-8. **Add optional resilience only after testing.** Depending on the site, consider a recovery hotspot,
-   a real-time clock or backup battery, disabling unneeded optional services, or a hardware watchdog.
-   Test each one on a clone before relying on it.
-9. **Review privacy and site rules.** The human-voice filter cannot guarantee removal of all speech.
-   BirdWeather can upload full analyzed audio plus timestamps, species, confidence, and coordinates,
-   so confirm consent, recording laws, and wildlife-location sensitivity before enabling it.
+1. **Prepare while online.** Install BirdNET-Pi and any intended updates using the supported 64-bit
+   Raspberry Pi OS release.
+2. **Configure the essentials.** Set the station coordinates and timezone, choose a non-blank
+   BirdNET-Pi admin password, and use a strong Raspberry Pi/SSH password. Do not expose the dashboard
+   directly to the internet or forward port 80 to the Pi.
+3. **Confirm that it works.** Make sure the station records and identifies a new bird, then verify
+   that its clip plays and its spectrogram appears in the dashboard.
+4. **Provide suitable hardware.** Use a dependable regulated power source, enough storage for the
+   expected deployment, and basic protection from the site's weather without blocking the
+   microphone or trapping heat.
+5. **Keep a simple recovery option.** Save any Wi-Fi network the station will use, know how you would
+   reach or restart the Pi locally, and keep at least one recent BirdNET-Pi data backup somewhere
+   other than the station.
 
-If the station passes those checks, the normal detection pipeline can continue locally even when
-weather, image, update-status, or other optional internet requests fail.
+For most accessible off-grid installations, that is enough. Weather and Wikipedia images can remain
+enabled; if the internet disappears, those optional features may become stale or unavailable, but
+local recording and identification continue. You do not need to add a recovery hotspot, hardware
+watchdog, real-time clock, spare SD card, or strict no-network configuration unless your particular
+deployment calls for one.
 
-## Detailed guide
+## Detailed planning — optional
 
-The sections below explain each decision and its tradeoffs. They deliberately keep risky behavior
-out of the BirdNET-Pi installer: the guide does not automatically enable a hotspot, hardware
-watchdog, scheduled reboot, or different model, and installing an update does not change the
-existing defaults described below.
+The remaining sections are a reference for stations that will be unattended for long periods,
+difficult or expensive to revisit, exposed to harsh conditions, limited by power or bandwidth, or
+used where data loss has serious consequences. Use only the sections that apply to your deployment;
+this is not a checklist that every user must complete.
 
-### Before deployment
+The guide deliberately keeps risky behavior out of the BirdNET-Pi installer: it does not
+automatically enable a hotspot, hardware watchdog, scheduled reboot, or different model, and
+installing an update does not change the existing defaults described below.
+
+### Additional preparation
 
 1. Use the supported 64-bit Raspberry Pi OS release and finish all installation and updates while
    you still have dependable internet access.
