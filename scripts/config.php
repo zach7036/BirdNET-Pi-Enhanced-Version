@@ -220,7 +220,7 @@ if(isset($_GET["latitude"])){
       window.parent.document.location.reload();
     }, 1000);</script>";
 
-    shell_exec("sudo systemctl restart chart_viewer.service");
+    shell_exec("sudo systemctl is-enabled --quiet chart_viewer.service && sudo systemctl restart chart_viewer.service");
     // the sleep allows for the service to restart and image to be generated
     sleep(5);
   }
@@ -638,13 +638,13 @@ https://discordapp.com/api/webhooks/{WebhookID}/{WebhookToken}
       <ul style="text-align:left; line-height:1.6;">
         <li><strong>Human-voice filtering:</strong> when the AI hears human speech near a detection, that detection is discarded instead of being saved
           <?php if (isset($config['PRIVACY_THRESHOLD'])) { ?>
-            &mdash; currently <?php echo (int)$config['PRIVACY_THRESHOLD'] > 0 ? 'enabled at threshold <strong>' . h($config['PRIVACY_THRESHOLD']) . '</strong>' : '<strong>disabled</strong> (threshold 0)'; ?>.
+            &mdash; currently <?php echo (int)$config['PRIVACY_THRESHOLD'] > 0 ? 'enabled at threshold <strong>' . h($config['PRIVACY_THRESHOLD']) . '</strong>' : 'using the built-in minimum (top 10 predictions)'; ?>.
             Adjust it under <a href="?view=Advanced">Advanced Settings</a>.
           <?php } else { ?>
             (configure under <a href="?view=Advanced">Advanced Settings</a>).
           <?php } ?>
         </li>
-        <li><strong>Only short clips are kept:</strong> full-length recordings are deleted after analysis; only the extracted detection clips remain, and old clips are purged automatically when disk space runs low.</li>
+        <li><strong>Only short clips are normally kept:</strong> during normal detection processing, full analysis segments are deleted after successful reporting; extracted clips remain, and the default Purge disk policy removes old clips when disk space runs low.</li>
         <li><strong>Best recordings are never purged:</strong> each species' highest-confidence clips survive cleanup, and when a higher-scoring clip arrives it takes over protection automatically. Clips you pin on a bird's page are always kept.
           <label for="protected_recordings_per_species" style="margin-left:6px">Keep per species:</label>
           <select name="protected_recordings_per_species" class="testbtn">
@@ -654,7 +654,7 @@ https://discordapp.com/api/webhooks/{WebhookID}/{WebhookToken}
             <?php } ?>
           </select>
         </li>
-        <li><strong>Local by default:</strong> nothing leaves your network unless you enable an integration (BirdWeather, Apprise, weather sync, species images).</li>
+        <li><strong>Outbound connections:</strong> BirdWeather, Apprise, and heartbeat uploads require configuration; weather and the default Wikipedia image provider do make outbound requests.</li>
       </ul>
       </td></tr></table><br>
       <table class="settingstable"><tr><td>

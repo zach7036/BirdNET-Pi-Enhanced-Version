@@ -258,7 +258,8 @@ CHANNELS=2
 ## setting is an effort to introduce privacy into the data collection.
 ## The PRIVACY_THRESHOLD value represents a percentage of the entire species
 ## list used during analysis. If a human sound is predicted anywhere within
-## the precentile set below, no data is collected for that audio chunk.
+## the percentile set below, no data is collected for that audio chunk. A value
+## of 0 still uses the built-in minimum of the top 10 predictions.
 ## Valid range: 0-3
 
 PRIVACY_THRESHOLD=0

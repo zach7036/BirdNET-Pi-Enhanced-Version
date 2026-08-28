@@ -117,6 +117,11 @@ function set_timezone() {
   date_default_timezone_set($_SESSION['my_timezone']);
 }
 
+function normalize_image_provider($provider) {
+  $provider = trim((string)$provider);
+  return strcasecmp($provider, 'NONE') === 0 ? '' : $provider;
+}
+
 function get_config($force_reload = false) {
   $mtime = stat('/etc/birdnet/birdnet.conf')["mtime"];
   if (isset($_SESSION['my_config_version']) && $_SESSION['my_config_version'] !== $mtime) {
@@ -131,6 +136,12 @@ function get_config($force_reload = false) {
       syslog(LOG_ERR, "Cannot parse config");
     }
     $_SESSION['my_config_version'] = $mtime;
+  }
+  if (isset($_SESSION['my_config'])) {
+    // Older/manual configurations sometimes use the literal word NONE.
+    // Normalize cached configurations too, so every existing empty() check
+    // disables image lookups immediately after an update.
+    $_SESSION['my_config']['IMAGE_PROVIDER'] = normalize_image_provider($_SESSION['my_config']['IMAGE_PROVIDER'] ?? '');
   }
   return $_SESSION['my_config'];
 }
@@ -448,12 +459,13 @@ class ImageProvider {
 // (IMAGE_PROVIDER unset or "None"): callers must skip lookups entirely - the
 // Settings privacy text promises no outbound image requests in that state.
 function make_image_provider($config) {
-  if (empty($config['IMAGE_PROVIDER'])) {
+  $provider = normalize_image_provider($config['IMAGE_PROVIDER'] ?? '');
+  if (empty($provider)) {
     return [null, null];
   }
   $flickr = new Flickr();
   $wikipedia = new Wikipedia();
-  return strtoupper($config['IMAGE_PROVIDER']) === 'FLICKR'
+  return strtoupper($provider) === 'FLICKR'
       ? [$flickr, $wikipedia]
       : [$wikipedia, $flickr];
 }

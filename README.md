@@ -82,6 +82,7 @@ earlier on warm mornings, and is 87% actually good enough to trust?
 - [Migrating from another fork](#migrating-from-another-fork)
 - [REST API](#rest-api)
 - [Troubleshooting](#troubleshooting)
+- [Off-grid deployment](#off-grid-deployment)
 - [Privacy](#privacy)
 - [Contributing and support](#contributing-and-support)
 - [Credits](#credits)
@@ -430,13 +431,22 @@ opening anything new. Use an **issue** for problems and a
 questions. When reporting a problem, include your Pi model, OS version, whether you installed
 fresh or migrated, and the relevant log output.
 
+## Off-grid deployment
+
+BirdNET-Pi can keep recording, identifying birds, and serving its local dashboard without the
+internet, but a remote station needs its network, clock, power, storage, and recovery plan tested
+before it is left unattended.
+
+📖 **[Off-grid deployment guide](docs/OFF_GRID_DEPLOYMENT.md)** — Wi-Fi recovery, offline traffic,
+power and storage planning, watchdog limits, RTC options, privacy, and model limitations.
+
 ## Privacy
 
-BirdNET-Pi records audio around your home, so it ships with protections on by default:
+BirdNET-Pi records audio around your home, so review its privacy controls for your installation:
 
-- **Human-voice filtering** — when the model hears speech near a detection, that detection is discarded rather than saved
-- **Only short clips are kept** — full recordings are deleted after analysis; only extracted detection clips remain
-- **Local by default** — nothing leaves your network unless you enable an integration (BirdWeather, Apprise, weather sync, species images)
+- **Human-voice filtering** — checks at least the top 10 predictions even at the default threshold `0`; raising the Advanced Settings threshold checks more predictions, and a detection near predicted speech is discarded rather than saved
+- **Only short clips are normally kept** — during normal detection processing, full analysis segments are deleted after successful reporting; extracted clips remain
+- **Uploads are opt-in** — BirdWeather, Apprise, and heartbeat integrations require configuration; weather and the default Wikipedia image provider do make outbound requests
 
 ## Contributing and support
 

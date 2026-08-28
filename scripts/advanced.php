@@ -276,7 +276,7 @@ if (isset($_GET["max_files_species"])) {
   }
   shell_exec("sudo restart_services.sh");
   if ($restart_livestream) {
-    exec("sudo systemctl restart livestream.service");
+    exec("sudo systemctl is-enabled --quiet livestream.service && sudo systemctl restart livestream.service");
   }
 }
 

@@ -7,7 +7,10 @@ require_once "scripts/common.php";
 $user = get_user();
 $home = get_home();
 
-$fetch = shell_exec("sudo -u".$user." git -C ".$home."/BirdNET-Pi fetch 2>&1");
+$num_commits_behind = $_SESSION['behind'] ?? '0';
+// This is only a status refresh. A slow or unavailable network must not leave
+// the System Controls page waiting on Git's much longer connection timeout.
+$fetch = shell_exec("sudo -n -u".$user." /usr/bin/timeout --kill-after=2s 15s git -C ".$home."/BirdNET-Pi fetch 2>&1");
 $str = trim(shell_exec("sudo -u".$user." git -C ".$home."/BirdNET-Pi status"));
 if (preg_match("/behind '.*?' by (\d+) commit(s?)\b/", $str, $matches)) {
   $num_commits_behind = $matches[1];

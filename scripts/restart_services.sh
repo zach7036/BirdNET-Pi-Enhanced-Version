@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restarts ALL services and removes ALL unprocessed audio
+# Restarts core services and any optional services the user left enabled.
 source /etc/birdnet/birdnet.conf
 set -x
 my_dir=$HOME/BirdNET-Pi/scripts
@@ -15,8 +15,19 @@ services=(chart_viewer.service
   birdnet_log.service
   birdnet_stats.service)
 
-for i in  "${services[@]}";do
-  sudo systemctl restart "${i}"
+for i in "${services[@]}"; do
+  case "${i}" in
+    birdnet_recording.service|birdnet_analysis.service)
+      sudo systemctl restart "${i}"
+      ;;
+    *)
+      # Optional services that a user disabled must stay disabled. Enabled
+      # services are still restarted after backup/restore temporarily stops them.
+      if sudo systemctl is-enabled --quiet "${i}"; then
+        sudo systemctl restart "${i}"
+      fi
+      ;;
+  esac
 done
 
 # Restarting icecast2 above severs ffmpeg's source connection, and ffmpeg can

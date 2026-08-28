@@ -20,9 +20,12 @@ if(isset($_GET['view']) && $_GET['view'] == "Species" && (isset($_GET['ajax_spec
 
 $restore = "cat $home/BirdSongs/restore.log";
 
-if(is_authenticated() && (!isset($_SESSION['behind']) || !isset($_SESSION['behind_time']) || time() > $_SESSION['behind_time'] + 86400)) {
+if(is_authenticated()
+    && (!isset($_GET['view']) || $_GET['view'] !== 'System Controls')
+    && (!isset($_SESSION['behind']) || !isset($_SESSION['behind_time']) || time() > $_SESSION['behind_time'] + 86400)) {
   $num_commits_behind = '0';
-  shell_exec("sudo -u".$user." git -C ".$home."/BirdNET-Pi fetch > /dev/null 2>/dev/null &");
+  // Keep the daily status check from lingering indefinitely on offline stations.
+  shell_exec("sudo -n -u".$user." /usr/bin/timeout --kill-after=2s 15s git -C ".$home."/BirdNET-Pi fetch > /dev/null 2>/dev/null &");
   $str = trim(shell_exec("sudo -u".$user." git -C ".$home."/BirdNET-Pi status"));
   if (preg_match("/behind '.*?' by (\d+) commit(s?)\b/", $str, $matches)) {
     $num_commits_behind = $matches[1];
