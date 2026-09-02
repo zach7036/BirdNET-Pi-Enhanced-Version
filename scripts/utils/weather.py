@@ -26,6 +26,27 @@ PAST_DAYS = 7
 HA_MAX_AGE_SECONDS = 3600
 HA_TIMEOUT_SECONDS = 10
 
+# HA's weather.* domain entities (WeatherFlow/Tempest, Ecowitt, AccuWeather,
+# etc.) report `state` as one of a small fixed set of condition strings
+# rather than a WMO code. Map the ones with an unambiguous WMO equivalent;
+# anything else (e.g. "windy", "exceptional") is left unmapped on purpose so
+# fetch_ha_weather() falls back to Open-Meteo's condition for that hour
+# instead of guessing.
+HA_CONDITION_TO_WMO_CODE = {
+    'clear-night': 0,
+    'sunny': 0,
+    'partlycloudy': 2,
+    'cloudy': 3,
+    'fog': 45,
+    'rainy': 61,
+    'pouring': 65,
+    'snowy': 71,
+    'snowy-rainy': 71,
+    'lightning': 95,
+    'lightning-rainy': 95,
+    'hail': 99,
+}
+
 
 def weather_sync_enabled(conf):
     """Return False only for an explicit WEATHER_ENABLED=0 setting."""
@@ -118,6 +139,106 @@ def fetch_ha_temperature(conf):
     return temp_f
 
 
+def fetch_ha_is_day(conf):
+    """1/0 from Home Assistant's sun.sun entity, or None to use the online value.
+
+    Only called when HA_WEATHER_ENTITY is configured - sun.sun is a stock
+    entity present on every HA install, so no separate config knob for it.
+    """
+    url = (conf.get('HA_URL') or '').strip().rstrip('/')
+    token = (conf.get('HA_TOKEN') or '').strip()
+    if not url or not token:
+        return None
+
+    try:
+        response = requests.get(
+            f"{url}/api/states/sun.sun",
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=HA_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        state = response.json().get('state')
+    except Exception as e:
+        log.warning(f"sun.sun unreachable ({e}); using online day/night.")
+        return None
+
+    if state == 'above_horizon':
+        return 1
+    if state == 'below_horizon':
+        return 0
+    return None
+
+
+def fetch_ha_weather(conf):
+    """Wind speed/direction, sky condition, and day/night from a Home
+    Assistant weather.* entity (HA_WEATHER_ENTITY), as a dict containing only
+    the keys read successfully - an empty dict means "use Open-Meteo for
+    everything this function covers".
+
+    These fields are independent of each other and of HA_TEMP_ENTITY, so a
+    partial result (e.g. wind but no condition_code, because the condition
+    string had no WMO mapping) is normal, not an error.
+    """
+    url = (conf.get('HA_URL') or '').strip().rstrip('/')
+    token = (conf.get('HA_TOKEN') or '').strip()
+    entity = (conf.get('HA_WEATHER_ENTITY') or '').strip()
+    if not url or not token or not entity:
+        return {}
+
+    try:
+        response = requests.get(
+            f"{url}/api/states/{entity}",
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=HA_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        state = response.json()
+    except Exception as e:
+        log.warning(f"Local weather entity {entity} unreachable ({e}); using online weather.")
+        return {}
+
+    # weather.* entities update their numeric attributes far more often than
+    # their condition (`state`) string changes, so staleness has to be judged
+    # against last_updated - last_changed only moves when the condition
+    # itself flips and can otherwise sit unchanged for hours on a clear day.
+    last_updated = state.get('last_updated') or ''
+    try:
+        updated_at = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+        age = (datetime.now(updated_at.tzinfo) - updated_at).total_seconds()
+    except ValueError:
+        log.warning(f"Local weather entity {entity} has unparseable last_updated {last_updated!r}; using online weather.")
+        return {}
+    if age > HA_MAX_AGE_SECONDS:
+        log.warning(f"Local weather entity {entity} unchanged for {int(age // 60)} min; using online weather.")
+        return {}
+
+    attrs = state.get('attributes') or {}
+    result = {}
+
+    wind_speed = attrs.get('wind_speed')
+    if isinstance(wind_speed, (int, float)):
+        result['WindSpeed'] = wind_speed
+
+    wind_bearing = attrs.get('wind_bearing')
+    if isinstance(wind_bearing, (int, float)):
+        result['WindDirection'] = wind_bearing
+
+    condition = state.get('state')
+    code = HA_CONDITION_TO_WMO_CODE.get(condition)
+    if code is not None:
+        result['ConditionCode'] = code
+    elif condition not in (None, 'unavailable', 'unknown'):
+        log.info(f"Local weather entity {entity} condition {condition!r} has no WMO mapping; keeping online condition.")
+
+    is_day = fetch_ha_is_day(conf)
+    if is_day is not None:
+        result['IsDay'] = is_day
+
+    if result:
+        log.info(f"Local weather entity {entity}: {result} (updated {int(age)}s ago).")
+    return result
+
+
 def ensure_weather_schema():
     """Create/upgrade the weather table.
 
@@ -183,6 +304,7 @@ def update_weather():
         return
 
     local_temp = fetch_ha_temperature(conf)
+    local_weather = fetch_ha_weather(conf)
 
     # Parse data
     times = data['hourly']['time']
@@ -208,13 +330,19 @@ def update_weather():
             cur.execute("INSERT OR REPLACE INTO weather (Date, Hour, Temp, ConditionCode, IsDay, WindSpeed, WindDirection) VALUES (?, ?, ?, ?, ?, ?, ?)",
                         (date_str, hour, temp, code, is_day, wind, direction))
                         
-        # The local sensor wins the current hour when healthy; every other
-        # hour (and every fallback case) keeps the online value.
+        # The local sensor/entity wins the current hour when healthy; every
+        # other hour (and every fallback case) keeps the online value.
+        now = datetime.now()
         if local_temp is not None:
-            now = datetime.now()
             cur.execute("UPDATE weather SET Temp = ? WHERE Date = ? AND Hour = ?",
                         (local_temp, now.strftime('%Y-%m-%d'), now.hour))
             log.info(f"Current hour temperature set from local sensor: {local_temp}°F.")
+
+        if local_weather:
+            set_clause = ', '.join(f"{column} = ?" for column in local_weather)
+            params = list(local_weather.values()) + [now.strftime('%Y-%m-%d'), now.hour]
+            cur.execute(f"UPDATE weather SET {set_clause} WHERE Date = ? AND Hour = ?", params)
+            log.info(f"Current hour {list(local_weather.keys())} set from local weather entity.")
 
         con.commit()
         con.close()

@@ -131,6 +131,7 @@ if(isset($_GET["latitude"])){
   $ha_url = isset($_GET['ha_url']) ? trim(str_replace('"', '', $_GET['ha_url'])) : '';
   $ha_token = isset($_GET['ha_token']) ? trim(str_replace('"', '', $_GET['ha_token'])) : '';
   $ha_temp_entity = isset($_GET['ha_temp_entity']) ? trim(str_replace('"', '', $_GET['ha_temp_entity'])) : '';
+  $ha_weather_entity = isset($_GET['ha_weather_entity']) ? trim(str_replace('"', '', $_GET['ha_weather_entity'])) : '';
 
   # Display & units
   $temperature_unit = (isset($_GET['temperature_unit']) && $_GET['temperature_unit'] === 'celsius') ? 'celsius' : 'fahrenheit';
@@ -210,6 +211,13 @@ if(isset($_GET["latitude"])){
   $contents = preg_replace("/HA_URL=.*/", "HA_URL=\"$ha_url\"", $contents);
   $contents = preg_replace("/HA_TOKEN=.*/", "HA_TOKEN=\"$ha_token\"", $contents);
   $contents = preg_replace("/HA_TEMP_ENTITY=.*/", "HA_TEMP_ENTITY=\"$ha_temp_entity\"", $contents);
+  if (preg_match('/^HA_WEATHER_ENTITY=.*$/m', $contents)) {
+    $contents = preg_replace('/^HA_WEATHER_ENTITY=.*$/m', "HA_WEATHER_ENTITY=\"$ha_weather_entity\"", $contents);
+  } else {
+    // Older restored configs may predate this setting; append it rather than
+    // silently leaving the field unable to save.
+    $contents = rtrim($contents) . "\nHA_WEATHER_ENTITY=\"$ha_weather_entity\"\n";
+  }
   $contents = preg_replace("/SIDEBAR_SITE_NAME=.*/", "SIDEBAR_SITE_NAME=$sidebar_site_name", $contents);
   $contents = preg_replace("/IMAGE_PROVIDER=.*/", "IMAGE_PROVIDER=$image_provider", $contents);
   $contents = preg_replace("/FLICKR_API_KEY=.*/", "FLICKR_API_KEY=$flickr_api_key", $contents);
@@ -496,7 +504,7 @@ function runProcess() {
         Enable weather syncing
       </label>
       <p>Enabled by default. Turning this off stops all Open-Meteo and Home Assistant weather requests. Stored weather history is kept.</p>
-      <h3>Local temperature sensor (optional)</h3>
+      <h3>Local weather station (optional)</h3>
       <table class="settingstable plaintable">
         <tr>
           <td><label for="ha_url">Home Assistant URL:</label></td>
@@ -510,10 +518,15 @@ function runProcess() {
           <td><label for="ha_temp_entity">Temperature entity:</label></td>
           <td><input name="ha_temp_entity" type="text" placeholder="sensor.backyard_temperature" value="<?php print(htmlspecialchars($config['HA_TEMP_ENTITY'] ?? '')); ?>"/></td>
         </tr>
+        <tr>
+          <td><label for="ha_weather_entity">Weather entity:</label></td>
+          <td><input name="ha_weather_entity" type="text" placeholder="weather.backyard" value="<?php print(htmlspecialchars($config['HA_WEATHER_ENTITY'] ?? '')); ?>"/></td>
+        </tr>
       </table>
-      <p>Leave blank to use online weather. When weather syncing is enabled and these fields are set, the current hour's temperature comes from your own sensor,
-      and falls back to online weather automatically if the sensor is unreachable or its reading hasn't changed
-      in over an hour. Create a long-lived access token in Home Assistant under your profile &rarr; Security.</p>
+      <p>Leave blank to use online weather. When weather syncing is enabled and the temperature entity is set, the current hour's temperature comes from your own sensor.
+      When the weather entity is set, the current hour's wind speed, wind direction, sky condition, and day/night also come from your own station instead of Open-Meteo
+      &mdash; this is a Home Assistant <code>weather.*</code> entity (the kind most weather-station integrations create), not a plain sensor. Both fields fall back to
+      online weather automatically and independently if unreachable or unchanged in over an hour. Create a long-lived access token in Home Assistant under your profile &rarr; Security.</p>
       </td></tr></table><br>
       <table class="settingstable"><tr><td>
       <h2 id="settings-display">Display & Units</h2>

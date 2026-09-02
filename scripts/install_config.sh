@@ -121,14 +121,18 @@ APPRISE_QUIET_HOURS_END=""
 ## Detections of a species within this many quiet minutes belong to one visit
 VISIT_GAP_MINUTES=5
 
-#----------------------  Local Temperature Sensor ------------------------#
-## Optional: current-hour temperature from a Home Assistant sensor instead of
-## the online weather model. Leave blank to disable. Falls back to online
-## weather automatically when the sensor is unreachable, unavailable, or its
-## value has not changed in over an hour.
+#----------------------  Local Weather Station ------------------------#
+## Optional: current-hour weather from Home Assistant instead of the online
+## weather model. HA_TEMP_ENTITY (a plain sensor) overrides temperature only;
+## HA_WEATHER_ENTITY (a weather.* entity, the kind most weather-station
+## integrations create) also overrides wind speed/direction, sky condition,
+## and day/night. Leave either blank to disable it. Both fall back to online
+## weather automatically and independently when unreachable, unavailable, or
+## unchanged for over an hour.
 HA_URL=""
 HA_TOKEN=""
 HA_TEMP_ENTITY=""
+HA_WEATHER_ENTITY=""
 
 #----------------------  Display & Units ------------------------#
 ## fahrenheit or celsius (weather is stored in Fahrenheit; display converts)
