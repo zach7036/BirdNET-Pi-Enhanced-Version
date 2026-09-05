@@ -27,23 +27,8 @@ function ensure_db_ok_json($sql_stmt) {
 
 function get_overview_weather($db, $date) {
   $weather = [];
-  $check_table = db_query_safe($db, "SELECT name FROM sqlite_master WHERE type='table' AND name='weather'", 'overview weather table check');
-  if (!db_fetch_assoc_safe($check_table)) {
-    return $weather;
-  }
-
-  $hasIsDay = false;
-  $cols = db_query_safe($db, "PRAGMA table_info(weather)", 'overview weather table info');
-  if ($cols) {
-    while($c = db_fetch_assoc_safe($cols)) {
-      if($c['name'] == 'IsDay') {
-        $hasIsDay = true;
-      }
-    }
-  }
-
-  $sel = $hasIsDay ? "Hour, Temp, ConditionCode, IsDay" : "Hour, Temp, ConditionCode";
-  $stmt = $db->prepare("SELECT $sel FROM weather WHERE Date = :date AND Temp IS NOT NULL ORDER BY Hour ASC");
+  $table = weather_data_table($db);
+  $stmt = $db->prepare("SELECT * FROM $table WHERE Date = :date ORDER BY Hour ASC");
   if (!$stmt) {
     return $weather;
   }
@@ -55,11 +40,7 @@ function get_overview_weather($db, $date) {
   }
 
   while ($row = db_fetch_assoc_safe($res)) {
-    $weather[(int)$row['Hour']] = [
-      'temp' => display_temp($row['Temp']),
-      'code' => (int)$row['ConditionCode'],
-      'is_day' => $hasIsDay ? (int)$row['IsDay'] : 1
-    ];
+    $weather[(int)$row['Hour']] = weather_hour_display($row);
   }
 
   return $weather;

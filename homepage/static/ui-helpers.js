@@ -20,6 +20,40 @@
     }
   }
 
+  function weatherTemperature(value, suffix) {
+    if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) return '\u2014';
+    return Math.round(Number(value)) + (suffix === undefined ? '\u00b0' : suffix);
+  }
+
+  function weatherSummary(weather) {
+    var parts = [];
+    if (weather && weather.temp !== null && weather.temp !== undefined) {
+      parts.push(weatherTemperature(weather.temp, weather.temp_unit || '\u00b0F'));
+    }
+    if (weather && weather.condition_code !== null && weather.condition_code !== undefined && weather.condition) {
+      parts.push(weather.condition);
+    }
+    if (!parts.length && weather && weather.wind_speed !== null && weather.wind_speed !== undefined) {
+      parts.push('Wind ' + weather.wind_speed + ' ' + (weather.wind_unit || 'mph'));
+    }
+    return parts.join(' ') || 'Weather unavailable';
+  }
+
+  function weatherEmoji(code, isDay) {
+    if (code === null || code === undefined || code === '') return '';
+    code = Number(code);
+    var dayKnown = isDay === 0 || isDay === 1;
+    var night = isDay === 0;
+    if (code === 0) return dayKnown ? (night ? '🌙' : '☀️') : '○';
+    if (code >= 1 && code <= 3) return night || !dayKnown ? '☁️' : '⛅';
+    if (code === 45 || code === 48) return '🌫️';
+    if (code >= 51 && code <= 67) return '🌧️';
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return '❄️';
+    if (code >= 80 && code <= 82) return '🌧️';
+    if (code >= 95 && code <= 99) return '⛈️';
+    return '';
+  }
+
   function formatBytes(bytes) {
     var value = Number(bytes || 0);
     var units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -109,11 +143,11 @@
       var lastDetection = health.last_detection_at || 'No detections';
       var weatherSyncEnabled = weather.sync_enabled !== false;
       var weatherIsCurrent = weather.status === 'current';
-      var weatherLabel = !weatherSyncEnabled ? 'Disabled' : (weatherIsCurrent ? (Math.round(Number(weather.temp)) + (weather.temp_unit || '\u00b0F') + ' ' + (weather.condition || '')) : 'Missing current hour');
+      var weatherLabel = !weatherSyncEnabled ? 'Disabled' : (weatherIsCurrent ? weatherSummary(weather) : 'Missing current hour');
       var weatherTooltip = !weatherSyncEnabled ?
         'Weather syncing is disabled in Settings. Existing weather history is kept.' :
         (weatherIsCurrent ?
-          'Current-hour weather from the weather sync table. This should match Live Activity. Synced row: ' + (weather.last_synced_at || 'unknown') + '.' :
+          'Current-hour local observations with stored online fallback. Some fields may be unavailable. Last attempt: ' + (weather.last_attempt_at || 'unknown') + '.' :
           'Current-hour weather is missing. Last synced row: ' + (weather.last_synced_at || 'none') + '.');
 
       strip.innerHTML =
@@ -233,6 +267,9 @@
   });
 
   window.BirdNETUI = {
+    weatherTemperature: weatherTemperature,
+    weatherSummary: weatherSummary,
+    weatherEmoji: weatherEmoji,
     escapeHtml: escapeHtml,
     safeHttpUrl: safeHttpUrl,
     formatBytes: formatBytes,

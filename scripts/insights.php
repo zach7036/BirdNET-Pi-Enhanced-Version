@@ -375,7 +375,8 @@ if ($subview == 'migration') {
 
 if ($subview == 'environmental') {
     $wmo_codes = [0 => 'Clear sky', 1 => 'Mostly clear', 2 => 'Partly cloudy', 3 => 'Overcast', 45 => 'Fog', 48 => 'Rime fog', 51 => 'Light drizzle', 53 => 'Moderate drizzle', 55 => 'Dense drizzle', 61 => 'Slight rain', 63 => 'Moderate rain', 65 => 'Heavy rain', 71 => 'Slight snow', 73 => 'Moderate snow', 75 => 'Heavy snow', 80 => 'Slight showers', 81 => 'Moderate showers', 82 => 'Violent showers', 95 => 'Thunderstorm', 96 => 'Thunderstorm + hail', 99 => 'Thunderstorm + heavy hail'];
-    $has_weather = (db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'insights weather table exists') > 0) && (db_query_single_safe($db, "SELECT COUNT(*) FROM weather", 0, 'insights weather row count') > 0);
+    $weather_table = weather_data_table($db);
+    $has_weather = db_query_single_safe($db, "SELECT COUNT(*) FROM $weather_table", 0, 'insights weather row count') > 0;
     if ($has_weather) {
         /* Bracket edges live in °F (how weather is stored), but in Celsius
            mode the edges land on exact 5°C steps (32/41/.../86°F = 0/5/.../30°C)
@@ -392,7 +393,7 @@ if ($subview == 'environmental') {
             $bracket_case .= " WHEN w.Temp < $edge THEN '" . $bracket_labels[$bi] . "'";
         }
         $bracket_case .= " ELSE '" . end($bracket_labels) . "' END";
-        $temp_res = db_query_safe($db, "SELECT $bracket_case as bracket, COUNT(*) as det_count, COUNT(DISTINCT d.Sci_Name) as species_count, ROUND(AVG(w.Temp), 1) as avg_temp FROM detections d INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour GROUP BY bracket", 'insights weather temperature brackets');
+        $temp_res = db_query_safe($db, "SELECT $bracket_case as bracket, COUNT(*) as det_count, COUNT(DISTINCT d.Sci_Name) as species_count, ROUND(AVG(w.Temp), 1) as avg_temp FROM detections d INNER JOIN $weather_table w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour GROUP BY bracket", 'insights weather temperature brackets');
         $master_brackets = [];
         foreach ($bracket_labels as $bl) {
             $master_brackets[$bl] = ['bracket' => $bl, 'det_count' => 0, 'species_count' => 0];
@@ -422,12 +423,13 @@ if ($subview == 'environmental') {
                 WHEN w.ConditionCode BETWEEN 51 AND 67 OR w.ConditionCode BETWEEN 80 AND 82 THEN 'Rain'
                 WHEN w.ConditionCode BETWEEN 71 AND 77 OR w.ConditionCode IN (85, 86) THEN 'Snow'
                 WHEN w.ConditionCode BETWEEN 95 AND 99 THEN 'Thunderstorm'
-                ELSE 'Cloudy' 
+                ELSE 'Unknown'
             END as description,
             COUNT(*) as det_count, 
             COUNT(DISTINCT d.Sci_Name) as species_count 
             FROM detections d 
-            INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour 
+            INNER JOIN $weather_table w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
+            WHERE w.ConditionCode IS NOT NULL
             GROUP BY description", 'insights weather conditions');
         
         while($row = db_fetch_assoc_safe($cond_res)) {
@@ -469,7 +471,7 @@ if ($subview == 'environmental') {
             COUNT(*) as det_count,
             COUNT(DISTINCT d.Sci_Name) as species_count
             FROM detections d
-            INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
+            INNER JOIN $weather_table w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
             WHERE w.WindSpeed IS NOT NULL
             GROUP BY bracket", 'insights weather wind speed');
 
@@ -498,7 +500,7 @@ if ($subview == 'environmental') {
             END as cardinal,
             COUNT(*) as det_count
             FROM detections d 
-            INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour 
+            INNER JOIN $weather_table w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour
             WHERE w.WindSpeed IS NOT NULL AND w.WindDirection IS NOT NULL
             GROUP BY bracket, cardinal", 'insights weather wind direction');
 
@@ -516,7 +518,7 @@ if ($subview == 'environmental') {
             }
         }
         $wind_impact = $unified_wind;
-        $ideal_res = db_query_safe($db, "SELECT d.Com_Name, ROUND(AVG(w.Temp), 1) as avg_temp, ROUND(MIN(w.Temp), 1) as min_temp, ROUND(MAX(w.Temp), 1) as max_temp, COUNT(*) as cnt FROM detections d INNER JOIN weather w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour GROUP BY d.Sci_Name HAVING cnt >= 5 ORDER BY cnt DESC", 'insights species ideal temperature');
+        $ideal_res = db_query_safe($db, "SELECT d.Com_Name, ROUND(AVG(w.Temp), 1) as avg_temp, ROUND(MIN(w.Temp), 1) as min_temp, ROUND(MAX(w.Temp), 1) as max_temp, COUNT(*) as cnt FROM detections d INNER JOIN $weather_table w ON d.Date = w.Date AND CAST(substr(d.Time, 1, 2) AS INTEGER) = w.Hour WHERE w.Temp IS NOT NULL GROUP BY d.Sci_Name HAVING cnt >= 5 ORDER BY cnt DESC", 'insights species ideal temperature');
         while($row = db_fetch_assoc_safe($ideal_res)) {
             $row['avg_temp'] = display_temp($row['avg_temp'], 1);
             $row['min_temp'] = display_temp($row['min_temp'], 1);
@@ -530,7 +532,7 @@ if ($subview == 'environmental') {
             FROM detections d
             LEFT JOIN (
                 SELECT Date, AVG(Temp) as avg_temp
-                FROM weather
+                FROM $weather_table
                 WHERE Temp IS NOT NULL
                 GROUP BY Date
             ) dw ON dw.Date = d.Date

@@ -86,52 +86,31 @@ function api_open_rw_db() {
 
 function api_current_weather($db) {
   $sync_enabled = weather_sync_enabled();
-  $has_weather = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'api current weather table') > 0;
-  if (!$has_weather) {
-    return ['status' => 'missing', 'sync_enabled' => $sync_enabled, 'message' => 'Weather table has not been created yet.'];
-  }
-
-  $has_is_day = false;
-  $cols = db_query_safe($db, "PRAGMA table_info(weather)", 'api weather table info');
-  while ($col = db_fetch_assoc_safe($cols)) {
-    if ($col['name'] === 'IsDay') {
-      $has_is_day = true;
-      break;
-    }
-  }
-
-  $sel = $has_is_day ? 'Date, Hour, Temp, ConditionCode, IsDay' : 'Date, Hour, Temp, ConditionCode';
-  $stmt = $db->prepare("SELECT $sel FROM weather WHERE Date = DATE('now','localtime') AND Hour = :hour AND Temp IS NOT NULL LIMIT 1");
+  $table = weather_data_table($db);
+  $usable = '(Temp IS NOT NULL OR ConditionCode IS NOT NULL OR WindSpeed IS NOT NULL OR WindDirection IS NOT NULL)';
+  $stmt = $db->prepare("SELECT * FROM $table WHERE Date = DATE('now','localtime') AND Hour = :hour AND $usable LIMIT 1");
   $stmt->bindValue(':hour', (int)date('G'), SQLITE3_INTEGER);
-  $current = db_fetch_assoc_safe(db_execute_safe($db, $stmt, 'api current weather row'));
-  $latest = db_query_one_safe($db, "SELECT Date, Hour FROM weather WHERE Temp IS NOT NULL ORDER BY Date DESC, Hour DESC LIMIT 1", 'api latest weather row');
-  $today_rows = db_query_single_safe($db, "SELECT COUNT(*) FROM weather WHERE Date = DATE('now','localtime') AND Temp IS NOT NULL", 0, 'api current weather today rows') ?: 0;
-
-  if (!$current) {
-    return [
-      'status' => 'missing',
-      'sync_enabled' => $sync_enabled,
-      'today_rows' => (int)$today_rows,
-      'last_synced_at' => $latest ? $latest['Date'] . ' ' . sprintf('%02d:00', (int)$latest['Hour']) : null,
-      'message' => 'Current-hour weather is missing.'
-    ];
-  }
-
-  $code = (int)$current['ConditionCode'];
-  return [
-    'status' => 'current',
-    'sync_enabled' => $sync_enabled,
-    'date' => $current['Date'],
-    'hour' => (int)$current['Hour'],
-    'temp' => display_temp($current['Temp']),
-    'temp_unit' => temp_unit_suffix(),
-    'condition_code' => $code,
-    'condition' => api_weather_label($code),
-    'is_day' => $has_is_day ? (int)$current['IsDay'] : 1,
-    'today_rows' => (int)$today_rows,
-    'last_synced_at' => $current['Date'] . ' ' . sprintf('%02d:00', (int)$current['Hour']),
-    'generated_at' => date('c')
+  $current = db_fetch_assoc_safe(db_execute_safe($db, $stmt, 'api current weather'));
+  $latest = db_query_one_safe($db, "SELECT Date, Hour FROM $table WHERE $usable AND (Date < DATE('now','localtime') OR (Date=DATE('now','localtime') AND Hour <= CAST(strftime('%H','now','localtime') AS INTEGER))) ORDER BY Date DESC, Hour DESC LIMIT 1", 'api latest weather');
+  $today_rows = db_query_single_safe($db, "SELECT COUNT(*) FROM $table WHERE Date = DATE('now','localtime') AND $usable", 0, 'api weather today');
+  $sync = weather_latest_sync($db);
+  $metadata = [
+    'sync_enabled' => $sync_enabled, 'today_rows' => (int)$today_rows,
+    'last_synced_at' => $latest ? $latest['Date'] . ' ' . sprintf('%02d:00', (int)$latest['Hour']) : null,
+    'last_attempt_at' => $sync ? date('c', (int)$sync['CollectedAt']) : null,
+    'generated_at' => date('c'),
   ];
+  if (!$current) return array_merge($metadata, ['status' => 'missing', 'message' => 'Current-hour weather is missing.']);
+  $display = weather_hour_display($current);
+  return array_merge($metadata, [
+    'status' => 'current', 'partial' => $display['temp'] === null || $display['code'] === null,
+    'date' => $current['Date'], 'hour' => (int)$current['Hour'],
+    'temp' => $display['temp'], 'temp_unit' => temp_unit_suffix(),
+    'condition_code' => $display['code'], 'condition' => api_weather_label($display['code']),
+    'is_day' => $display['is_day'], 'wind_speed' => $display['wind_speed'],
+    'wind_unit' => $display['wind_unit'], 'wind_direction' => $display['wind_direction'],
+    'sources' => $display['sources'],
+  ]);
 }
 
 function api_format_service($service) {
@@ -152,9 +131,12 @@ function api_weather_label($code) {
     45 => 'Fog', 48 => 'Rime fog', 51 => 'Light drizzle', 53 => 'Moderate drizzle',
     55 => 'Dense drizzle', 61 => 'Slight rain', 63 => 'Moderate rain', 65 => 'Heavy rain',
     71 => 'Slight snow', 73 => 'Moderate snow', 75 => 'Heavy snow', 80 => 'Slight showers',
-    81 => 'Moderate showers', 82 => 'Violent showers', 95 => 'Thunderstorm'
+    81 => 'Moderate showers', 82 => 'Violent showers', 95 => 'Thunderstorm',
+    56 => 'Light freezing drizzle', 57 => 'Dense freezing drizzle', 66 => 'Light freezing rain',
+    67 => 'Heavy freezing rain', 77 => 'Snow grains', 85 => 'Slight snow showers',
+    86 => 'Heavy snow showers', 96 => 'Thunderstorm with hail', 99 => 'Thunderstorm with heavy hail'
   ];
-  return $codes[$code] ?? 'Cloudy';
+  return $code === null ? 'Conditions unavailable' : ($codes[$code] ?? 'Conditions unavailable');
 }
 
 function api_ebird_export_count($db, $date, $min_confidence = 0.75) {
@@ -189,7 +171,8 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   $home = get_home();
   $db_path = __ROOT__ . '/scripts/birds.db';
   $last_detection = db_query_single_safe($db, 'SELECT Date || " " || Time FROM detections ORDER BY Date DESC, Time DESC LIMIT 1', null, 'api system health last detection');
-  $weather_count = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'api system health weather table') ? db_query_single_safe($db, "SELECT COUNT(*) FROM weather WHERE Date = DATE('now','localtime')", 0, 'api system health weather rows') : 0;
+  $weather_table = weather_data_table($db);
+  $weather_count = db_query_single_safe($db, "SELECT COUNT(*) FROM $weather_table WHERE Date = DATE('now','localtime')", 0, 'api system health weather rows');
   $disk_total = @disk_total_space($home);
   $disk_free = @disk_free_space($home);
 
@@ -609,21 +592,15 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     ];
   }
 
-  // Hourly weather for the requested date (drawn as the Timeline weather strip)
+  // Shared weather overlay includes partial local-only hours.
   $weather_map = [];
-  $has_weather_tbl = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'timeline weather table') > 0;
-  if ($has_weather_tbl) {
-    $w_stmt = $db->prepare('SELECT * FROM weather WHERE Date = :date AND Temp IS NOT NULL ORDER BY Hour ASC');
-    if ($w_stmt) {
-      $w_stmt->bindValue(':date', $date, SQLITE3_TEXT);
-      $w_res = db_execute_safe($db, $w_stmt, 'timeline weather rows');
-      while ($w_row = db_fetch_assoc_safe($w_res)) {
-        $weather_map[(int)$w_row['Hour']] = [
-          'temp' => display_temp($w_row['Temp']),
-          'code' => (int)$w_row['ConditionCode'],
-          'is_day' => isset($w_row['IsDay']) ? (int)$w_row['IsDay'] : 1
-        ];
-      }
+  $weather_table = weather_data_table($db);
+  $w_stmt = $db->prepare("SELECT * FROM $weather_table WHERE Date = :date ORDER BY Hour ASC");
+  if ($w_stmt) {
+    $w_stmt->bindValue(':date', $date, SQLITE3_TEXT);
+    $w_res = db_execute_safe($db, $w_stmt, 'timeline weather rows');
+    while ($w_row = db_fetch_assoc_safe($w_res)) {
+      $weather_map[(int)$w_row['Hour']] = weather_hour_display($w_row);
     }
   }
 
@@ -1318,73 +1295,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'action' => $det_status === 'ok' ? null : 'Quiet periods are normal at night; if this persists in daytime, check the microphone and services.'
   ];
 
-  $weather_enabled = weather_sync_enabled($config);
-  $weather_status = 'ok';
-  $weather_message = 'Weather syncing is disabled in Settings. Existing weather history is still available.';
-  if ($weather_enabled) {
-    $has_weather_table = db_query_single_safe($db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='weather'", 0, 'doctor weather table') > 0;
-    $weather_status = 'warn';
-    $weather_message = 'Weather table has not been created yet.';
-    if ($has_weather_table) {
-      $latest_weather = db_query_one_safe($db, 'SELECT Date, Hour FROM weather WHERE Temp IS NOT NULL ORDER BY Date DESC, Hour DESC LIMIT 1', 'doctor weather');
-      if ($latest_weather) {
-        $weather_age = round((time() - strtotime($latest_weather['Date'] . ' ' . sprintf('%02d:00', (int)$latest_weather['Hour']))) / 3600, 1);
-        $weather_status = $weather_age <= 3 ? 'ok' : 'warn';
-        $weather_message = 'Latest weather data is ' . $weather_age . 'h old.';
-      } else {
-        $weather_message = 'No weather rows synced yet.';
-      }
-    }
-  }
-  $checks[] = [
-    'id' => 'weather',
-    'label' => 'Weather sync',
-    'status' => $weather_status,
-    'message' => $weather_message,
-    'action' => !$weather_enabled || $weather_status === 'ok' ? null : 'Weather syncs hourly; check internet connectivity if it stays stale.'
-  ];
-
-  // Local temperature sensor (only checked when configured): a live probe
-  // showing whether the current hour is using the sensor or the online
-  // fallback. The fallback working is a warn, never an error.
-  $ha_url = rtrim(trim((string)($config['HA_URL'] ?? '')), '/');
-  $ha_token = trim((string)($config['HA_TOKEN'] ?? ''));
-  $ha_entity = trim((string)($config['HA_TEMP_ENTITY'] ?? ''));
-  if ($weather_enabled && $ha_url !== '' && $ha_token !== '' && $ha_entity !== '') {
-    $ha_status = 'warn';
-    $ha_message = 'Sensor could not be reached; the current hour uses online weather.';
-    $ctx = stream_context_create(['http' => [
-      'method' => 'GET',
-      'header' => "Authorization: Bearer $ha_token\r\nAccept: application/json\r\n",
-      'timeout' => 5,
-      'ignore_errors' => true
-    ]]);
-    $ha_raw = @file_get_contents($ha_url . '/api/states/' . rawurlencode($ha_entity), false, $ctx);
-    if ($ha_raw !== false) {
-      $ha_state = json_decode($ha_raw, true);
-      $raw_val = isset($ha_state['state']) ? $ha_state['state'] : null;
-      if ($raw_val !== null && $raw_val !== 'unavailable' && $raw_val !== 'unknown' && is_numeric($raw_val)) {
-        $changed = isset($ha_state['last_changed']) ? strtotime($ha_state['last_changed']) : false;
-        $age = $changed !== false ? time() - $changed : PHP_INT_MAX;
-        $unit = isset($ha_state['attributes']['unit_of_measurement']) ? $ha_state['attributes']['unit_of_measurement'] : '';
-        if ($age <= 3600) {
-          $ha_status = 'ok';
-          $ha_message = "$ha_entity reads $raw_val$unit (updated " . round($age / 60) . " min ago); the current hour uses your sensor.";
-        } else {
-          $ha_message = "$ha_entity has not changed in " . round($age / 60) . " min; the current hour uses online weather.";
-        }
-      } else {
-        $ha_message = "$ha_entity is " . ($raw_val === null ? 'missing' : $raw_val) . '; the current hour uses online weather.';
-      }
-    }
-    $checks[] = [
-      'id' => 'local_sensor',
-      'label' => 'Local temperature sensor',
-      'status' => $ha_status,
-      'message' => $ha_message,
-      'action' => $ha_status === 'ok' ? null : 'Check the Home Assistant URL, token, and entity in Tools > Settings. Online weather covers the gap meanwhile.'
-    ];
-  }
+  $checks = array_merge($checks, weather_health_checks($db, $config));
 
   $lat = isset($config['LATITUDE']) ? $config['LATITUDE'] : '';
   $lon = isset($config['LONGITUDE']) ? $config['LONGITUDE'] : '';

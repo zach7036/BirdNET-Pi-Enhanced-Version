@@ -4,6 +4,8 @@ if (!defined('__ROOT__')) {
   define('__ROOT__', dirname(dirname(__FILE__)));
 }
 
+require_once __DIR__ . '/weather_data.php';
+
 // CLI runs (cleanup helpers, seeders) have no session to resume and would
 // leave an orphan session file behind on every run; $_SESSION still works as
 // a plain array for the per-request caches.

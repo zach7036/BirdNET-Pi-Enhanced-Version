@@ -146,17 +146,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
   }
 
   function weatherEmoji(code, isDay) {
-    code = Number(code);
-    isDay = Number(isDay) !== 0;
-    if (code === 0) return isDay ? '☀️' : '🌙';
-    if (code >= 1 && code <= 3) return isDay ? '⛅' : '☁️';
-    if (code === 45 || code === 48) return '🌫️';
-    if (code >= 51 && code <= 55) return isDay ? '🌦️' : '🌧️';
-    if (code >= 61 && code <= 65) return '🌧️';
-    if (code >= 71 && code <= 75) return '❄️';
-    if (code >= 80 && code <= 82) return isDay ? '🌦️' : '🌧️';
-    if (code >= 95) return '⛈️';
-    return '☁️';
+    return window.BirdNETUI ? BirdNETUI.weatherEmoji(code, isDay) : '';
   }
 
   function setHeroPhoto(sciName) {
@@ -205,7 +195,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
       : esc(formatAgo(v.seconds_ago));
     var weather = '';
     if (data.weather && data.weather.status === 'current') {
-      weather = ' &middot; ' + Math.round(data.weather.temp) + (window.BIRDNET_UNITS ? window.BIRDNET_UNITS.tempSuffix.replace('°', '&deg;') : '&deg;F') + ' ' + esc(data.weather.condition);
+      weather = ' &middot; ' + esc(BirdNETUI.weatherSummary(data.weather));
     }
     document.getElementById('heroMeta').innerHTML =
       when +
@@ -316,7 +306,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
       axis += '<div class="axis-col">' +
         '<span class="axis-time">' + hourLabel(ah) + '</span>' +
         (w ? '<span class="axis-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span>' +
-             '<span class="axis-temp">' + Math.round(w.temp) + '&deg;</span>' : '') +
+             '<span class="axis-temp">' + BirdNETUI.weatherTemperature(w.temp) + '</span>' : '') +
         '</div>';
     }
     return '<div class="spark">' + bars + '</div><div class="spark-axis">' + axis + '</div>';

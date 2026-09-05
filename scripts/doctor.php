@@ -32,7 +32,7 @@ if (isset($_GET['sync_weather']) && $_GET['sync_weather'] == 'true') {
     $timeout = is_executable('/usr/bin/timeout') ? '/usr/bin/timeout 30 ' : '';
     $output = shell_exec($timeout . 'sudo -u ' . escapeshellarg($user) . ' ' . escapeshellarg($python) . ' ' . escapeshellarg($script) . ' 2>&1');
     @flock($lock, LOCK_UN);
-    echo 'OK' . ($output ? "\n" . $output : '');
+    echo 'Weather sync attempted. Refresh Station Doctor for saved source results.' . ($output ? "\n" . $output : '');
   } else {
     echo 'A weather sync is already running.';
   }
@@ -121,7 +121,7 @@ if (isset($_GET['support_bundle']) && $_GET['support_bundle'] == 'true') {
     fetch('scripts/doctor.php?sync_weather=true')
       .then(function (r) { return r.text(); })
       .then(function (t) {
-        showActionOutput(t, t.indexOf('OK') !== 0);
+        showActionOutput(t, t.indexOf('Weather sync attempted.') !== 0);
         btn.disabled = false;
         refreshDoctor();
       })

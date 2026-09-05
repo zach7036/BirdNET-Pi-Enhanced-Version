@@ -190,8 +190,10 @@ is enabled by default and can be turned off under **Settings → Location & Weat
 weather history already stored by the station.
 
 If you run [Home Assistant](https://www.home-assistant.io/), you can point the station at a
-temperature entity and it will use your own garden reading instead of the regional forecast,
-falling back to Open-Meteo if the sensor goes stale.
+weather entity for local temperature, wind and supported conditions. A separate temperature sensor
+can take priority. Missing fields use available Open-Meteo fallback; local observations remain in
+history and can be collected during internet outages. See the [local weather guide](docs/LOCAL_WEATHER.md)
+for setup, supported units, testing on your Pi and rollback.
 
 ### Everything else
 
@@ -199,7 +201,7 @@ falling back to Open-Meteo if the sensor goes stale.
 - **eBird checklist export** — rebuilt, with a date picker for historical checklists, validation on eBird's required fields, and reviewed false positives automatically excluded
 - **BirdWeather** — contribute detections to the worldwide network
 - **Notifications** — 90+ platforms via [Apprise](https://github.com/caronc/apprise), grouped by visit rather than per detection, with quiet hours, rare-species alerts, per-species throttling, and weekly reports
-- **Station Doctor** — health checks for the live stream, disk space, last detection, weather sync, local temperature sensor, location, and admin password, with one-click fixes
+- **Station Doctor** — health checks for the live stream, disk space, last detection, weather sync, saved local-weather results, location, and admin password, with one-click fixes
 - **Installable on a phone** as a progressive web app, with a mobile tab bar
 - **Command palette** — <kbd>Ctrl</kbd>+<kbd>K</kbd> to jump to any view or species
 - **Dark mode** across every page, remembered after you choose it; new visitors start in light mode
@@ -327,7 +329,7 @@ Everything is configurable from the web interface. The main sections under *Sett
 |---|---|
 | Detection Model | Model choice, confidence threshold, sensitivity, overlap |
 | Location & Weather | Latitude, longitude, and weather sync |
-| Local temperature sensor | Optional Home Assistant temperature entity |
+| Local weather | Optional Home Assistant weather and temperature entities |
 | Display & Units | Temperature, wind speed, time format, number format, site name |
 | BirdWeather | Station ID for contributing to the network |
 | Notifications | Apprise targets, triggers, quiet hours, visit grouping, weekly report |

@@ -37,7 +37,7 @@ def test_disabled_weather_exits_before_database_or_network_work():
     with patch.object(weather, 'get_settings', return_value={'WEATHER_ENABLED': '0'}), \
             patch.object(weather, 'ensure_weather_schema') as ensure_schema, \
             patch.object(weather, 'fetch_hourly') as fetch_hourly, \
-            patch.object(weather, 'fetch_ha_temperature') as fetch_ha:
+            patch.object(weather, 'collect_local_weather') as fetch_ha:
         weather.update_weather()
 
     ensure_schema.assert_not_called()

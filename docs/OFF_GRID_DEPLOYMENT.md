@@ -100,8 +100,9 @@ Detection stays local. The following features and status checks can contact anot
 - Weather syncing is enabled by default. Under **Settings → Location & Weather**, turn
   off **Enable weather syncing** to stop both Open-Meteo and configured Home Assistant requests.
   Existing weather history is kept, and turning syncing back on resumes the normal hourly process.
-- While weather syncing is enabled, a configured Home Assistant temperature sensor does not make
-  weather fully local; Open-Meteo remains the fallback and supplies the other conditions.
+- Configured Home Assistant weather/temperature entities can save local readings during an internet
+  outage. Open-Meteo is still requested while syncing is enabled and provides available fallback.
+  Missing fields remain unavailable. See [Local weather](LOCAL_WEATHER.md) for source behavior and rollback.
 - Opening **System Info** performs a public-IP lookup, and a few optional admin tools load interface
   assets from public CDNs. These do not run the detection pipeline, but they matter to a strict
   outbound-network policy.

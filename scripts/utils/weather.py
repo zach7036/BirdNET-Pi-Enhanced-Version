@@ -1,37 +1,32 @@
-import sqlite3
-import requests
-import os
+"""Hourly weather collection with additive local history and bounded DB writes."""
+import json
 import logging
-import time
-from datetime import datetime
+import os
+import sqlite3
 import sys
+import time
+from contextlib import closing, contextmanager
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+import requests
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from helpers import DB_PATH, get_settings
+from weather_sources import collect_local_weather, number
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('weather')
-
-# Open-Meteo occasionally times out or returns 5xx; without retries a failed
-# hourly cron run left a permanent gap in the weather table. Retry a few
-# times, and fetch a week of history (the API serves it freely) so any
-# successful run backfills gaps from Pi downtime or earlier failed runs.
 FETCH_ATTEMPTS = 3
 RETRY_DELAY_SECONDS = [30, 60]
 PAST_DAYS = 7
-
-# A local Home Assistant temperature sensor (HA_URL/HA_TOKEN/HA_TEMP_ENTITY)
-# can override the CURRENT hour's temperature. Readings older than this are
-# treated as a frozen or disconnected sensor and ignored - Open-Meteo's value
-# stands, which is the automatic fallback.
-HA_MAX_AGE_SECONDS = 3600
-HA_TIMEOUT_SECONDS = 10
+FIELDS = ('Temp', 'ConditionCode', 'IsDay', 'WindSpeed', 'WindDirection')
+WMO_CODES = {0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67,
+             71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99}
 
 
 def weather_sync_enabled(conf):
-    """Return False only for an explicit WEATHER_ENABLED=0 setting."""
-    if 'WEATHER_ENABLED' not in conf:
-        return True
-    return str(conf.get('WEATHER_ENABLED', '')).strip() != '0'
+    return str(conf.get('WEATHER_ENABLED', '1')).strip() != '0'
 
 
 def fetch_hourly(lat, lon):
@@ -53,174 +48,180 @@ def fetch_hourly(lat, lon):
                 log.error(f"Weather fetch failed after {FETCH_ATTEMPTS} attempts: {e}")
     return None
 
-def to_fahrenheit(value, unit):
-    unit = (unit or '').strip()
-    if unit in ('°F', 'F'):
-        return value
-    if unit == 'K':
-        return (value - 273.15) * 9 / 5 + 32
-    # HA temperature sensors default to °C outside the US; treat an unknown
-    # unit as Celsius rather than silently storing a wrong-scale value.
-    return value * 9 / 5 + 32
-
-
-def fetch_ha_temperature(conf):
-    """Current temperature (°F) from a Home Assistant sensor, or None.
-
-    None means "use the online value" - the caller falls back silently. Any
-    failure (unconfigured, unreachable, bad token, dead entity, non-numeric
-    state, or a reading that has not changed in HA_MAX_AGE_SECONDS) lands
-    there; a genuinely rock-steady temperature would too, but outdoors at
-    sensor resolution that does not happen inside an hour.
-    """
-    url = (conf.get('HA_URL') or '').strip().rstrip('/')
-    token = (conf.get('HA_TOKEN') or '').strip()
-    entity = (conf.get('HA_TEMP_ENTITY') or '').strip()
-    if not url or not token or not entity:
-        return None
-
-    try:
-        response = requests.get(
-            f"{url}/api/states/{entity}",
-            headers={'Authorization': f'Bearer {token}'},
-            timeout=HA_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        state = response.json()
-    except Exception as e:
-        log.warning(f"Local sensor {entity} unreachable ({e}); using online temperature.")
-        return None
-
-    raw = state.get('state')
-    if raw in (None, 'unavailable', 'unknown'):
-        log.warning(f"Local sensor {entity} is {raw}; using online temperature.")
-        return None
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        log.warning(f"Local sensor {entity} state {raw!r} is not numeric; using online temperature.")
-        return None
-
-    last_changed = state.get('last_changed') or ''
-    try:
-        changed_at = datetime.fromisoformat(last_changed.replace('Z', '+00:00'))
-        age = (datetime.now(changed_at.tzinfo) - changed_at).total_seconds()
-    except ValueError:
-        log.warning(f"Local sensor {entity} has unparseable last_changed {last_changed!r}; using online temperature.")
-        return None
-    if age > HA_MAX_AGE_SECONDS:
-        log.warning(f"Local sensor {entity} value unchanged for {int(age // 60)} min; using online temperature.")
-        return None
-
-    unit = (state.get('attributes') or {}).get('unit_of_measurement')
-    temp_f = round(to_fahrenheit(value, unit), 1)
-    log.info(f"Local sensor {entity}: {raw}{unit or ''} -> {temp_f}°F (changed {int(age)}s ago).")
-    return temp_f
-
 
 def ensure_weather_schema():
-    """Create/upgrade the weather table.
-
-    Runs before any network call so a fresh install has the table even when the
-    first fetch fails and the PHP pages read it as empty instead of erroring.
-    Retry pacing on an offline station is handled in overview.php, which
-    rate-limits its on-demand sync.
-    """
+    """Add only: never rebuild a table or remove a row, including old installs."""
     try:
-        con = sqlite3.connect(DB_PATH)
-        cur = con.cursor()
-
-        # Ensure the weather table exists isolated from the detections table
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS weather (
-                Date DATE,
-                Hour INT,
-                Temp FLOAT,
-                ConditionCode INT,
-                IsDay INT,
-                WindSpeed FLOAT,
-                WindDirection INT,
-                PRIMARY KEY(Date, Hour)
-            )
-        ''')
-
-        # Check for new columns (for existing tables)
-        cur.execute("PRAGMA table_info(weather)")
-        columns = [column[1] for column in cur.fetchall()]
-        if 'IsDay' not in columns:
-            cur.execute("ALTER TABLE weather ADD COLUMN IsDay INT DEFAULT 1")
-        if 'WindSpeed' not in columns:
-            cur.execute("ALTER TABLE weather ADD COLUMN WindSpeed FLOAT")
-        if 'WindDirection' not in columns:
-            cur.execute("ALTER TABLE weather ADD COLUMN WindDirection INT")
-
-        con.commit()
-        con.close()
+        with closing(sqlite3.connect(DB_PATH, timeout=2)) as con, con:
+            con.execute("""CREATE TABLE IF NOT EXISTS weather (
+                Date DATE, Hour INT, Temp FLOAT, ConditionCode INT, IsDay INT,
+                WindSpeed FLOAT, WindDirection INT, PRIMARY KEY(Date, Hour))""")
+            columns = {row[1] for row in con.execute('PRAGMA table_info(weather)')}
+            for column, declaration in (('IsDay', 'INT'), ('WindSpeed', 'FLOAT'),
+                                        ('WindDirection', 'INT')):
+                if column not in columns:
+                    con.execute(f'ALTER TABLE weather ADD COLUMN {column} {declaration}')
+            con.execute("""CREATE TABLE IF NOT EXISTS weather_sync_runs (
+                Id INTEGER PRIMARY KEY, Date TEXT NOT NULL, Hour INTEGER NOT NULL,
+                CollectedAt REAL NOT NULL, FinishedAt REAL, LocalStatus TEXT NOT NULL,
+                OnlineStatus TEXT NOT NULL DEFAULT 'pending', OnlineMessage TEXT NOT NULL DEFAULT '')""")
+            con.execute("""CREATE INDEX IF NOT EXISTS weather_runs_hour
+                ON weather_sync_runs (Date, Hour, Id DESC)""")
+            con.execute("""CREATE TABLE IF NOT EXISTS weather_local_observations (
+                Id INTEGER PRIMARY KEY, RunId INTEGER NOT NULL, Date TEXT NOT NULL,
+                Hour INTEGER NOT NULL, Field TEXT NOT NULL, Value REAL NOT NULL,
+                Entity TEXT NOT NULL, ReportedAt REAL NOT NULL,
+                UNIQUE(RunId, Field))""")
+            con.execute("""CREATE INDEX IF NOT EXISTS weather_local_hour
+                ON weather_local_observations (Date, Hour, Field, RunId DESC)""")
         return True
-    except Exception as e:
-        log.error(f"Database error creating weather table: {e}")
+    except sqlite3.Error as exc:
+        log.error("Cannot prepare weather storage: %s", exc)
         return False
+
+
+@contextmanager
+def sync_lock():
+    """Cron and manual syncs must not race; no DB lock is held during HTTP."""
+    with open(DB_PATH + '.weather-sync.lock', 'a+b') as handle:
+        if os.name == 'nt':
+            import msvcrt
+            handle.seek(0)
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError:
+                yield False
+                return
+            try:
+                yield True
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                yield False
+                return
+            try:
+                yield True
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def save_local(readings, status, collected_at):
+    """Append a complete local attempt before waiting for the online service.
+
+    Empty attempts matter: the current display falls back immediately after an
+    unsuccessful local fetch. Past hours still retain their last good observation.
+    """
+    local = datetime.fromtimestamp(collected_at)
+    date, hour = local.strftime('%Y-%m-%d'), local.hour
+    with closing(sqlite3.connect(DB_PATH, timeout=2)) as con, con:
+        run = con.execute("""INSERT INTO weather_sync_runs
+            (Date, Hour, CollectedAt, LocalStatus) VALUES (?, ?, ?, ?)""",
+                          (date, hour, collected_at, json.dumps(status))).lastrowid
+        for field, (value, entity, reported_at) in readings.items():
+            if field not in FIELDS or field == 'IsDay':
+                raise ValueError('Unsupported local weather field')
+            con.execute("""INSERT INTO weather_local_observations
+                (RunId, Date, Hour, Field, Value, Entity, ReportedAt) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (run, date, hour, field, value, entity, reported_at))
+    return run
+
+
+def hourly_rows(data):
+    """Validate the online response before any existing weather is updated."""
+    hourly = data.get('hourly') if isinstance(data, dict) else None
+    names = ('time', 'temperature_2m', 'weather_code', 'is_day',
+             'wind_speed_10m', 'wind_direction_10m')
+    if not isinstance(hourly, dict) or any(not isinstance(hourly.get(k), list) for k in names):
+        raise ValueError('Incomplete hourly response')
+    if not hourly['time'] or len({len(hourly[k]) for k in names}) != 1:
+        raise ValueError('Inconsistent hourly response')
+    zone = None
+    if data.get('timezone'):
+        try:
+            zone = ZoneInfo(data['timezone'])
+        except (ZoneInfoNotFoundError, TypeError, ValueError):
+            raise ValueError('Unknown online timezone') from None
+    rows = []
+    for raw_time, raw_temp, raw_code, raw_day, raw_wind, raw_direction in zip(*(hourly[k] for k in names)):
+        dt = datetime.fromisoformat(raw_time)
+        # Open-Meteo's timezone=auto may differ from the Pi's timezone. Database
+        # hour keys must use the same local clock as detections and the PHP UI.
+        if dt.tzinfo is None and zone is not None:
+            dt = dt.replace(tzinfo=zone)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone()
+        temp, code, day, wind, direction = map(number, (raw_temp, raw_code, raw_day, raw_wind, raw_direction))
+        temp = temp if temp is not None and temp >= -459.67 else None
+        code = int(code) if code in WMO_CODES else None
+        day = int(day) if day in (0, 1) else None
+        wind = wind if wind is not None and wind >= 0 else None
+        direction = direction % 360 if direction is not None and 0 <= direction <= 360 else None
+        if any(v is not None for v in (temp, code, day, wind, direction)):
+            rows.append((dt.strftime('%Y-%m-%d'), dt.hour, temp, code, day, wind, direction))
+    if not rows:
+        raise ValueError('No usable online readings')
+    return rows
+
+
+def save_online(rows, now):
+    """Fill missing history; only update an existing current/future hour.
+
+    ON CONFLICT UPDATE preserves row identity (unlike INSERT OR REPLACE).
+    A partial response never clears a previously stored value.
+    """
+    date, hour = now.strftime('%Y-%m-%d'), now.hour
+    assignments = ', '.join(f'{field}=COALESCE(excluded.{field}, weather.{field})' for field in FIELDS)
+    sql = f"""INSERT INTO weather (Date, Hour, {', '.join(FIELDS)})
+        VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Date, Hour) DO UPDATE SET {assignments}
+        WHERE weather.Date > ? OR (weather.Date = ? AND weather.Hour >= ?)"""
+    with closing(sqlite3.connect(DB_PATH, timeout=2)) as con, con:
+        con.executemany(sql, [tuple(row) + (date, date, hour) for row in rows])
+
+
+def finish_run(run, status, message):
+    with closing(sqlite3.connect(DB_PATH, timeout=2)) as con, con:
+        con.execute("""UPDATE weather_sync_runs SET OnlineStatus=?, OnlineMessage=?, FinishedAt=?
+            WHERE Id=?""", (status, message, time.time(), run))
 
 
 def update_weather():
     conf = get_settings()
     if not weather_sync_enabled(conf):
-        log.info("Weather syncing is disabled in Settings.")
+        log.info('Weather syncing is disabled in Settings.')
         return
-
-    lat = conf.get('LATITUDE', None)
-    lon = conf.get('LONGITUDE', None)
-
     if not ensure_weather_schema():
         return
-
-    if lat is None or lon is None or lat == '' or lon == '':
-        log.error("Latitude or Longitude not set. Cannot fetch weather.")
-        return
-
-    data = fetch_hourly(lat, lon)
-    if data is None:
-        return
-
-    local_temp = fetch_ha_temperature(conf)
-
-    # Parse data
-    times = data['hourly']['time']
-    temps = data['hourly']['temperature_2m']
-    codes = data['hourly']['weather_code']
-    is_days = data['hourly']['is_day']
-    winds = data['hourly']['wind_speed_10m']
-    dirs = data['hourly']['wind_direction_10m']
-
-    # Connect to the SQLite DB
     try:
-        con = sqlite3.connect(DB_PATH)
-        cur = con.cursor()
+        with sync_lock() as acquired:
+            if not acquired:
+                log.info('A weather sync is already running.')
+                return
+            readings, status = collect_local_weather(conf)
+            run = save_local(readings, status, time.time())
+            lat, lon = number(conf.get('LATITUDE')), number(conf.get('LONGITUDE'))
+            if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                finish_run(run, 'unavailable', 'Station coordinates are missing or invalid.')
+                return
+            data = fetch_hourly(lat, lon)
+            if data is None:
+                finish_run(run, 'unavailable', 'Open-Meteo could not be reached; saved local observations remain available.')
+                return
+            try:
+                rows = hourly_rows(data)
+            except (ValueError, TypeError, OverflowError):
+                finish_run(run, 'unavailable', 'Open-Meteo returned incomplete or invalid weather.')
+                return
+            save_online(rows, datetime.now())
+            finish_run(run, 'ok', 'Online weather synced; completed historical hours preserved.')
+            log.info('Weather synced: %d local fields, %d online hours.', len(readings), len(rows))
+    except (sqlite3.Error, OSError) as exc:
+        log.error('Weather sync could not be saved: %s', exc)
 
-        # Insert or replace hourly metrics
-        for t, temp, code, is_day, wind, direction in zip(times, temps, codes, is_days, winds, dirs):
-            if temp is None:
-                continue
-            dt = datetime.fromisoformat(t)
-            date_str = dt.strftime('%Y-%m-%d')
-            hour = dt.hour
-            
-            cur.execute("INSERT OR REPLACE INTO weather (Date, Hour, Temp, ConditionCode, IsDay, WindSpeed, WindDirection) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (date_str, hour, temp, code, is_day, wind, direction))
-                        
-        # The local sensor wins the current hour when healthy; every other
-        # hour (and every fallback case) keeps the online value.
-        if local_temp is not None:
-            now = datetime.now()
-            cur.execute("UPDATE weather SET Temp = ? WHERE Date = ? AND Hour = ?",
-                        (local_temp, now.strftime('%Y-%m-%d'), now.hour))
-            log.info(f"Current hour temperature set from local sensor: {local_temp}°F.")
-
-        con.commit()
-        con.close()
-        log.info("Hourly weather data synced successfully to birds.db.")
-    except Exception as e:
-        log.error(f"Database error writing weather: {e}")
 
 if __name__ == '__main__':
     update_weather()

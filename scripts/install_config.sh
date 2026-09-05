@@ -121,14 +121,15 @@ APPRISE_QUIET_HOURS_END=""
 ## Detections of a species within this many quiet minutes belong to one visit
 VISIT_GAP_MINUTES=5
 
-#----------------------  Local Temperature Sensor ------------------------#
-## Optional: current-hour temperature from a Home Assistant sensor instead of
-## the online weather model. Leave blank to disable. Falls back to online
-## weather automatically when the sensor is unreachable, unavailable, or its
-## value has not changed in over an hour.
+#----------------------  Local Weather ------------------------#
+## Optional Home Assistant entities. A weather.* entity supplies temperature,
+## wind and supported conditions; a sensor.* entity takes temperature priority.
+## Reports older than one hour or invalid fields use available online fallback.
+## Blank entities disable local collection. WEATHER_ENABLED=0 stops both sources.
 HA_URL=""
 HA_TOKEN=""
 HA_TEMP_ENTITY=""
+HA_WEATHER_ENTITY=""
 
 #----------------------  Display & Units ------------------------#
 ## fahrenheit or celsius (weather is stored in Fahrenheit; display converts)

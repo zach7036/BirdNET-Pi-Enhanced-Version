@@ -379,6 +379,9 @@ fi
 if ! grep -E '^HA_TEMP_ENTITY=' /etc/birdnet/birdnet.conf &>/dev/null;then
   echo 'HA_TEMP_ENTITY=""' >> /etc/birdnet/birdnet.conf
 fi
+if ! grep -E '^HA_WEATHER_ENTITY=' /etc/birdnet/birdnet.conf &>/dev/null;then
+  echo 'HA_WEATHER_ENTITY=""' >> /etc/birdnet/birdnet.conf
+fi
 if ! grep -E '^PROTECTED_RECORDINGS_PER_SPECIES=' /etc/birdnet/birdnet.conf &>/dev/null;then
   echo 'PROTECTED_RECORDINGS_PER_SPECIES=2' >> /etc/birdnet/birdnet.conf
 fi

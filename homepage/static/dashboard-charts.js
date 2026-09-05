@@ -151,7 +151,9 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         function getWeatherEmoji(code, is_day) {
+            if (window.BirdNETUI) return BirdNETUI.weatherEmoji(code, is_day);
             if (code === undefined || code === null) return '';
+            if (code === 0 && is_day !== 0 && is_day !== 1) return '○';
             var isNight = is_day === 0;
             if (code === 0) return isNight ? '🌙' : '☀️';
             if (code >= 1 && code <= 3) return isNight ? '☁️' : '⛅';
@@ -189,7 +191,7 @@
                 ctx.fillText(emoji, x, yHour - 16);
                 ctx.font = '10px Roboto Flex, sans-serif';
                 ctx.fillStyle = isDark ? '#aaaaaa' : '#666666';
-                ctx.fillText(w.temp + '°', x, yHour - 28);
+                ctx.fillText(w.temp == null ? '—' : w.temp + '°', x, yHour - 28);
             }
         });
 
@@ -400,8 +402,9 @@
                         85: 'Slight Snow Showers', 86: 'Heavy Snow Showers',
                         95: 'Thunderstorm', 96: 'Thunderstorm with Hail', 99: 'Thunderstorm with Heavy Hail'
                     };
-                    var cond = codes[w.code] || 'Cloudy';
-                    weatherStr = '<br><span style="color:#aaa;font-size:10px;">' + w.temp + ((window.BIRDNET_UNITS && window.BIRDNET_UNITS.tempSuffix) || '°F') + ' • ' + cond + '</span>';
+                    var cond = codes[w.code] || 'Conditions unavailable';
+                    var tempText = w.temp == null ? 'Temperature unavailable' : w.temp + ((window.BIRDNET_UNITS && window.BIRDNET_UNITS.tempSuffix) || '°F');
+                    weatherStr = '<br><span style="color:#aaa;font-size:10px;">' + tempText + ' • ' + cond + '</span>';
                 }
                 tooltip.innerHTML = '<strong>' + name + '</strong><br>' + hour + ':00 — ' + val + ' detection' + (val !== 1 ? 's' : '') + weatherStr;
                 tooltip.style.display = 'block';

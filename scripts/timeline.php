@@ -49,17 +49,7 @@ $tl_date = isset($_GET['date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['da
   var date = document.querySelector('.timeline-page').getAttribute('data-date');
 
   function weatherEmoji(code, isDay) {
-    code = Number(code);
-    isDay = Number(isDay) !== 0;
-    if (code === 0) return isDay ? '☀️' : '🌙';
-    if (code >= 1 && code <= 3) return isDay ? '⛅' : '☁️';
-    if (code === 45 || code === 48) return '🌫️';
-    if (code >= 51 && code <= 55) return isDay ? '🌦️' : '🌧️';
-    if (code >= 61 && code <= 65) return '🌧️';
-    if (code >= 71 && code <= 75) return '❄️';
-    if (code >= 80 && code <= 82) return isDay ? '🌦️' : '🌧️';
-    if (code >= 95) return '⛈️';
-    return '☁️';
+    return window.BirdNETUI ? BirdNETUI.weatherEmoji(code, isDay) : '';
   }
 
   function hourLabel(h) {
@@ -113,7 +103,7 @@ $tl_date = isset($_GET['date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['da
     for (var h = 0; h < 24; h++) {
       var w = data.weather ? data.weather[h] : null;
       weatherHtml += '<div class="tl-wcell">' + (w
-        ? '<span class="hm-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span><span class="hm-temp">' + w.temp + '&deg;</span>'
+        ? '<span class="hm-weather" aria-hidden="true">' + weatherEmoji(w.code, w.is_day) + '</span><span class="hm-temp">' + BirdNETUI.weatherTemperature(w.temp) + '</span>'
         : '') + '</div>';
       hoursHtml += '<div class="tl-hcell">' + hourLabel(h) + '</div>';
     }
