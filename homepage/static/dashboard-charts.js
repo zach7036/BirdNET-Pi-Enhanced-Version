@@ -7,7 +7,69 @@
 (function () {
     'use strict';
 
-    var heatmapChart = null;
+    var heatResizeTimer;
+    var heatmapResizeObserver = null;
+    var observedHeatmapHost = null;
+    var observedHeatmapWidth = null;
+
+    function heatmapContentWidth(host) {
+        var style = getComputedStyle(host);
+        // clientWidth includes padding, which is not drawable canvas space.
+        // Never fall back to canvas.width: that is the high-DPI backing bitmap.
+        return Math.max(0, Math.floor(host.clientWidth -
+            (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)));
+    }
+
+    function heatmapLayout(width, hasWeather) {
+        var labelWidth = Math.min(220, width * 0.35);
+        return {
+            labelWidth: labelWidth,
+            cellWidth: (width - labelWidth - 10) / 24,
+            cellHeight: 32,
+            headerHeight: hasWeather ? 48 : 30
+        };
+    }
+
+    function scheduleHeatmapResize() {
+        clearTimeout(heatResizeTimer);
+        heatResizeTimer = setTimeout(function () {
+            var canvas = document.getElementById('hourlyHeatmap');
+            if (canvas && lastData) renderHeatmap(canvas, lastData);
+        }, 150);
+    }
+
+    function observeHeatmapSize(canvas) {
+        var host = canvas.parentElement;
+        if (!window.ResizeObserver || host === observedHeatmapHost) return;
+        if (!heatmapResizeObserver) {
+            heatmapResizeObserver = new ResizeObserver(function (entries) {
+                var currentCanvas = document.getElementById('hourlyHeatmap');
+                // Grid/Heatmap switching replaces the wrapper. Release the old
+                // node, and bind the next wrapper when its canvas is rendered.
+                if (!currentCanvas || currentCanvas.parentElement !== observedHeatmapHost) {
+                    heatmapResizeObserver.disconnect();
+                    observedHeatmapHost = null;
+                    observedHeatmapWidth = null;
+                    return;
+                }
+                entries.forEach(function (entry) {
+                    if (entry.target !== observedHeatmapHost) return;
+                    var width = heatmapContentWidth(observedHeatmapHost);
+                    // Drawing changes the wrapper's height. Only width changes
+                    // need a redraw, otherwise the observer can feed itself.
+                    if (width !== observedHeatmapWidth) {
+                        observedHeatmapWidth = width;
+                        scheduleHeatmapResize();
+                    }
+                });
+            });
+        }
+        heatmapResizeObserver.disconnect();
+        observedHeatmapHost = host;
+        observedHeatmapWidth = heatmapContentWidth(host);
+        heatmapResizeObserver.observe(host);
+    }
+
     var imageCache = {};
     // Thumbnails that failed to load, keyed by URL -> {at, count}. The retry
     // delay doubles with each consecutive failure (30s, 60s, ... 10 min) so an
@@ -74,6 +136,10 @@
         // detached element (the bug once misreported as a JSON parse error).
         var host = canvas.parentElement;
         if (!host) return;
+        observeHeatmapSize(canvas);
+        // Do not leave a stale tooltip positioned against the previous size.
+        var tooltip = host.querySelector('.chart-tooltip');
+        if (tooltip) tooltip.style.display = 'none';
         var emptyMsg = host.querySelector('.heatmap-empty-msg');
         if (!data || !data.species || data.species.length === 0) {
             canvas.style.display = 'none';
@@ -103,14 +169,16 @@
         // Build datasets: one dataset per species (row), each containing 24 values
         // We'll use a simple grid rendered on canvas since Chart.js 2.x doesn't have a built-in heatmap
         var ctx = canvas.getContext('2d');
-        var width = Math.max(canvas.parentElement.clientWidth || canvas.width, 760);
-        var cellHeight = 32;
-        var labelWidth = Math.min(220, width * 0.35);
-        var chartWidth = width - labelWidth - 10;
-        var cellWidth = chartWidth / 24;
+        // Retain readable 24-hour cells and horizontal scrolling on small
+        // screens; wider charts fit inside the wrapper's padding exactly.
+        var width = Math.max(heatmapContentWidth(host), 760);
+        var layout = heatmapLayout(width, hasWeather);
+        var cellHeight = layout.cellHeight;
+        var labelWidth = layout.labelWidth;
+        var cellWidth = layout.cellWidth;
 
         // Make space for the weather row and the hour header
-        var headerHeight = hasWeather ? 48 : 30;
+        var headerHeight = layout.headerHeight;
         var totalHeight = headerHeight + (speciesNames.length * cellHeight) + 4;
 
         // Support High-DPI (Retina) displays for crystal clear text
@@ -327,7 +395,7 @@
         if (!canvas.parentElement) return;
         var tooltip = document.createElement('div');
         tooltip.className = 'chart-tooltip';
-        tooltip.style.cssText = 'display:none;position:absolute;background:rgba(0,0,0,0.8);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;pointer-events:none;z-index:100;white-space:nowrap;';
+        tooltip.style.cssText = 'display:none;position:absolute;background:rgba(0,0,0,0.8);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;pointer-events:none;z-index:100;width:max-content;white-space:normal;overflow-wrap:anywhere;';
         canvas.parentElement.style.position = 'relative';
         canvas.parentElement.appendChild(tooltip);
 
@@ -348,11 +416,12 @@
             // Use client coordinates relative to the bounding box (CSS pixels)
             var x = e.clientX - rect.left;
             var y = e.clientY - rect.top;
-            var width = rect.width; // Use CSS width
-            var labelWidth = Math.min(220, width * 0.35); // Matches renderHeatmap exactly
-            var cellWidth = (width - labelWidth - 10) / 24;
-            var headerHeight = hasWeather ? 48 : 30;
-            var cellHeight = 32;
+            // Drawing and hit testing share the same CSS-pixel geometry.
+            var layout = heatmapLayout(rect.width, hasWeather);
+            var labelWidth = layout.labelWidth;
+            var cellWidth = layout.cellWidth;
+            var headerHeight = layout.headerHeight;
+            var cellHeight = layout.cellHeight;
 
             var hour = Math.floor((x - labelWidth) / cellWidth);
             var row = Math.floor((y - headerHeight) / cellHeight);
@@ -407,20 +476,23 @@
                     weatherStr = '<br><span style="color:#aaa;font-size:10px;">' + tempText + ' • ' + cond + '</span>';
                 }
                 tooltip.innerHTML = '<strong>' + name + '</strong><br>' + hour + ':00 — ' + val + ' detection' + (val !== 1 ? 's' : '') + weatherStr;
+                var host = canvas.parentElement;
+                var hostRect = host.getBoundingClientRect();
+                var pointerX = e.clientX - hostRect.left - host.clientLeft;
+                var pointerY = e.clientY - hostRect.top - host.clientTop;
+                tooltip.style.maxWidth = Math.max(0, host.clientWidth - 16) + 'px';
                 tooltip.style.display = 'block';
-                var tipX = e.clientX - rect.left + 30;
-                // Flip to left side if near right edge
-                if (tipX + 180 > canvas.parentElement.clientWidth) {
-                    tipX = e.clientX - rect.left - 12;
-                    // Measure actual tooltip width and shift left
-                    tooltip.style.left = 'auto';
-                    tooltip.style.right = (rect.right - e.clientX + 12) + 'px';
-                    tooltip.style.top = (e.clientY - rect.top - 30) + 'px';
-                } else {
-                    tooltip.style.right = 'auto';
-                    tooltip.style.left = tipX + 'px';
-                    tooltip.style.top = (e.clientY - rect.top - 30) + 'px';
+                // Clamp to the visible scrollport, including after a phone has
+                // scrolled to late hours. A tooltip must not create overflow.
+                var tipX = pointerX + 18;
+                if (tipX + tooltip.offsetWidth > host.clientWidth - 8) {
+                    tipX = pointerX - tooltip.offsetWidth - 12;
                 }
+                tipX = Math.max(8, Math.min(tipX, host.clientWidth - tooltip.offsetWidth - 8));
+                var tipY = Math.max(0, Math.min(pointerY - tooltip.offsetHeight - 12,
+                    host.clientHeight - tooltip.offsetHeight));
+                tooltip.style.left = (host.scrollLeft + tipX) + 'px';
+                tooltip.style.top = (host.scrollTop + tipY) + 'px';
             } else {
                 tooltip.style.display = 'none';
             }
@@ -438,11 +510,10 @@
             var rect = canvas.getBoundingClientRect();
             var x = e.clientX - rect.left;
             var y = e.clientY - rect.top;
-            var labelWidth = Math.min(220, rect.width * 0.35);
             var hasWeather = lastData.weather && Object.keys(lastData.weather).length > 0;
-            var headerHeight = hasWeather ? 48 : 30;
-            var row = Math.floor((y - headerHeight) / 32);
-            if (row >= 0 && row < species.length && x > 5 && x < labelWidth && species[row].sciName) {
+            var layout = heatmapLayout(rect.width, hasWeather);
+            var row = Math.floor((y - layout.headerHeight) / layout.cellHeight);
+            if (row >= 0 && row < species.length && x > 5 && x < layout.labelWidth && species[row].sciName) {
                 window.location = '?view=Bird&sci_name=' + encodeURIComponent(species[row].sciName);
             }
         });
@@ -509,19 +580,9 @@
         }
     };
 
-    // Re-render heatmap on resize/zoom so it fits the new container width
-    var heatResizeTimer;
-    window.addEventListener('resize', function () {
-        clearTimeout(heatResizeTimer);
-        heatResizeTimer = setTimeout(function () {
-            if (lastData) {
-                var heatCanvas = document.getElementById('hourlyHeatmap');
-                if (heatCanvas) {
-                    renderHeatmap(heatCanvas, lastData);
-                }
-            }
-        }, 300);
-    });
+    // Also handle browser zoom/DPI changes and older browsers without
+    // ResizeObserver. This redraws cached data; it never fetches new data.
+    window.addEventListener('resize', scheduleHeatmapResize);
 
     // Canvas pixels do not respond to CSS theme changes. Redraw from the
     // already-cached data when the app theme changes; no new request is needed.
