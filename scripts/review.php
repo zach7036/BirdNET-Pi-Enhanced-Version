@@ -12,13 +12,16 @@ require_once 'scripts/common.php';
     <span class="ui-meta" id="reviewQueueMeta">Loading&hellip;</span>
   </div>
   <p class="doctor-intro">
-    Visits worth a second listen: uncertain confidence (60&ndash;85% best match) or a first-ever species.
-    One decision covers every detection in the visit. Actions require sign-in.
+    Visits worth a second listen: uncertain IDs, first-ever or rare species, and frequently rejected matches.
+    One decision covers the displayed visit window. New detections may need another review. Actions require sign-in.
   </p>
   <div class="review-toolbar">
+    <button type="button" class="ui-button-link" id="reviewRefresh">Refresh queue</button>
     <span class="review-progress" id="reviewProgress"></span>
     <span class="review-keys">Keys: <kbd>&darr;</kbd>/<kbd>&uarr;</kbd> move &middot; <kbd>Space</kbd> play &middot; <kbd>Y</kbd> confirm &middot; <kbd>N</kbd> not this bird &middot; <kbd>R</kbd> reassign &middot; <kbd>U</kbd> unsure &middot; <kbd>H</kbd> hide</span>
   </div>
+  <div id="reviewActionStatus" class="review-done" role="status" aria-live="polite"></div>
+  <div id="reviewLoadStatus" class="review-error" role="alert"></div>
   <div id="reviewSuggestions"></div>
   <div id="reviewQueue" class="review-queue">
     <div class="ui-skeleton-block" aria-hidden="true">
@@ -58,6 +61,24 @@ require_once 'scripts/common.php';
   var reviewedCount = 0;
   var exampleCache = {};
   var labelsCache = null;
+  var loading = false;
+  var saving = false;
+  var reassignNeedsRefresh = false;
+
+  function updateBusy() {
+    var modalOpen = document.getElementById('reassignModal').style.display !== 'none';
+    document.getElementById('reviewRefresh').disabled = loading || saving || modalOpen;
+    document.querySelectorAll('.review-btn').forEach(function (button) {
+      button.disabled = loading || saving || modalOpen || button.closest('.review-card').classList.contains('reviewed');
+    });
+    document.getElementById('reviewQueue').setAttribute('aria-busy', loading || saving ? 'true' : 'false');
+  }
+
+  function notifyReviewChange() {
+    // Wake a Now page open in another tab. Storage may be blocked in private
+    // browsers; its regular refresh remains the fallback.
+    try { localStorage.setItem('birdnet-reviews-changed', Date.now() + ':' + Math.random()); } catch (e) {}
+  }
 
   function clipUrl(path, ext) {
     return '/By_Date/' + path.split('/').map(encodeURIComponent).join('/') + (ext || '');
@@ -65,16 +86,27 @@ require_once 'scripts/common.php';
 
   function updateProgress() {
     document.getElementById('reviewProgress').textContent =
-      reviewedCount + ' of ' + queue.length + ' reviewed this session';
+      reviewedCount + ' reviewed this session';
   }
 
   function loadQueue() {
-    fetch('api/v1/reviews/queue?days=7&limit=25&_=' + Date.now(), { headers: { 'Accept': 'application/json' } })
+    if (loading || saving) return Promise.resolve();
+    loading = true;
+    updateBusy();
+    document.getElementById('reviewLoadStatus').textContent = '';
+    // Reload the first remaining batch. Advancing an offset after removing
+    // visits would skip work, and local subtraction misses eligibility changes.
+    return fetch('api/v1/reviews/queue?days=7&limit=25&_=' + Date.now(), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { if (!r.ok) throw new Error('queue failed'); return r.json(); })
       .then(function (data) {
-        queue = data.queue || [];
+        if (!Array.isArray(data.queue) || !Number.isInteger(data.total) || data.total < 0 ||
+            (data.total > 0 && data.queue.length === 0)) throw new Error('Invalid queue response');
+        queue = data.queue;
+        activeIdx = -1;
+        exampleCache = {};
         document.getElementById('reviewQueueMeta').textContent =
-          data.total + ' visit' + (data.total === 1 ? '' : 's') + ' to review (last ' + data.days + ' days)';
+          data.total + ' visit' + (data.total === 1 ? '' : 's') + ' to review (last ' + data.days + ' days)' +
+          (data.total > queue.length ? ' · showing ' + queue.length : '');
         updateProgress();
         renderSuggestions(data.suggestions || []);
         var box = document.getElementById('reviewQueue');
@@ -112,8 +144,13 @@ require_once 'scripts/common.php';
         setActive(0);
       })
       .catch(function () {
-        document.getElementById('reviewQueue').innerHTML =
-          '<div class="ui-message ui-message-error" role="alert"><strong>Queue unavailable</strong><span>Could not load the review queue.</span></div>';
+        document.getElementById('reviewQueueMeta').textContent = 'Review count unavailable';
+        document.getElementById('reviewLoadStatus').textContent = 'Could not refresh the queue. Use Refresh queue to retry.';
+        if (!queue.length) document.getElementById('reviewQueue').innerHTML = '';
+      })
+      .then(function () {
+        loading = false;
+        updateBusy();
       });
   }
 
@@ -204,21 +241,24 @@ require_once 'scripts/common.php';
 
   function markCardDone(i, message) {
     var card = document.getElementById('reviewCard' + i);
+    if (!card || card.classList.contains('reviewed')) return;
     card.classList.add('reviewed');
     card.querySelectorAll('.review-btn').forEach(function (b) { b.disabled = true; });
-    document.getElementById('reviewResult' + i).innerHTML = '<span class="review-done">' + message + '</span>';
+    document.getElementById('reviewResult' + i).textContent = message;
+    document.getElementById('reviewActionStatus').textContent = message;
     reviewedCount++;
     updateProgress();
-    if (i === activeIdx) {
-      var next = i + 1;
-      while (next < queue.length && document.getElementById('reviewCard' + next) && document.getElementById('reviewCard' + next).classList.contains('reviewed')) next++;
-      if (next < queue.length) setActive(next);
-    }
   }
 
   function submitReview(i, status) {
+    var card = document.getElementById('reviewCard' + i);
+    if (loading || saving || !card || card.classList.contains('reviewed')) return;
     var v = queue[i];
     var resultBox = document.getElementById('reviewResult' + i);
+    saving = true;
+    updateBusy();
+    document.getElementById('reviewActionStatus').textContent = '';
+    resultBox.textContent = 'Saving…';
     fetch('api/v1/reviews', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -233,11 +273,17 @@ require_once 'scripts/common.php';
         return r.json();
       })
       .then(function (j) {
+        if (j.status !== 'ok' || !Number.isInteger(j.affected) || j.affected < 1) throw new Error('The station did not confirm the save. Refresh the queue before retrying.');
         var labels = { confirmed: 'confirmed', false_positive: 'marked not this bird', unsure: 'marked unsure', hidden: 'hidden' };
         markCardDone(i, 'Saved - ' + j.affected + ' detection' + (j.affected === 1 ? '' : 's') + ' ' + (labels[status] || status) + '.');
+        notifyReviewChange();
+        saving = false;
+        return loadQueue();
       })
       .catch(function (err) {
         resultBox.innerHTML = '<span class="review-error">' + esc(err.message) + '</span>';
+        saving = false;
+        updateBusy();
       });
   }
 
@@ -245,9 +291,14 @@ require_once 'scripts/common.php';
   var reassignTarget = -1;
 
   function openReassign(i) {
+    var card = document.getElementById('reviewCard' + i);
+    if (loading || saving || !card || card.classList.contains('reviewed')) return;
     reassignTarget = i;
+    reassignNeedsRefresh = false;
     var modal = document.getElementById('reassignModal');
     modal.style.display = '';
+    updateBusy();
+    document.getElementById('reassignGo').disabled = false;
     document.getElementById('reassignStatus').innerHTML = '';
     document.getElementById('reassignFilter').value = '';
     var fill = function () {
@@ -279,33 +330,48 @@ require_once 'scripts/common.php';
   }
 
   document.getElementById('reassignFilter').addEventListener('input', function () { fillReassignList(this.value); });
-  document.getElementById('reassignCancel').addEventListener('click', function () {
+  function closeReassign() {
+    if (saving) return;
     document.getElementById('reassignModal').style.display = 'none';
-  });
+    updateBusy();
+    if (reassignNeedsRefresh) loadQueue();
+  }
+  document.getElementById('reassignCancel').addEventListener('click', closeReassign);
   document.getElementById('reassignModal').addEventListener('click', function (e) {
-    if (e.target === this) this.style.display = 'none';
+    if (e.target === this) closeReassign();
   });
 
   document.getElementById('reassignGo').addEventListener('click', function () {
     var list = document.getElementById('reassignList');
     var newLabel = list.value;
-    if (!newLabel || reassignTarget < 0) return;
+    if (!newLabel || reassignTarget < 0 || saving || loading || reassignNeedsRefresh) return;
     var v = queue[reassignTarget];
     var clips = v.member_clips || [];
     var status = document.getElementById('reassignStatus');
     var go = this;
+    if (!clips.length) return;
+    saving = true;
+    updateBusy();
+    document.getElementById('reviewActionStatus').textContent = '';
+    document.getElementById('reassignCancel').disabled = true;
     go.disabled = true;
     var done = 0;
     var failed = 0;
     var lastError = '';
 
     var finish = function () {
-      go.disabled = false;
+      saving = false;
+      document.getElementById('reassignCancel').disabled = false;
+      // Even a lost response can mean a file was renamed. Refresh before
+      // another attempt, rather than reusing possibly stale member paths.
+      reassignNeedsRefresh = true;
+      notifyReviewChange();
       if (failed === 0) {
-        document.getElementById('reassignModal').style.display = 'none';
-        markCardDone(reassignTarget, 'Reassigned ' + done + ' detection' + (done === 1 ? '' : 's') + ' to ' + esc(newLabel.split('_')[1] || newLabel) + '.');
+        markCardDone(reassignTarget, 'Reassigned ' + done + ' detection' + (done === 1 ? '' : 's') + ' to ' + (newLabel.split('_')[1] || newLabel) + '.');
+        closeReassign();
       } else {
-        status.innerHTML = '<span class="review-error">' + done + ' renamed, ' + failed + ' failed. ' + lastError + '</span>';
+        status.innerHTML = '<span class="review-error">' + done + ' renamed, ' + failed + ' failed. ' + lastError + ' Close this dialog to refresh the remaining visits before retrying.</span>';
+        updateBusy();
       }
     };
 
@@ -370,10 +436,10 @@ require_once 'scripts/common.php';
   document.addEventListener('keydown', function (e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     if (document.getElementById('reassignModal').style.display !== 'none') {
-      if (e.key === 'Escape') document.getElementById('reassignModal').style.display = 'none';
+      if (e.key === 'Escape') closeReassign();
       return;
     }
-    if (activeIdx < 0 || queue.length === 0) return;
+    if (loading || saving || activeIdx < 0 || queue.length === 0) return;
     var card = document.getElementById('reviewCard' + activeIdx);
     var isDone = card && card.classList.contains('reviewed');
     switch (e.key) {
@@ -393,6 +459,7 @@ require_once 'scripts/common.php';
     }
   });
 
+  document.getElementById('reviewRefresh').addEventListener('click', loadQueue);
   loadQueue();
 })();
 </script>

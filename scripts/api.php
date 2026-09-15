@@ -717,22 +717,13 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     $new_today[] = ['species' => $row['Com_Name'], 'sci_name' => $row['Sci_Name'], 'first_time' => $row['first_time']];
   }
 
-  // Visit-level review count: visits whose BEST detection is in the uncertain
-  // band and not yet reviewed (matches what the Review queue actually shows).
-  $uncertain_best_files = [];
-  foreach ($visits_today as $v) {
-    if ($v['best_confidence'] >= 0.60 && $v['best_confidence'] < 0.85) {
-      $uncertain_best_files[$v['best_file']] = true;
-    }
-  }
-  $review_worthy = 0;
-  if (!empty($uncertain_best_files)) {
-    $reviewed = get_review_map($db, array_keys($uncertain_best_files));
-    foreach ($uncertain_best_files as $file => $unused) {
-      if (!isset($reviewed[$file])) {
-        $review_worthy++;
-      }
-    }
+  // Same seven-day queue and eligibility rules as the Review page.
+  // null means unavailable, not that the station has no pending reviews.
+  $review_worthy = null;
+  try {
+    $review_worthy = review_queue_data($db, ['limit' => 0])['total'];
+  } catch (Throwable $e) {
+    error_log('Review count unavailable: ' . $e->getMessage());
   }
 
   api_json([
@@ -923,142 +914,14 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   echo $payload;
 
 } elseif (preg_match('#^/api/v1/reviews/queue$#', $requestUri)) {
-  $days = request_int($_GET, 'days', 7, 1, 30);
-  $band_min = isset($_GET['band_min']) && is_numeric($_GET['band_min']) ? max(0, min(1, (float)$_GET['band_min'])) : 0.60;
-  $band_max = isset($_GET['band_max']) && is_numeric($_GET['band_max']) ? max(0, min(1, (float)$_GET['band_max'])) : 0.85;
-  $limit = request_int($_GET, 'limit', 50, 1, 200);
-  $offset = request_int($_GET, 'offset', 0, 0, 100000);
-
-  $visits = get_visits($db, ['days' => $days, 'include_detections' => true]);
-
-  $all_files = [];
-  foreach ($visits as $v) {
-    foreach ($v['detections'] as $d) {
-      $all_files[] = $d['file'];
-    }
+  try {
+    $options = array_intersect_key($_GET, array_flip(['days', 'band_min', 'band_max', 'limit', 'offset']));
+    $options['limit'] = request_int($_GET, 'limit', 50, 1, 200);
+    api_json(review_queue_data($db, $options));
+  } catch (Throwable $e) {
+    error_log('Review queue unavailable: ' . $e->getMessage());
+    api_error('Could not load the review queue. Please retry.', 503);
   }
-  $review_map = get_review_map($db, $all_files);
-
-  $first_seen_map = [];
-  $lifetime_map = [];
-  $fs_res = db_query_safe($db, 'SELECT Sci_Name, MIN(Date) AS first_seen, COUNT(*) AS lifetime FROM detections GROUP BY Sci_Name', 'queue first seen');
-  while ($row = db_fetch_assoc_safe($fs_res)) {
-    $first_seen_map[$row['Sci_Name']] = $row['first_seen'];
-    $lifetime_map[$row['Sci_Name']] = (int)$row['lifetime'];
-  }
-
-  // Per-species precision from review history: the station learns which IDs
-  // it can trust. n >= 10 decisions required before precision means anything.
-  $precision_map = [];
-  $review_stats = [];
-  if (spine_table_exists($db, 'detection_reviews')) {
-    $pr_res = db_query_safe($db, "SELECT sci_name, com_name,
-        SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed,
-        SUM(CASE WHEN status = 'false_positive' THEN 1 ELSE 0 END) AS rejected
-      FROM detection_reviews GROUP BY sci_name", 'queue precision');
-    while ($row = db_fetch_assoc_safe($pr_res)) {
-      $n = (int)$row['confirmed'] + (int)$row['rejected'];
-      $review_stats[$row['sci_name']] = [
-        'com_name' => $row['com_name'],
-        'confirmed' => (int)$row['confirmed'],
-        'rejected' => (int)$row['rejected']
-      ];
-      if ($n >= 10) {
-        $precision_map[$row['sci_name']] = (int)$row['confirmed'] / $n;
-      }
-    }
-  }
-
-  $queue = [];
-  foreach ($visits as $v) {
-    $unreviewed = 0;
-    foreach ($v['detections'] as $d) {
-      if (!isset($review_map[$d['file']])) {
-        $unreviewed++;
-      }
-    }
-    if ($unreviewed === 0) {
-      continue;
-    }
-    $precision = isset($precision_map[$v['sci_name']]) ? $precision_map[$v['sci_name']] : null;
-    $reasons = [];
-    // Uncertainty is judged at the visit level: a visit whose BEST detection
-    // is confident is not uncertain, even if weaker member detections exist.
-    // Auto-trust: species this station has consistently confirmed (>= 95%
-    // precision) skip the uncertainty routing - their track record speaks.
-    if ($v['best_confidence'] >= $band_min && $v['best_confidence'] < $band_max && !isset($review_map[$v['best_file']])) {
-      if ($precision === null || $precision < 0.95) {
-        $reasons[] = 'uncertain';
-      }
-    }
-    if (isset($first_seen_map[$v['sci_name']]) && $first_seen_map[$v['sci_name']] === $v['date']) {
-      $reasons[] = 'first_lifetime';
-    }
-    if (is_region_rare($v['sci_name'], $v['date'])) {
-      $reasons[] = 'region_rare';
-    }
-    if (!in_array('first_lifetime', $reasons, true)
-        && isset($lifetime_map[$v['sci_name']]) && $lifetime_map[$v['sci_name']] <= YARD_RARE_LIFETIME_MAX) {
-      $reasons[] = 'yard_rare';
-    }
-    // Auto-route: species this station usually rejects get reviewed even at
-    // high confidence.
-    if ($precision !== null && $precision <= 0.5) {
-      $reasons[] = 'low_precision';
-    }
-    if (empty($reasons)) {
-      continue;
-    }
-    // Member clip paths let the Review page reassign the whole visit
-    // (one rename call per file via play.php's change-identification flow).
-    $member_clips = [];
-    foreach ($v['detections'] as $d) {
-      $member_clips[] = detection_clip_relative_path($v['date'], $v['species'], $d['file']);
-    }
-    unset($v['detections']);
-    $v['member_clips'] = $member_clips;
-    $v['unreviewed_count'] = $unreviewed;
-    $v['reasons'] = $reasons;
-    $v['clip_path'] = detection_clip_relative_path($v['date'], $v['species'], $v['best_file']);
-    $queue[] = $v;
-  }
-
-  usort($queue, function ($a, $b) {
-    if ($a['date'] !== $b['date']) {
-      return strcmp($b['date'], $a['date']);
-    }
-    return strcmp($b['last_time'], $a['last_time']);
-  });
-
-  $total = count($queue);
-  $queue = array_slice($queue, $offset, $limit);
-
-  // Exclude-list suggestions: species the reviewer rejects 80%+ of the time
-  // (with enough decisions to mean it) probably should not be detected here.
-  $suggestions = [];
-  foreach ($review_stats as $sci => $stats) {
-    $n = $stats['confirmed'] + $stats['rejected'];
-    if ($n >= 10 && ($stats['rejected'] / $n) >= 0.8) {
-      $suggestions[] = [
-        'sci_name' => $sci,
-        'com_name' => $stats['com_name'],
-        'confirmed' => $stats['confirmed'],
-        'rejected' => $stats['rejected'],
-        'rejected_pct' => round(($stats['rejected'] / $n) * 100)
-      ];
-    }
-  }
-
-  api_json([
-    'queue' => $queue,
-    'count' => count($queue),
-    'total' => $total,
-    'offset' => $offset,
-    'band' => ['min' => $band_min, 'max' => $band_max],
-    'days' => $days,
-    'suggestions' => $suggestions,
-    'generated_at' => date('c')
-  ]);
 
 } elseif (preg_match('#^/api/v1/reviews/examples$#', $requestUri)) {
   // "Verify by comparison": known-good clips of the same species from this
@@ -1333,87 +1196,26 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
 } elseif (preg_match('#^/api/v1/reviews$#', $requestUri) && $requestMethod === 'POST') {
   api_require_auth();
   $body = api_request_body();
-  $review_status = isset($body['status']) ? $body['status'] : '';
-  $valid_statuses = ['confirmed', 'false_positive', 'hidden', 'unsure', 'clear'];
-  if (!in_array($review_status, $valid_statuses, true)) {
-    api_error('status must be one of: ' . implode(', ', $valid_statuses));
-  }
-  $note = isset($body['note']) ? trim((string)$body['note']) : null;
-  if ($note !== null && mb_strlen($note) > 2000) {
-    api_error('note too long (max 2000 characters)');
-  }
-
-  $targets = [];
-  $via = 'single';
-  if (!empty($body['file_name'])) {
-    $stmt = $db->prepare('SELECT File_Name, Sci_Name, Com_Name, Date, Time FROM detections WHERE File_Name = :f LIMIT 1');
-    $stmt->bindValue(':f', $body['file_name'], SQLITE3_TEXT);
-    $row = db_fetch_assoc_safe(db_execute_safe($db, $stmt, 'review target file'));
-    if (!$row) {
-      api_error('Detection not found', 404);
-    }
-    $targets[] = $row;
-  } elseif (!empty($body['visit']) && is_array($body['visit'])) {
-    $vw = $body['visit'];
-    foreach (['sci_name', 'date', 'from_time', 'to_time'] as $k) {
-      if (empty($vw[$k])) {
-        api_error('visit.' . $k . ' is required');
-      }
-    }
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $vw['date'])) {
-      api_error('visit.date must be YYYY-MM-DD');
-    }
-    $stmt = $db->prepare('SELECT File_Name, Sci_Name, Com_Name, Date, Time FROM detections WHERE Sci_Name = :sci AND Date = :d AND Time >= :from AND Time <= :to ORDER BY Time ASC');
-    $stmt->bindValue(':sci', $vw['sci_name'], SQLITE3_TEXT);
-    $stmt->bindValue(':d', $vw['date'], SQLITE3_TEXT);
-    $stmt->bindValue(':from', $vw['from_time'], SQLITE3_TEXT);
-    $stmt->bindValue(':to', $vw['to_time'], SQLITE3_TEXT);
-    $result = db_execute_safe($db, $stmt, 'review target visit');
-    while ($row = db_fetch_assoc_safe($result)) {
-      $targets[] = $row;
-    }
-    if (empty($targets)) {
-      api_error('No detections found in that visit window', 404);
-    }
-    $via = 'visit';
-  } else {
-    api_error('Provide file_name or visit {sci_name, date, from_time, to_time}');
-  }
-
-  $db_rw = api_open_rw_db();
-  $affected = 0;
-  if ($review_status === 'clear') {
-    foreach ($targets as $t) {
-      $del = $db_rw->prepare('DELETE FROM detection_reviews WHERE file_name = :f');
-      $del->bindValue(':f', $t['File_Name'], SQLITE3_TEXT);
-      db_execute_safe($db_rw, $del, 'review clear');
-      $affected += $db_rw->changes();
-    }
-  } else {
-    $db_rw->exec('BEGIN');
-    foreach ($targets as $t) {
-      $ins = $db_rw->prepare("INSERT INTO detection_reviews (file_name, sci_name, com_name, date, time, status, reviewed_via, note)
-        VALUES (:f, :sci, :com, :d, :t, :s, :via, :n)
-        ON CONFLICT(file_name) DO UPDATE SET status = :s, reviewed_via = :via, note = :n, created_at = datetime('now','localtime')");
-      $ins->bindValue(':f', $t['File_Name'], SQLITE3_TEXT);
-      $ins->bindValue(':sci', $t['Sci_Name'], SQLITE3_TEXT);
-      $ins->bindValue(':com', $t['Com_Name'], SQLITE3_TEXT);
-      $ins->bindValue(':d', $t['Date'], SQLITE3_TEXT);
-      $ins->bindValue(':t', $t['Time'], SQLITE3_TEXT);
-      $ins->bindValue(':s', $review_status, SQLITE3_TEXT);
-      $ins->bindValue(':via', $via, SQLITE3_TEXT);
-      if ($note === null || $note === '') {
-        $ins->bindValue(':n', null, SQLITE3_NULL);
-      } else {
-        $ins->bindValue(':n', $note, SQLITE3_TEXT);
-      }
-      db_execute_safe($db_rw, $ins, 'review upsert');
-      $affected++;
-    }
-    $db_rw->exec('COMMIT');
+  $db_rw = null;
+  try {
+    // Do not use api_open_rw_db(): review schema setup belongs inside the
+    // checked transaction, together with target selection and every verdict.
+    $db_rw = new SQLite3(__ROOT__ . '/scripts/birds.db', SQLITE3_OPEN_READWRITE);
+    $db_rw->busyTimeout(2000);
+    $saved = save_detection_review($db_rw, $body);
+  } catch (InvalidArgumentException $e) {
+    if ($db_rw) $db_rw->close();
+    api_error($e->getMessage(), 400);
+  } catch (ReviewTargetNotFound $e) {
+    if ($db_rw) $db_rw->close();
+    api_error($e->getMessage(), 404);
+  } catch (Throwable $e) {
+    if ($db_rw) $db_rw->close();
+    error_log('Review save failed: ' . $e->getMessage());
+    api_error('Could not save this review. Please refresh the queue and retry.', 503);
   }
   $db_rw->close();
-  api_json(['status' => 'ok', 'affected' => $affected, 'review_status' => $review_status, 'via' => $via]);
+  api_json($saved);
 
 } elseif (preg_match('#^/api/v1/species/prefs$#', $requestUri) && $requestMethod === 'POST') {
   api_require_auth();

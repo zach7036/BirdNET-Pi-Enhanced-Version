@@ -122,6 +122,28 @@ required; the custom header forces a CORS preflight as CSRF protection):
 - `POST /api/v1/notes` — `{body, date?, sci_name?, file_name?}` or
   `{action:"delete", id}`.
 
+## Review queue regression tests
+
+These checks use synthetic data and mocked browser requests. They do not use
+the station database or recordings, and do not require the development server:
+
+```sh
+php -d extension=sqlite3 -d extension=mbstring tests/test_review_data.php
+python -m pytest tests/test_review_api.py
+BIRDNET_TEST_BROWSER=chrome node --test tests/test_review_ui.js
+```
+
+The API test needs PHP with SQLite3 and mbstring (`BIRDNET_TEST_PHP` can select
+the executable). The browser test needs Playwright; omit `BIRDNET_TEST_BROWSER`
+to use its bundled Chromium, or select an installed Chrome/Edge browser.
+
+The dashboard's `review_worthy` field and the Review page share the selection
+rules in `scripts/review_data.php`. A failed count is `null`, not zero. Review
+verdict writes are transactional; `clear` removes only review metadata. The
+existing species-reassignment flow still renames files separately and can
+report a partial result. After a decision, the UI reloads the first remaining
+batch so removing visits never causes pagination to skip work.
+
 ## Notes
 
 - Always lint changed PHP with `php -l` before testing.

@@ -91,7 +91,7 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
         <audio id="heroAudio" controls preload="none" style="display:none; width:100%; margin-top:10px;"></audio>
         <div class="hero-actions">
           <a id="heroDetailLink" href="?view=Species" class="ui-button-link">All species &rarr;</a>
-          <a id="heroReviewLink" href="?view=Review" class="ui-button-link" style="display:none;">Review <span id="reviewWorthyCount">0</span> uncertain visits &rarr;</a>
+          <a id="heroReviewLink" href="?view=Review" class="ui-button-link" style="display:none;" title="Visits awaiting review from the last 7 days">Review <span id="reviewWorthyCount">0</span> <span id="reviewVisitUnit">visits</span> &rarr;</a>
         </div>
       </div>
     </section>
@@ -237,8 +237,12 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     document.getElementById('kpiSpecies').textContent = data.today.species;
     document.getElementById('kpiVisits').textContent = data.today.visits;
     document.getElementById('kpiNew').textContent = data.today.new_species;
-    document.getElementById('reviewWorthyCount').textContent = data.review_worthy;
-    document.getElementById('heroReviewLink').style.display = data.review_worthy > 0 ? '' : 'none';
+    var pending = data.review_worthy;
+    document.getElementById('reviewWorthyCount').textContent = pending == null ? '' : pending;
+    document.getElementById('reviewVisitUnit').textContent = pending === 1 ? 'visit' : 'visits';
+    document.getElementById('heroReviewLink').style.display = pending === 0 ? 'none' : '';
+    document.getElementById('heroReviewLink').title = pending == null
+      ? 'Review count unavailable. Open the queue to retry.' : 'Visits awaiting review from the last 7 days';
   }
 
   function renderStory(lines) {
@@ -262,10 +266,13 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     }).join('');
   }
 
+  var nowRefreshSeq = 0;
   function refreshNow() {
+    var seq = ++nowRefreshSeq;
     fetch('api/v1/dashboard/now?_=' + Date.now(), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { if (!r.ok) throw new Error('now failed'); return r.json(); })
       .then(function (data) {
+        if (seq !== nowRefreshSeq) return;
         renderHero(data);
         renderKpis(data);
         renderStory(data.story);
@@ -405,6 +412,12 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
   refreshSpeciesGrid();
   setInterval(refreshNow, 30000);
   setInterval(refreshSpeciesGrid, 120000);
+  window.addEventListener('storage', function (event) {
+    if (event.key === 'birdnet-reviews-changed') refreshNow();
+  });
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) refreshNow();
+  });
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) {
       refreshNow();

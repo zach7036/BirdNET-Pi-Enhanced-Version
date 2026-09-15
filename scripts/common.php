@@ -5,6 +5,7 @@ if (!defined('__ROOT__')) {
 }
 
 require_once __DIR__ . '/weather_data.php';
+require_once __DIR__ . '/review_data.php';
 
 // CLI runs (cleanup helpers, seeders) have no session to resume and would
 // leave an orphan session file behind on every run; $_SESSION still works as
