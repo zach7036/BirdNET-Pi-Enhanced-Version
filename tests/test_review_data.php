@@ -32,10 +32,10 @@ function detection($db, $file, $time = '12:00:00', $conf = 0.70, $ago = 0, $sci 
     [':date' => day($db, $ago), ':time' => $time, ':sci' => $sci, ':com' => 'Test Bird', ':conf' => $conf, ':file' => $file])->finalize();
 }
 function history($db, $sci = 'Testus birdus', $n = 6) {
-  for ($i = 0; $i < $n; $i++) detection($db, $sci . '-old-' . $i, '10:00:00', 0.99, 30, $sci);
+  for ($i = 0; $i < $n; $i++) detection($db, $sci . '-old-' . $i, gmdate('H:i:s', 36000 + $i * 600), 0.99, 30, $sci);
 }
 function queue_data($db, $options = []) {
-  return review_queue_data($db, $options + ['gap_seconds' => 300]);
+  return review_queue_data($db, $options + ['gap_seconds' => 300, 'now' => strtotime(day($db) . ' 23:59:59'), 'clip_available' => function () { return true; }]);
 }
 function pending($db) {
   $full = queue_data($db);
@@ -64,6 +64,8 @@ same($db->querySingle("SELECT COUNT(*) FROM sqlite_master WHERE name='detection_
 $original = rows($db);
 foreach (['false_positive', 'confirmed', 'hidden', 'unsure'] as $status) {
   $saved = verdict($db, $status);
+  check((bool)preg_match('/^[a-f0-9]{64}$/', $saved['undo_token']), 'Saved action has a server undo token');
+  unset($saved['undo_token'], $saved['deferred_until']);
   same($saved, ['status' => 'ok', 'affected' => 2, 'review_status' => $status, 'via' => 'visit'], 'Whole visit acknowledged');
   same(count_reviews($db), 2, 'Both verdicts stored');
   same(pending($db), 0, $status . ' leaves queue');
@@ -109,6 +111,16 @@ foreach (['confirmed' => 0, 'false_positive' => 1] as $status => $expected) {
 $db = fixture(); history($db);
 foreach ([0.59994, 0.59996, 0.84994, 0.84996, 0.95] as $i => $confidence) detection($db, 'band-' . $i, sprintf('%02d:00:00', $i), $confidence);
 same(pending($db), 2, 'Rounded confidence band boundaries preserved');
+
+// Whole-percent badges are rounded independently of the review cutoff.
+$db = fixture(); history($db);
+detection($db, 'rounded-85.wav', '12:00:00', 0.846);
+same(round(queue_data($db)['queue'][0]['best_confidence'] * 100), 85.0, '84.6 percent displays as 85');
+same(queue_data($db)['queue'][0]['reasons'], ['uncertain'], 'Rounded 85 is still below the uncertainty cutoff');
+detection($db, 'exact-85.wav', '13:00:00', 0.85);
+same(pending($db), 1, 'Exact 85 percent is not routed for uncertainty');
+$db = fixture(); detection($db, 'new-species-85.wav', '12:00:00', 0.85);
+same(queue_data($db)['queue'][0]['reasons'], ['first_lifetime'], 'Exact 85 can still be routed as a first-ever species');
 
 // Compare streamed summaries with the existing grouping implementation,
 // including interleaved species, exact gap, ties, a split, and midnight.

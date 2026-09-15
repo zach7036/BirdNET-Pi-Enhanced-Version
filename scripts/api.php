@@ -720,8 +720,11 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   // Same seven-day queue and eligibility rules as the Review page.
   // null means unavailable, not that the station has no pending reviews.
   $review_worthy = null;
+  $review_counts = null;
   try {
-    $review_worthy = review_queue_data($db, ['limit' => 0])['total'];
+    $review_summary = review_queue_data($db, ['limit' => 0]);
+    $review_worthy = $review_summary['total'];
+    $review_counts = $review_summary['counts'];
   } catch (Throwable $e) {
     error_log('Review count unavailable: ' . $e->getMessage());
   }
@@ -749,6 +752,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'new_today' => $new_today,
     'story' => get_todays_story($db),
     'review_worthy' => $review_worthy,
+    'review_counts' => $review_counts,
     'gap_seconds' => get_visit_gap_seconds(),
     'generated_at' => date('c')
   ]);
@@ -915,9 +919,11 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
 
 } elseif (preg_match('#^/api/v1/reviews/queue$#', $requestUri)) {
   try {
-    $options = array_intersect_key($_GET, array_flip(['days', 'band_min', 'band_max', 'limit', 'offset']));
+    $options = array_intersect_key($_GET, array_flip(['days', 'band_min', 'band_max', 'limit', 'offset', 'group']));
     $options['limit'] = request_int($_GET, 'limit', 50, 1, 200);
     api_json(review_queue_data($db, $options));
+  } catch (InvalidArgumentException $e) {
+    api_error($e->getMessage(), 400);
   } catch (Throwable $e) {
     error_log('Review queue unavailable: ' . $e->getMessage());
     api_error('Could not load the review queue. Please retry.', 503);
@@ -1209,6 +1215,9 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   } catch (ReviewTargetNotFound $e) {
     if ($db_rw) $db_rw->close();
     api_error($e->getMessage(), 404);
+  } catch (ReviewConflict $e) {
+    if ($db_rw) $db_rw->close();
+    api_error($e->getMessage(), 409);
   } catch (Throwable $e) {
     if ($db_rw) $db_rw->close();
     error_log('Review save failed: ' . $e->getMessage());

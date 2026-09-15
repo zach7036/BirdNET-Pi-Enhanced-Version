@@ -19,7 +19,7 @@ def api(tmp_path):
     scripts = tmp_path / 'scripts'
     scripts.mkdir()
     (tmp_path / '.review-test-fixture').touch()
-    for name in ['common.php', 'review_data.php', 'weather_data.php', 'spine_schema.php']:
+    for name in ['common.php', 'review_data.php', 'review_actions.php', 'weather_data.php', 'spine_schema.php']:
         shutil.copyfile(ROOT / 'scripts' / name, scripts / name)
     # A location-rarity fixture also checks the otherwise-cache-dependent route.
     (scripts / 'seasonal_cache.json').write_text(json.dumps({'data': {'Testus rarus': [0.001] * 48}}))
@@ -28,8 +28,12 @@ def api(tmp_path):
     for i in range(6):
         db.execute("INSERT INTO detections VALUES (DATE('now','localtime','-30 days'),'10:00:00','Testus birdus','Test Bird',.99,?)", (f'old-{i}',))
     for name, time in [('a.wav', '12:00:00'), ('b.wav', '12:01:00')]:
-        db.execute("INSERT INTO detections VALUES (DATE('now','localtime'),?,'Testus birdus','Test Bird',.75,?)", (time, name))
+        db.execute("INSERT INTO detections VALUES (DATE('now','localtime','-1 day'),?,'Testus birdus','Test Bird',.75,?)", (time, name))
     db.commit()
+    for date, common, filename in db.execute('SELECT Date, Com_Name, File_Name FROM detections'):
+        clip = tmp_path / 'audio' / 'By_Date' / date / common.replace("'", '').replace(' ', '_') / filename
+        clip.parent.mkdir(parents=True, exist_ok=True)
+        clip.write_bytes(b'RIFF synthetic audio fixture')
     extensions = Path(php).parent / 'ext'
     cmd = [php]
     if extensions.is_dir():
@@ -118,3 +122,78 @@ def test_location_rarity_rule_is_preserved(api):
     code, data = request()
     assert code == 200 and data['total'] == 1
     assert data['queue'][0]['reasons'] == ['region_rare']
+
+
+def test_group_totals_and_invalid_filter(api):
+    _, request = api
+    _, data = request()
+    assert data['counts']['ready'] == data['counts']['routine'] == 1
+    assert data['counts']['important'] == 0
+    assert request('/api/v1/reviews/queue?group=important')[1]['total'] == 0
+    assert request('/api/v1/reviews/queue?group=bogus')[0] == 400
+
+
+def test_skip_resume_and_undo_are_metadata_only(api):
+    db, request = api
+    original = db.execute('SELECT * FROM detections').fetchall()
+    visit = request()[1]['queue'][0]
+    target = {'sci_name': visit['sci_name'], 'date': visit['date'], 'from_time': visit['first_time'], 'to_time': visit['last_time']}
+    code, skipped = request('/api/v1/reviews', method='POST', body={'action': 'skip', 'visit': target})
+    assert code == 200 and skipped['affected'] == 2
+    assert request()[1]['counts']['skipped'] == 1
+    assert request()[1]['total'] == 0
+    assert request('/api/v1/reviews/queue?group=skipped')[1]['total'] == 1
+    assert db.execute('SELECT COUNT(*) FROM detection_reviews').fetchone()[0] == 0
+    code, resumed = request('/api/v1/reviews', method='POST', body={'action': 'resume', 'visit': target})
+    assert code == 200 and request()[1]['total'] == 1
+    assert request('/api/v1/reviews', method='POST', body={'action': 'undo', 'undo_token': resumed['undo_token']})[0] == 200
+    assert request()[1]['counts']['skipped'] == 1
+    assert request('/api/v1/reviews', method='POST', body={'action': 'undo', 'undo_token': skipped['undo_token']})[0] == 200
+    assert request()[1]['total'] == 1
+    assert db.execute('SELECT * FROM detections').fetchall() == original
+
+
+def test_undo_auth_validation_and_conflicts(api):
+    db, request = api
+    _, saved = save(request, status='confirmed')
+    body = {'action': 'undo', 'undo_token': saved['undo_token']}
+    assert request('/api/v1/reviews', method='POST', body=body, auth=False)[0] == 401
+    assert request('/api/v1/reviews', method='POST', body=body, csrf=False)[0] == 403
+    assert request('/api/v1/reviews', method='POST', body={'action': 'undo', 'undo_token': '../bad'})[0] == 400
+    assert request('/api/v1/reviews', method='POST', body={'action': 'undo', 'undo_token': 'f' * 64})[0] == 404
+    save(request, status='confirmed')  # Same verdict still counts as a newer decision.
+    assert request('/api/v1/reviews', method='POST', body=body)[0] == 409
+    assert db.execute("SELECT status FROM detection_reviews WHERE file_name='a.wav'").fetchone()[0] == 'confirmed'
+
+
+def test_missing_best_clip_falls_back_then_moves_out_of_ready(api):
+    db, request = api
+    db.execute("UPDATE detections SET Confidence=.80 WHERE File_Name='b.wav'")
+    db.commit()
+    _, first = request()
+    assert first['queue'][0]['playback_file'] == 'b.wav'
+    # Resolve only paths inside this test's own disposable database directory.
+    db_path = Path(db.execute('PRAGMA database_list').fetchone()[2])
+    audio = db_path.parent.parent / 'audio' / 'By_Date'
+    for file in audio.rglob('b.wav'):
+        file.unlink()
+    _, fallback = request()
+    assert fallback['queue'][0]['playback_file'] == 'a.wav'
+    assert fallback['queue'][0]['audio_fallback'] is True
+    assert fallback['queue'][0]['reassign_available'] is False
+    for file in audio.rglob('a.wav'):
+        file.unlink()
+    _, missing = request()
+    assert missing['total'] == 0 and missing['counts']['unavailable'] == 1
+    _, unavailable = request('/api/v1/reviews/queue?group=unavailable')
+    assert unavailable['queue'][0]['clip_path'] is None
+    assert db.execute('SELECT COUNT(*) FROM detections').fetchone()[0] == 8
+
+
+def test_future_visit_is_active_not_ready(api):
+    db, request = api
+    db.execute("UPDATE detections SET Date=DATE('now','localtime','+1 day') WHERE File_Name IN ('a.wav','b.wav')")
+    db.commit()
+    code, data = request()
+    assert code == 200 and data['total'] == 0 and data['counts']['active'] == 1
+    assert request('/api/v1/reviews/queue?group=active')[1]['queue'][0]['active'] is True

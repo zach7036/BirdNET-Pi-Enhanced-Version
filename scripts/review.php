@@ -12,15 +12,29 @@ require_once 'scripts/common.php';
     <span class="ui-meta" id="reviewQueueMeta">Loading&hellip;</span>
   </div>
   <p class="doctor-intro">
-    Visits worth a second listen: uncertain IDs, first-ever or rare species, and frequently rejected matches.
-    One decision covers the displayed visit window. New detections may need another review. Actions require sign-in.
+    Start with completed visits that have audio. Important cases come first; routine uncertain matches remain available separately.
+    One decision covers the displayed visit window. Nothing is automatically confirmed or deleted. Actions require sign-in.
   </p>
+  <div class="review-filters" role="group" aria-label="Review queue views">
+    <button type="button" class="ui-button-link review-filter" data-group="ready" aria-pressed="true">Ready <span>0</span></button>
+    <button type="button" class="ui-button-link review-filter" data-group="important" aria-pressed="false">Important <span>0</span></button>
+    <button type="button" class="ui-button-link review-filter" data-group="routine" aria-pressed="false">Routine <span>0</span></button>
+    <button type="button" class="ui-button-link review-filter" data-group="active" aria-pressed="false">Still active <span>0</span></button>
+    <button type="button" class="ui-button-link review-filter" data-group="unavailable" aria-pressed="false">Audio unavailable <span>0</span></button>
+    <button type="button" class="ui-button-link review-filter" data-group="skipped" aria-pressed="false">Skipped <span>0</span></button>
+  </div>
+  <p id="reviewGroupHelp" class="ui-meta"></p>
   <div class="review-toolbar">
     <button type="button" class="ui-button-link" id="reviewRefresh">Refresh queue</button>
     <span class="review-progress" id="reviewProgress"></span>
-    <span class="review-keys">Keys: <kbd>&darr;</kbd>/<kbd>&uarr;</kbd> move &middot; <kbd>Space</kbd> play &middot; <kbd>Y</kbd> confirm &middot; <kbd>N</kbd> not this bird &middot; <kbd>R</kbd> reassign &middot; <kbd>U</kbd> unsure &middot; <kbd>H</kbd> hide</span>
+    <span class="review-keys">Keys: <kbd>&darr;</kbd>/<kbd>&uarr;</kbd> move &middot; <kbd>Space</kbd> play &middot; <kbd>Y</kbd> confirm &middot; <kbd>N</kbd> not this bird &middot; <kbd>R</kbd> reassign &middot; <kbd>U</kbd> skip &middot; <kbd>H</kbd> hide from statistics</span>
   </div>
   <div id="reviewActionStatus" class="review-done" role="status" aria-live="polite"></div>
+  <div id="reviewUndoPanel" class="review-undo" hidden>
+    <button type="button" class="ui-button-link" id="reviewUndo">Undo last decision</button>
+    <span id="reviewUndoLabel"></span>
+    <small>Restores verdicts and Skip/Resume actions. Species reassignments use the separate Reassign flow.</small>
+  </div>
   <div id="reviewLoadStatus" class="review-error" role="alert"></div>
   <div id="reviewSuggestions"></div>
   <div id="reviewQueue" class="review-queue">
@@ -48,7 +62,9 @@ require_once 'scripts/common.php';
 <script>
 (function () {
   'use strict';
-  var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) { return String(s == null ? '' : s); };
+  var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]; });
+  };
   var reasonLabels = {
     uncertain: 'Uncertain ID',
     first_lifetime: 'First ever',
@@ -64,12 +80,38 @@ require_once 'scripts/common.php';
   var loading = false;
   var saving = false;
   var reassignNeedsRefresh = false;
+  var selectedGroup = 'ready';
+  var undoStack = [];
+  try {
+    var storedUndo = JSON.parse(sessionStorage.getItem('birdnet-review-undo') || '[]');
+    if (Array.isArray(storedUndo)) undoStack = storedUndo.filter(function (a) {
+      return a && /^[a-f0-9]{64}$/.test(a.token) && typeof a.label === 'string' && a.label.length < 400;
+    }).slice(-20);
+  } catch (e) {}
+
+  function percentage(value) { return (Number(value) * 100).toFixed(2).replace(/\.?0+$/, '') + '%'; }
+
+  function updateUndo() {
+    var last = undoStack[undoStack.length - 1];
+    document.getElementById('reviewUndoPanel').hidden = !last;
+    document.getElementById('reviewUndoLabel').textContent = last ? last.label : '';
+    try { sessionStorage.setItem('birdnet-review-undo', JSON.stringify(undoStack)); } catch (e) {}
+  }
+
+  function canAct(i, action) {
+    var card = document.getElementById('reviewCard' + i);
+    if (loading || saving || !queue[i] || !card || card.classList.contains('reviewed')) return false;
+    if (action === 'reassign' && queue[i].reassign_available === false) return false;
+    return !(['confirmed', 'false_positive', 'reassign'].indexOf(action) >= 0 && queue[i].audio_available === false);
+  }
 
   function updateBusy() {
     var modalOpen = document.getElementById('reassignModal').style.display !== 'none';
     document.getElementById('reviewRefresh').disabled = loading || saving || modalOpen;
+    document.getElementById('reviewUndo').disabled = loading || saving || modalOpen;
+    document.querySelectorAll('.review-filter').forEach(function (button) { button.disabled = loading || saving || modalOpen; });
     document.querySelectorAll('.review-btn').forEach(function (button) {
-      button.disabled = loading || saving || modalOpen || button.closest('.review-card').classList.contains('reviewed');
+      button.disabled = modalOpen || !canAct(Number(button.dataset.i), button.dataset.action);
     });
     document.getElementById('reviewQueue').setAttribute('aria-busy', loading || saving ? 'true' : 'false');
   }
@@ -96,14 +138,28 @@ require_once 'scripts/common.php';
     document.getElementById('reviewLoadStatus').textContent = '';
     // Reload the first remaining batch. Advancing an offset after removing
     // visits would skip work, and local subtraction misses eligibility changes.
-    return fetch('api/v1/reviews/queue?days=7&limit=25&_=' + Date.now(), { headers: { 'Accept': 'application/json' } })
+    return fetch('api/v1/reviews/queue?days=7&limit=25&group=' + selectedGroup + '&_=' + Date.now(), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { if (!r.ok) throw new Error('queue failed'); return r.json(); })
       .then(function (data) {
         if (!Array.isArray(data.queue) || !Number.isInteger(data.total) || data.total < 0 ||
+            !data.counts || !Number.isInteger(data.pending_total) ||
             (data.total > 0 && data.queue.length === 0)) throw new Error('Invalid queue response');
         queue = data.queue;
         activeIdx = -1;
         exampleCache = {};
+        document.querySelectorAll('.review-filter').forEach(function (button) {
+          button.setAttribute('aria-pressed', button.dataset.group === selectedGroup ? 'true' : 'false');
+          button.querySelector('span').textContent = data.counts[button.dataset.group];
+        });
+        var helps = {
+          ready: 'Completed visits with playable audio. Important cases first, then routine checks. This is the count shown on Today.',
+          important: 'New species, unusual records, and frequently rejected identifications. High confidence alone does not rule these out.',
+          routine: 'Ordinary uncertain matches. These are optional checks, not evidence that every identification is wrong.',
+          active: 'These visits are still receiving detections. They enter Ready after ' + (data.gap_seconds / 60) + ' minutes of quiet, if audio is available. Reviewing now covers only the displayed window.',
+          unavailable: 'No unreviewed audio from these visits is available. They are not counted as ready, and no verdict has been applied automatically.',
+          skipped: 'Deferred for 24 hours without changing statistics. Bring a visit back sooner with Resume review.'
+        };
+        document.getElementById('reviewGroupHelp').textContent = helps[selectedGroup];
         document.getElementById('reviewQueueMeta').textContent =
           data.total + ' visit' + (data.total === 1 ? '' : 's') + ' to review (last ' + data.days + ' days)' +
           (data.total > queue.length ? ' · showing ' + queue.length : '');
@@ -111,36 +167,56 @@ require_once 'scripts/common.php';
         renderSuggestions(data.suggestions || []);
         var box = document.getElementById('reviewQueue');
         if (queue.length === 0) {
-          box.innerHTML = '<div class="ui-message ui-message-success" role="status"><strong>All caught up</strong><span>Nothing needs review right now.</span></div>';
+          var empty = data.pending_total === 0 ? 'All caught up' : 'No visits in this view';
+          var detail = data.pending_total === 0 ? 'Nothing needs review right now.' : 'Check the other views for remaining visits.';
+          box.innerHTML = '<div class="ui-message" role="status"><strong>' + empty + '</strong><span>' + detail + '</span></div>';
           return;
         }
         box.innerHTML = queue.map(function (v, i) {
-          var pct = Math.round(v.best_confidence * 100);
+          var pct = percentage(v.best_confidence);
           var range = v.first_time.slice(0, 5) + (v.first_time === v.last_time ? '' : '–' + v.last_time.slice(0, 5));
           var reasons = (v.reasons || []).map(function (r) {
             return '<span class="review-reason ' + esc(r) + '">' + esc(reasonLabels[r] || r) + '</span>';
           }).join(' ');
+          var explanations = (v.reason_details || []).map(function (reason) { return '<li>' + esc(reason.text) + '</li>'; }).join('');
+          var audio = v.audio_available !== false && v.clip_path
+            ? '<img loading="lazy" src="' + clipUrl(v.clip_path, '.png') + '" alt="Spectrogram" onerror="this.style.display=\'none\'">' +
+              '<audio controls preload="none" src="' + clipUrl(v.clip_path) + '"></audio>'
+            : '<p class="review-media-warning">Audio unavailable. This visit cannot be confirmed or rejected by listening.</p>';
+          var playback = v.audio_fallback ? '<p class="review-playback-note">Playing the strongest available unreviewed clip (' + percentage(v.playback_confidence) + '). The visit’s best recorded score is ' + pct + '.</p>' : '';
           return '<div class="ui-card review-card" id="reviewCard' + i + '" data-i="' + i + '" tabindex="0">' +
-            '<div class="review-card-media">' +
-              '<img loading="lazy" src="' + clipUrl(v.clip_path, '.png') + '" alt="Spectrogram" onerror="this.style.display=\'none\'">' +
-              '<audio controls preload="none" src="' + clipUrl(v.clip_path) + '" onerror="this.style.display=\'none\'"></audio>' +
-            '</div>' +
+            '<div class="review-card-media">' + audio + playback + '</div>' +
             '<div class="review-card-body">' +
               '<div class="review-card-title"><a href="?view=Bird&sci_name=' + encodeURIComponent(v.sci_name) + '">' + esc(v.species) + '</a> ' + reasons + '</div>' +
               '<div class="review-card-meta">' + esc(v.date) + ' &middot; ' + esc(range) + ' &middot; ' +
-                v.count + ' detection' + (v.count === 1 ? '' : 's') + ' &middot; best ' + pct + '%</div>' +
+                v.count + ' detection' + (v.count === 1 ? '' : 's') + ' &middot; best ' + pct + ' &middot; ' + esc(v.priority || 'routine') + '</div>' +
+              '<ul class="review-explanations" aria-label="Why this visit is here">' + explanations + '</ul>' +
+              (v.active ? '<p class="review-media-warning">Still active: new detections may need a later review.</p>' : '') +
+              (v.group === 'skipped' && v.deferred_until ? '<p>Skipped until ' + esc(new Date(v.deferred_until * 1000).toLocaleString()) + '.</p>' : '') +
               '<div class="review-card-actions">' +
                 actBtn(i, 'confirmed', 'Confirm', 'Y') +
                 actBtn(i, 'false_positive', 'Not this bird', 'N') +
                 actBtn(i, 'reassign', 'Reassign&hellip;', 'R') +
-                actBtn(i, 'unsure', 'Unsure', 'U') +
-                actBtn(i, 'hidden', 'Hide', 'H') +
+                (v.group === 'skipped' ? actBtn(i, 'resume', 'Resume review', '') : actBtn(i, 'skip', 'Skip for now', 'U')) +
+                actBtn(i, 'hidden', 'Hide from statistics', 'H') +
               '</div>' +
+              '<p class="review-action-help">Skip: revisit in 24 hours, statistics unchanged. Hide: exclude this visit from curated statistics; recordings are kept.</p>' +
               '<div class="review-examples" id="reviewExamples' + i + '"></div>' +
               '<div class="review-card-result" id="reviewResult' + i + '"></div>' +
             '</div>' +
             '</div>';
         }).join('');
+        box.querySelectorAll('.review-card-media audio').forEach(function (audio) {
+          audio.addEventListener('error', function () {
+            var i = Number(audio.closest('.review-card').dataset.i);
+            queue[i].audio_available = false;
+            var warning = document.createElement('p');
+            warning.className = 'review-media-warning';
+            warning.textContent = 'Recording could not be played. Refresh the queue to check for another clip.';
+            audio.replaceWith(warning);
+            updateBusy();
+          });
+        });
         setActive(0);
       })
       .catch(function () {
@@ -155,8 +231,10 @@ require_once 'scripts/common.php';
   }
 
   function actBtn(i, action, label, key) {
-    return '<button type="button" class="review-btn ' + action + '" data-i="' + i + '" data-action="' + action + '">' +
-      label + ' <kbd>' + key + '</kbd></button>';
+    var title = action === 'reassign' && queue[i].reassign_available === false
+      ? 'Some member recordings are unavailable. Whole-visit reassignment is disabled to avoid a partial rename.' : '';
+    return '<button type="button" class="review-btn ' + action + '" data-i="' + i + '" data-action="' + action + '" title="' + esc(title) + '">' +
+      label + (key ? ' <kbd>' + key + '</kbd>' : '') + '</button>';
   }
 
   function renderSuggestions(suggestions) {
@@ -167,7 +245,7 @@ require_once 'scripts/common.php';
     }
     box.innerHTML = suggestions.map(function (s) {
       return '<div class="ui-message ui-message-warning" role="status"><strong>Consider excluding ' + esc(s.com_name) + '</strong>' +
-        '<span>You rejected ' + s.rejected_pct + '% of its reviewed detections (' + s.rejected + ' of ' + (s.confirmed + s.rejected) + '). ' +
+        '<span>You rejected ' + s.rejected_pct + '% of its independently reviewed visits (' + s.rejected + ' of ' + (s.confirmed + s.rejected) + '). ' +
         'Adding it to the <a href="?view=Excluded">excluded species list</a> stops these detections at the source.</span></div>';
     }).join('');
   }
@@ -239,43 +317,52 @@ require_once 'scripts/common.php';
       .catch(function () {});
   }
 
-  function markCardDone(i, message) {
+  function markCardDone(i, message, reviewed) {
     var card = document.getElementById('reviewCard' + i);
     if (!card || card.classList.contains('reviewed')) return;
     card.classList.add('reviewed');
     card.querySelectorAll('.review-btn').forEach(function (b) { b.disabled = true; });
     document.getElementById('reviewResult' + i).textContent = message;
     document.getElementById('reviewActionStatus').textContent = message;
-    reviewedCount++;
+    if (reviewed !== false) reviewedCount++;
     updateProgress();
   }
 
+  function postReview(body) {
+    return fetch('api/v1/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (r.status === 401) throw new Error('Sign in required - open any Settings page first, then retry.');
+      return r.json().then(function (j) {
+        if (!r.ok || j.status !== 'ok') throw new Error(j.message || 'Review failed (' + r.status + '). Refresh the queue before retrying.');
+        return j;
+      });
+    });
+  }
+
   function submitReview(i, status) {
-    var card = document.getElementById('reviewCard' + i);
-    if (loading || saving || !card || card.classList.contains('reviewed')) return;
+    if (!canAct(i, status)) return;
     var v = queue[i];
     var resultBox = document.getElementById('reviewResult' + i);
     saving = true;
     updateBusy();
     document.getElementById('reviewActionStatus').textContent = '';
     resultBox.textContent = 'Saving…';
-    fetch('api/v1/reviews', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify({
-        status: status,
-        visit: { sci_name: v.sci_name, date: v.date, from_time: v.first_time, to_time: v.last_time }
-      })
-    })
-      .then(function (r) {
-        if (r.status === 401) throw new Error('Sign in required - open any Settings page first, then retry.');
-        if (!r.ok) throw new Error('Review failed (' + r.status + ')');
-        return r.json();
-      })
+    var body = {visit: { sci_name: v.sci_name, date: v.date, from_time: v.first_time, to_time: v.last_time }};
+    body[status === 'skip' || status === 'resume' ? 'action' : 'status'] = status;
+    postReview(body)
       .then(function (j) {
         if (j.status !== 'ok' || !Number.isInteger(j.affected) || j.affected < 1) throw new Error('The station did not confirm the save. Refresh the queue before retrying.');
-        var labels = { confirmed: 'confirmed', false_positive: 'marked not this bird', unsure: 'marked unsure', hidden: 'hidden' };
-        markCardDone(i, 'Saved - ' + j.affected + ' detection' + (j.affected === 1 ? '' : 's') + ' ' + (labels[status] || status) + '.');
+        var labels = { confirmed: 'confirmed', false_positive: 'marked not this bird', hidden: 'hidden from statistics', skip: 'skipped for 24 hours', resume: 'returned to review' };
+        var isVerdict = status !== 'skip' && status !== 'resume';
+        markCardDone(i, 'Saved - ' + j.affected + ' detection' + (j.affected === 1 ? '' : 's') + ' ' + (labels[status] || status) + '.' + (!isVerdict ? ' Statistics unchanged.' : ''), isVerdict);
+        if (typeof j.undo_token === 'string' && /^[a-f0-9]{64}$/.test(j.undo_token)) {
+          undoStack.push({token: j.undo_token, label: v.species + ' — ' + labels[status] + ' (' + v.date + ' ' + v.first_time + ')', reviewed: isVerdict});
+          undoStack = undoStack.slice(-20);
+          updateUndo();
+        }
         notifyReviewChange();
         saving = false;
         return loadQueue();
@@ -287,12 +374,36 @@ require_once 'scripts/common.php';
       });
   }
 
+  document.getElementById('reviewUndo').addEventListener('click', function () {
+    if (saving || loading || !undoStack.length) return;
+    var last = undoStack[undoStack.length - 1];
+    saving = true;
+    updateBusy();
+    document.getElementById('reviewActionStatus').textContent = 'Undoing decision…';
+    document.getElementById('reviewLoadStatus').textContent = '';
+    postReview({action: 'undo', undo_token: last.token}).then(function (j) {
+      if (!Number.isInteger(j.affected) || (j.affected < 1 && !j.already_undone)) throw new Error('The station did not confirm Undo. Refresh before retrying.');
+      undoStack.pop();
+      updateUndo();
+      if (last.reviewed) reviewedCount = Math.max(0, reviewedCount - 1);
+      updateProgress();
+      document.getElementById('reviewActionStatus').textContent = 'Undone — previous review state restored. ' + last.label;
+      notifyReviewChange();
+      saving = false;
+      return loadQueue();
+    }).catch(function (err) {
+      document.getElementById('reviewActionStatus').textContent = '';
+      document.getElementById('reviewLoadStatus').textContent = err.message;
+      saving = false;
+      updateBusy();
+    });
+  });
+
   // ===== Reassignment (reuses play.php's change-identification flow) =====
   var reassignTarget = -1;
 
   function openReassign(i) {
-    var card = document.getElementById('reviewCard' + i);
-    if (loading || saving || !card || card.classList.contains('reviewed')) return;
+    if (!canAct(i, 'reassign')) return;
     reassignTarget = i;
     reassignNeedsRefresh = false;
     var modal = document.getElementById('reassignModal');
@@ -434,6 +545,7 @@ require_once 'scripts/common.php';
   });
 
   document.addEventListener('keydown', function (e) {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     if (document.getElementById('reassignModal').style.display !== 'none') {
       if (e.key === 'Escape') closeReassign();
@@ -453,13 +565,26 @@ require_once 'scripts/common.php';
       }
       case 'y': case 'Y': if (!isDone) submitReview(activeIdx, 'confirmed'); break;
       case 'n': case 'N': if (!isDone) submitReview(activeIdx, 'false_positive'); break;
-      case 'u': case 'U': if (!isDone) submitReview(activeIdx, 'unsure'); break;
+      case 'u': case 'U': if (!isDone) submitReview(activeIdx, 'skip'); break;
       case 'h': case 'H': if (!isDone) submitReview(activeIdx, 'hidden'); break;
       case 'r': case 'R': if (!isDone) openReassign(activeIdx); break;
     }
   });
 
   document.getElementById('reviewRefresh').addEventListener('click', loadQueue);
+  document.querySelectorAll('.review-filter').forEach(function (button) {
+    button.addEventListener('click', function () {
+      if (loading || saving || button.disabled) return;
+      selectedGroup = button.dataset.group;
+      loadQueue();
+    });
+  });
+  // Do not reshuffle cards while someone is listening. An empty view can
+  // quietly discover newly completed visits or expired deferrals.
+  setInterval(function () {
+    if (!document.hidden && !queue.length && document.getElementById('reassignModal').style.display === 'none') loadQueue();
+  }, 30000);
+  updateUndo();
   loadQueue();
 })();
 </script>

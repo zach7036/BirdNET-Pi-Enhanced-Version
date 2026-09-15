@@ -8,6 +8,7 @@ $request = json_decode($argv[2], true);
 // warning on machines without /etc/birdnet, as the web entry point does.
 error_reporting(E_ERROR);
 $_SESSION = ['my_config' => ['VISIT_GAP_MINUTES' => 5, 'CADDY_PWD' => 'test-password'], 'my_timezone' => 'UTC'];
+$_SESSION['my_config']['EXTRACTED'] = preg_replace('/^[A-Za-z]:/', '', str_replace('\\', '/', __ROOT__)) . '/audio';
 $_SERVER['REQUEST_URI'] = $request['uri'];
 $_SERVER['REQUEST_METHOD'] = $request['method'] ?? 'GET';
 $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';

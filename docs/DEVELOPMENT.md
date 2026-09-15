@@ -129,6 +129,7 @@ the station database or recordings, and do not require the development server:
 
 ```sh
 php -d extension=sqlite3 -d extension=mbstring tests/test_review_data.php
+php -d extension=sqlite3 -d extension=mbstring tests/test_review_workflow.php
 python -m pytest tests/test_review_api.py
 BIRDNET_TEST_BROWSER=chrome node --test tests/test_review_ui.js
 ```
@@ -137,12 +138,74 @@ The API test needs PHP with SQLite3 and mbstring (`BIRDNET_TEST_PHP` can select
 the executable). The browser test needs Playwright; omit `BIRDNET_TEST_BROWSER`
 to use its bundled Chromium, or select an installed Chrome/Edge browser.
 
-The dashboard's `review_worthy` field and the Review page share the selection
-rules in `scripts/review_data.php`. A failed count is `null`, not zero. Review
-verdict writes are transactional; `clear` removes only review metadata. The
-existing species-reassignment flow still renames files separately and can
-report a partial result. After a decision, the UI reloads the first remaining
-batch so removing visits never causes pagination to skip work.
+The dashboard's `review_worthy` field and the default Review page count only
+completed, playable visits from the shared selection rules in
+`scripts/review_data.php`. A failed count is `null`, not zero. `review_counts`
+provides the category counts. `GET /api/v1/reviews/queue?group=...` accepts:
+
+- `ready` (default): Important and Routine together, important cases first.
+- `important`: first-ever, regionally unusual, rare-visitor or low-precision records.
+- `routine`: ordinary uncertain matches, using the 60% to below-85% band.
+- `active`: visits still inside `VISIT_GAP_MINUTES`, including future-dated ones.
+- `unavailable`: completed visits with no surviving, readable unreviewed audio.
+- `skipped`: visits whose pending member clips are deferred.
+
+The queue returns `total` for the selected view, `counts` for every category,
+and `pending_total` across all views (without double-counting Ready's two
+subgroups). Scores are displayed precisely enough to distinguish 84.99% from
+85%. Each card includes explanatory `reason_details`. Important records are
+ranked first-ever, regional rarity, rejection history, then yard rarity;
+ties and routine records are oldest first. The underlying confidence band
+and rarity thresholds are unchanged. Confidence does not override a rarity
+or first-ever reason.
+
+Trust and exclusion suggestions count independent completed visits, not clips.
+A visit contributes one vote only when every member has the same confirmed
+or false-positive verdict. Mixed, incomplete, hidden and unsure visits do not
+establish trust. Ten independent decisions are required before applying the
+existing 95% auto-trust or 50% low-precision cutoffs. Confirming an occurrence
+suppresses repeat first-ever prompts for that species, but does not suppress
+other applicable reasons or confirm any other detection.
+
+Recording existence is checked only for eligible visits. A missing best clip
+falls back to the strongest surviving unreviewed clip in that same visit;
+its playback score is separate from the best recorded score. No audio means
+no listening-based verdict buttons. Whole-visit reassignment is disabled if
+any member file is missing, to avoid a predictable partial rename.
+
+`POST /api/v1/reviews` retains the verdict `status` API (including legacy
+`unsure` and `clear`). It additionally accepts `action: skip` or `resume` with
+the same file/visit target, or `action: undo` with an `undo_token` returned by
+a prior write. Skip defers pending files for 24 hours without changing their
+verdicts or statistics. Resume removes that deferral early. Expiry is evaluated
+on reads without deleting or confirming anything. The UI's Skip button replaces
+Unsure; existing unsure verdicts are not migrated or reinterpreted.
+
+Writes are transactional; `clear` removes only review metadata. The new helper
+`scripts/review_actions.php` lazily creates three additive metadata tables on
+the first write: `review_deferrals`, `review_state_versions`, `review_actions`.
+No existing schema or detection rows are migrated. Undo history is retained in
+the database; the UI keeps the last 20 undo tokens in this tab's session storage
+(including across reloads). Undo restores previous verdicts, notes, timestamps
+and deferrals, never detection rows or recording files. Version checks reject
+conflicting newer decisions or renamed targets with HTTP 409. A repeated Undo
+is idempotent. All writes, including Undo, require the existing authentication
+and CSRF header. A failure in any member or in the undo journal rolls back the
+entire action.
+
+The existing species-reassignment flow renames files separately and is not part
+of decision Undo; use Reassign to change an identification back. Unanticipated
+rename failures can still report a partial result. After a decision, the UI
+reloads the first remaining batch so removing visits never causes pagination
+to skip work. Cards are not automatically reshuffled while someone is listening;
+an empty view refreshes periodically to discover completed or unskipped visits.
+
+On a Pi, validate the UI on the development branch: check Important/Routine,
+let an active visit finish, Skip/Resume one known visit, and Undo a deliberate
+test verdict. These operations should change only review metadata. Confirm the
+Now count matches Ready and that existing audio still plays. Local automated
+checks do not replace measuring queue responsiveness against a large real
+station database.
 
 ## Notes
 

@@ -91,7 +91,6 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
         <audio id="heroAudio" controls preload="none" style="display:none; width:100%; margin-top:10px;"></audio>
         <div class="hero-actions">
           <a id="heroDetailLink" href="?view=Species" class="ui-button-link">All species &rarr;</a>
-          <a id="heroReviewLink" href="?view=Review" class="ui-button-link" style="display:none;" title="Visits awaiting review from the last 7 days">Review <span id="reviewWorthyCount">0</span> <span id="reviewVisitUnit">visits</span> &rarr;</a>
         </div>
       </div>
     </section>
@@ -103,6 +102,11 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
       <div class="ui-card kpi-mini" title="<?php echo h($visit_explainer); ?>"><div class="kpi-mini-value" id="kpiVisits"><?php echo $visits_today; ?></div><div class="kpi-mini-label">Visits today <span class="info-badge">i</span></div></div>
       <div class="ui-card kpi-mini"><div class="kpi-mini-value" id="kpiNew"><?php echo (int)$summary['newspeciestally']; ?></div><div class="kpi-mini-label">New species</div></div>
       <div class="kpi-lifetime">Lifetime: <strong><?php echo format_number((int)$summary['totalcount']); ?></strong> detections &middot; <strong><?php echo (int)$summary['totalspeciestally']; ?></strong> species</div>
+      <div class="kpi-review" id="stationReviewActions" style="display:none;">
+        <a id="heroReviewLink" href="?view=Review" class="ui-button-link" style="display:none;" title="Visits awaiting review from the last 7 days">Review <span id="reviewWorthyCount">0</span> <span id="reviewVisitUnit">visits</span> &rarr;</a>
+        <span class="kpi-review-note">All species &middot; Last 7 days &middot; Ready to review</span>
+        <span class="kpi-review-note" id="reviewOtherCounts"></span>
+      </div>
     </section>
   </div>
 
@@ -238,11 +242,19 @@ $visit_explainer = 'A visit groups repeated detections of the same bird. After '
     document.getElementById('kpiVisits').textContent = data.today.visits;
     document.getElementById('kpiNew').textContent = data.today.new_species;
     var pending = data.review_worthy;
+    var counts = data.review_counts;
+    var other = counts ? counts.active + counts.unavailable + counts.skipped : 0;
     document.getElementById('reviewWorthyCount').textContent = pending == null ? '' : pending;
     document.getElementById('reviewVisitUnit').textContent = pending === 1 ? 'visit' : 'visits';
-    document.getElementById('heroReviewLink').style.display = pending === 0 ? 'none' : '';
+    document.getElementById('heroReviewLink').style.display = pending === 0 && !other ? 'none' : '';
+    document.getElementById('stationReviewActions').style.display = pending === 0 && !other ? 'none' : '';
+    var waiting = [];
+    if (counts && counts.active) waiting.push(counts.active + ' still active');
+    if (counts && counts.unavailable) waiting.push(counts.unavailable + ' without audio');
+    if (counts && counts.skipped) waiting.push(counts.skipped + ' skipped');
+    document.getElementById('reviewOtherCounts').textContent = waiting.join(' · ');
     document.getElementById('heroReviewLink').title = pending == null
-      ? 'Review count unavailable. Open the queue to retry.' : 'Visits awaiting review from the last 7 days';
+      ? 'Review count unavailable. Open the queue to retry.' : 'Completed visits with playable audio, across all species in the last 7 days';
   }
 
   function renderStory(lines) {
