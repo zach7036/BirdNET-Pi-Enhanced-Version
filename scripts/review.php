@@ -5,8 +5,13 @@
 // One decision per visit fans out to every member detection.
 error_reporting(E_ERROR);
 require_once 'scripts/common.php';
+if (($_GET['visit_tools'] ?? '') !== '1') {
+  require __DIR__ . '/review_guided.php';
+  return;
+}
 ?>
 <div class="review-page">
+  <p><a href="?view=Review">&larr; Guided review</a> &middot; Advanced visit tools: decisions here affect the entire displayed visit.</p>
   <div class="ui-section-header">
     <h3><?php echo nav_icon('search'); ?> Review queue</h3>
     <span class="ui-meta" id="reviewQueueMeta">Loading&hellip;</span>
@@ -244,9 +249,9 @@ require_once 'scripts/common.php';
       return;
     }
     box.innerHTML = suggestions.map(function (s) {
-      return '<div class="ui-message ui-message-warning" role="status"><strong>Consider excluding ' + esc(s.com_name) + '</strong>' +
+      return '<div class="ui-message ui-message-warning" role="status"><strong>Check recurring identifications of ' + esc(s.com_name) + '</strong>' +
         '<span>You rejected ' + s.rejected_pct + '% of its independently reviewed visits (' + s.rejected + ' of ' + (s.confirmed + s.rejected) + '). ' +
-        'Adding it to the <a href="?view=Excluded">excluded species list</a> stops these detections at the source.</span></div>';
+        'These targeted reviews are not a species-wide accuracy estimate. Compare fresh evidence before changing detection settings.</span></div>';
     }).join('');
   }
 

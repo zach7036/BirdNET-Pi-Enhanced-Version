@@ -10,7 +10,7 @@ set_timezone();
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 
-$post_routes = ['#^/api/v1/reviews$#', '#^/api/v1/species/prefs$#', '#^/api/v1/notes$#'];
+$post_routes = ['#^/api/v1/reviews$#', '#^/api/v1/reviews/case-actions$#', '#^/api/v1/species/prefs$#', '#^/api/v1/notes$#'];
 $is_post_route = false;
 foreach ($post_routes as $post_pattern) {
   if (preg_match($post_pattern, $requestUri)) {
@@ -722,7 +722,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   $review_worthy = null;
   $review_counts = null;
   try {
-    $review_summary = review_queue_data($db, ['limit' => 0]);
+    $review_summary = review_cases_data($db, ['limit' => 0]);
     $review_worthy = $review_summary['total'];
     $review_counts = $review_summary['counts'];
   } catch (Throwable $e) {
@@ -801,6 +801,8 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   // from the one shared definition (pinned clip first, then best surviving).
   $best_info = species_best_recording($db, $sci, $prefs);
 
+  $review_history = review_evidence_history($db, $sci)[$sci] ?? null;
+  $confirmed_presence = review_confirmed_presence($db, null, $sci);
   $precision = null;
   $review_counts = [];
   if (spine_table_exists($db, 'detection_reviews')) {
@@ -843,6 +845,8 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
     'prefs' => $prefs,
     'review_counts' => $review_counts,
     'precision' => $precision,
+    'review_history' => $review_history,
+    'confirmed_presence' => $confirmed_presence,
     'recent_visits' => $recent_visits,
     'note_count' => $note_count,
     'info_url' => $info_url['URL'],
@@ -917,6 +921,47 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   header('X-BirdNET-Cache: miss');
   echo $payload;
 
+} elseif (preg_match('#^/api/v1/reviews/cases$#', $requestUri)) {
+  try {
+    $options = array_intersect_key($_GET, array_flip(['view','start','end','limit','offset','key','details']));
+    api_json(review_cases_data($db, $options));
+  } catch (InvalidArgumentException $e) { api_error($e->getMessage(), 400); }
+  catch (Throwable $e) { error_log('Review cases unavailable: ' . $e->getMessage()); api_error('Could not load review questions. Please retry.', 503); }
+
+} elseif (preg_match('#^/api/v1/reviews/confirmed$#', $requestUri)) {
+  try {
+    $date = review_case_date($_GET['date'] ?? date('Y-m-d'));
+    $presence = review_confirmed_presence($db, $date);
+    foreach ($presence as &$p) {
+      $p['audio_available'] = false;
+      $support = review_rows($db, "SELECT d.File_Name,d.Com_Name FROM detection_reviews r JOIN detections d
+        ON r.file_name=d.File_Name AND r.sci_name=d.Sci_Name AND r.date=d.Date AND r.time=d.Time
+        WHERE r.status='confirmed' AND d.Sci_Name=:sci AND d.Date=:date ORDER BY d.Confidence DESC", [':sci' => $p['sci_name'], ':date' => $date]);
+      foreach ($support as $candidate) {
+        $path = detection_clip_relative_path($date, $candidate['Com_Name'], $candidate['File_Name']);
+        if (clip_exists($path) && is_readable(clip_absolute_path($path))) { $p['evidence_file'] = $candidate['File_Name']; $p['clip_path'] = $path; $p['audio_available'] = true; break; }
+      }
+      $p['clip_path'] = $p['clip_path'] ?? detection_clip_relative_path($p['date'], $p['species'], $p['evidence_file']);
+    }
+    unset($p);
+    api_json(['date' => $date, 'species' => $presence]);
+  } catch (InvalidArgumentException $e) { api_error($e->getMessage(), 400); }
+  catch (Throwable $e) { api_error('Could not load confirmed species.', 503); }
+
+} elseif (preg_match('#^/api/v1/reviews/case-actions$#', $requestUri) && $requestMethod === 'POST') {
+  api_require_auth();
+  $db_rw = null;
+  try {
+    $db_rw = new SQLite3(__ROOT__ . '/scripts/birds.db', SQLITE3_OPEN_READWRITE);
+    $db_rw->busyTimeout(2000);
+    $saved = save_review_case($db_rw, api_request_body());
+    api_json($saved);
+  } catch (InvalidArgumentException $e) { api_error($e->getMessage(), 400); }
+  catch (ReviewTargetNotFound $e) { api_error($e->getMessage(), 404); }
+  catch (ReviewConflict $e) { api_error($e->getMessage(), 409); }
+  catch (Throwable $e) { error_log('Case action failed: ' . $e->getMessage()); api_error('Could not save. Retry the same decision or refresh.', 503); }
+  finally { if ($db_rw) $db_rw->close(); }
+
 } elseif (preg_match('#^/api/v1/reviews/queue$#', $requestUri)) {
   try {
     $options = array_intersect_key($_GET, array_flip(['days', 'band_min', 'band_max', 'limit', 'offset', 'group']));
@@ -983,8 +1028,8 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   $confirmed_strong = [];
   $confirmed_weak = [];
   if (spine_table_exists($db, 'detection_reviews')) {
-    $ex_stmt = $db->prepare("SELECT r.file_name, r.date, r.com_name, d.Confidence
-      FROM detection_reviews r JOIN detections d ON d.File_Name = r.file_name
+    $ex_stmt = $db->prepare("SELECT r.file_name, r.date, r.com_name, r.reviewed_via, d.Confidence
+      FROM detection_reviews r JOIN detections d ON d.File_Name = r.file_name AND d.Sci_Name=r.sci_name AND d.Date=r.date AND d.Time=r.time
       WHERE r.sci_name = :sci AND r.status = 'confirmed' AND r.file_name != :exclude" . $visit_excl_for('d.') . "
       ORDER BY d.Confidence DESC LIMIT 24");
     if ($ex_stmt) {
@@ -1002,7 +1047,8 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
           'file' => $row['file_name'],
           'clip_path' => $rel,
           'confidence' => round((float)$row['Confidence'], 4),
-          'source' => 'confirmed'
+          'source' => 'confirmed',
+          'verification' => in_array($row['reviewed_via'], ['guided_clip','guided_sample'], true) ? 'individual' : 'prior_or_bulk'
         ];
         if ((float)$row['Confidence'] >= 0.8) {
           $confirmed_strong[] = $entry;
@@ -1023,7 +1069,7 @@ if (preg_match('#^/api/v1/system/health$#', $requestUri)) {
   // candidates survive; rank the survivors by confidence.
   if (count($examples) < 3) {
     $fb_stmt = $db->prepare('SELECT File_Name, Date, Com_Name, Confidence FROM detections
-      WHERE Sci_Name = :sci AND File_Name != :exclude AND Confidence >= 0.9' . $visit_excl_for('') . '
+      WHERE Sci_Name = :sci AND File_Name != :exclude AND Confidence >= 0.9' . $fp_and . $visit_excl_for('') . '
       ORDER BY Date DESC, Time DESC LIMIT 60');
     if ($fb_stmt) {
       $fb_stmt->bindValue(':sci', $sci, SQLITE3_TEXT);

@@ -142,14 +142,16 @@ if ($bird_sci === '') {
 
   function renderStats(d) {
     var items = [
-      [d.total_detections.toLocaleString(window.BIRDNET_UNITS.numLocale), 'detections'],
+      [d.total_detections.toLocaleString(window.BIRDNET_UNITS.numLocale), 'machine detections (raw)'],
       [d.first_seen || '—', 'first heard'],
       [d.last_seen || '—', 'last heard'],
       [Math.round(d.best_confidence * 100) + '%', 'best confidence']
     ];
-    if (d.precision !== null && d.precision !== undefined) {
-      items.push([Math.round(d.precision * 100) + '%', 'confirmed by you']);
+    if (d.review_history && d.review_history.sample && d.review_history.sample.confirmed + d.review_history.sample.rejected > 0) {
+      var sample = d.review_history.sample;
+      items.push([sample.confirmed + ' of ' + (sample.confirmed + sample.rejected), 'sampled recordings confirmed (separate visits, last 90 days)']);
     }
+    if (d.confirmed_presence) items.push([d.confirmed_presence.length, 'dates with human-confirmed presence, including prior reviews']);
     document.getElementById('birdStats').innerHTML = items.map(function (it) {
       return '<div class="bird-stat"><div class="bird-stat-value">' + esc(String(it[0])) + '</div><div class="bird-stat-label">' + esc(it[1]) + '</div></div>';
     }).join('');

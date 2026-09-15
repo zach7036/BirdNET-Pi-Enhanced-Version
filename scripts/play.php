@@ -154,17 +154,17 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
     die();
   }
 
+  try { $review_before_rename = review_rename_state($db, $oldname); }
+  catch (Throwable $e) { echo 'Error: review metadata could not be read before reassignment. Please retry.'; die(); }
   $output = [];
   exec("sudo -u ".escapeshellarg($user)." ".escapeshellarg($home."/BirdNET-Pi/scripts/birdnet_changeidentification.sh")." ".escapeshellarg($oldname)." ".escapeshellarg($newname)." log_errors 2>&1", $output, $status);
   if ($status === 0) {
     $rename_notices = [];
     $metadata_failed = false;
-    /* The rename script updates detections and moves the files, but two
-       other places still reference the old name: detection_reviews (the
-       trust-loop history) and disk_check_exclude.txt (crown purge
-       protection - stale lines there would let the cleaner delete a
-       protected clip). Carry both along. Any failure here degrades to the
-       old orphaning behavior, never worse. */
+    /* A verdict about the old identification cannot transfer to the new
+       species. Archive it, then clear its active review metadata. File moves
+       remain the rename script's responsibility. Carry purge protection
+       separately; report any metadata failure to callers. */
     if (strpos($newname, '_') !== false) {
       $new_sci = substr($newname, 0, strpos($newname, '_'));
       $new_com = substr($newname, strpos($newname, '_') + 1);
@@ -177,18 +177,8 @@ if(isset($_GET['changefile']) && isset($_GET['newname'])) {
       try {
         $rw = new SQLite3('./scripts/birds.db');
         $rw->busyTimeout(5000);
-        $upd = $rw->prepare('UPDATE detection_reviews SET file_name = :nf, sci_name = :ns, com_name = :nc WHERE file_name = :of');
-        if ($upd) {
-          $upd->bindValue(':nf', $new_file, SQLITE3_TEXT);
-          $upd->bindValue(':ns', $new_sci, SQLITE3_TEXT);
-          $upd->bindValue(':nc', $new_com, SQLITE3_TEXT);
-          $upd->bindValue(':of', $oldname, SQLITE3_TEXT);
-          if (db_execute_safe($rw, $upd, 'changefile review follow') === false) {
-            $metadata_failed = true;
-          }
-        } else {
-          $metadata_failed = true;
-        }
+        review_archive_renamed_metadata($rw, $oldname, $new_file, $review_before_rename);
+        $rename_notices[] = 'prior-review-archived';
         // A pin named the OLD species' best recording; it does not survive a
         // reclassification. Clear it and say so (header, so callers that
         // compare the body to "OK" keep working).

@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
+import uuid
 
 import pytest
 
@@ -19,7 +20,7 @@ def api(tmp_path):
     scripts = tmp_path / 'scripts'
     scripts.mkdir()
     (tmp_path / '.review-test-fixture').touch()
-    for name in ['common.php', 'review_data.php', 'review_actions.php', 'weather_data.php', 'spine_schema.php']:
+    for name in ['common.php', 'review_data.php', 'review_actions.php', 'review_cases.php', 'review_case_actions.php', 'weather_data.php', 'spine_schema.php']:
         shutil.copyfile(ROOT / 'scripts' / name, scripts / name)
     # A location-rarity fixture also checks the otherwise-cache-dependent route.
     (scripts / 'seasonal_cache.json').write_text(json.dumps({'data': {'Testus rarus': [0.001] * 48}}))
@@ -53,6 +54,81 @@ def api(tmp_path):
 
 def save(request, status='false_positive', **kwargs):
     return request('/api/v1/reviews', method='POST', body={'status': status, 'file_name': 'a.wav'}, **kwargs)
+
+
+def guided_body(case, action='confirm'):
+    body = {'request_id': uuid.uuid4().hex, 'action': action,
+            'case': {k: case[k] for k in ['key', 'version', 'date', 'end_date', 'sci_name']}}
+    if case['evidence']:
+        body['files'] = [{k: case['evidence'][0][k] for k in ['file_name', 'file_revision']}]
+    return body
+
+
+@pytest.mark.parametrize('auth,csrf,code', [(False, True, 401), (True, False, 403), (True, True, 200)])
+def test_guided_auth(api, auth, csrf, code):
+    _, request = api
+    case = request('/api/v1/reviews/cases')[1]['cases'][0]
+    assert request('/api/v1/reviews/case-actions', method='POST', body=guided_body(case), auth=auth, csrf=csrf)[0] == code
+
+
+def test_guided_scoped_confirmation_retry_and_undo(api):
+    db, request = api
+    original = db.execute('SELECT * FROM detections').fetchall()
+    case = request('/api/v1/reviews/cases')[1]['cases'][0]
+    body = guided_body(case)
+    code, saved = request('/api/v1/reviews/case-actions', method='POST', body=body)
+    assert code == 200 and saved['affected'] == 1
+    assert request('/api/v1/reviews/case-actions', method='POST', body=body) == (200, saved)
+    assert request('/api/v1/reviews/cases')[1]['counts']['recommended'] == 0
+    confirmed = request('/api/v1/reviews/confirmed?date=' + case['date'])[1]['species']
+    assert len(confirmed) == 1 and confirmed[0]['individually_checked'] == 1
+    assert db.execute('SELECT COUNT(*) FROM detection_reviews').fetchone()[0] == 1
+    undo = {'request_id': uuid.uuid4().hex, 'action': 'undo', 'undo_token': saved['undo_token']}
+    assert request('/api/v1/reviews/case-actions', method='POST', body=undo)[0] == 200
+    assert request('/api/v1/reviews/cases')[1]['counts']['recommended'] == 1
+    assert db.execute('SELECT * FROM detections').fetchall() == original
+
+
+def test_guided_history_conflict_and_invalid_requests(api):
+    _, request = api
+    case = request('/api/v1/reviews/cases')[1]['cases'][0]
+    assert request('/api/v1/reviews/cases?view=invalid')[0] == 400
+    assert request('/api/v1/reviews/cases?start=2020-01-01&end=2025-01-01')[0] == 400
+    assert request('/api/v1/reviews/confirmed?date=bad')[0] == 400
+    assert request('/api/v1/reviews/case-actions', method='DELETE')[0] == 405
+    body = guided_body(case, 'uncertain')
+    assert request('/api/v1/reviews/case-actions', method='POST', body=body)[0] == 200
+    assert request('/api/v1/reviews/cases')[1]['total'] == 0
+    assert request('/api/v1/reviews/cases?view=history')[1]['cases'][0]['state'] == 'unresolved'
+    assert request('/api/v1/reviews/case-actions', method='POST', body=guided_body(case))[0] == 409
+
+
+def test_guided_failure_rolls_back_and_retry_recovers(api):
+    db, request = api
+    case = request('/api/v1/reviews/cases')[1]['cases'][0]
+    # First harmless case action creates the additive schema, then Undo restores it.
+    saved = request('/api/v1/reviews/case-actions', method='POST', body=guided_body(case, 'later'))[1]
+    request('/api/v1/reviews/case-actions', method='POST', body={'request_id': uuid.uuid4().hex, 'action': 'undo', 'undo_token': saved['undo_token']})
+    db.execute("CREATE TRIGGER fail_guided_journal BEFORE INSERT ON review_case_actions BEGIN SELECT RAISE(ABORT,'injected'); END")
+    db.commit()
+    body = guided_body(case)
+    assert request('/api/v1/reviews/case-actions', method='POST', body=body)[0] == 503
+    assert db.execute('SELECT COUNT(*) FROM detection_reviews').fetchone()[0] == 0
+    db.execute('DROP TRIGGER fail_guided_journal')
+    db.commit()
+    assert request('/api/v1/reviews/case-actions', method='POST', body=body)[0] == 200
+
+
+def test_dashboard_and_recommended_share_the_same_case_count(api):
+    _, request = api
+    recommended = request('/api/v1/reviews/cases')[1]
+    code, dashboard = request('/api/v1/dashboard/now')
+    assert code == 200
+    assert dashboard['review_worthy'] == recommended['total']
+    assert dashboard['review_counts'] == recommended['counts']
+    saved = request('/api/v1/reviews/case-actions', method='POST', body=guided_body(recommended['cases'][0]))[1]
+    assert saved['status'] == 'ok'
+    assert request('/api/v1/dashboard/now')[1]['review_worthy'] == 0
 
 
 @pytest.mark.parametrize('auth,csrf,code', [(False, True, 401), (True, False, 403), (True, True, 200)])

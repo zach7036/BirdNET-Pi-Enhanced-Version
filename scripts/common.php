@@ -878,7 +878,13 @@ function detections_watermark() {
     $review_mark = spine_table_exists($db, 'detection_reviews')
       ? (string) db_query_single_safe($db, "SELECT COUNT(*) || '-' || COALESCE(MAX(created_at), '') FROM detection_reviews", '', 'cache watermark reviews')
       : '';
-    $watermark = $max_id . '|' . $review_mark;
+    $case_mark = spine_table_exists($db, 'review_case_actions')
+      ? (string) db_query_single_safe($db, 'SELECT MAX(rowid) FROM review_case_actions', '', 'case cache watermark') : '';
+    $legacy_action_mark = spine_table_exists($db, 'review_actions')
+      ? (string) db_query_single_safe($db, "SELECT MAX(rowid) || '-' || COALESCE(SUM(undone),0) FROM review_actions", '', 'legacy action watermark') : '';
+    $rename_mark = spine_table_exists($db, 'review_rename_archive')
+      ? (string) db_query_single_safe($db, 'SELECT MAX(id) FROM review_rename_archive', '', 'rename cache watermark') : '';
+    $watermark = $max_id . '|' . $review_mark . '|' . $case_mark . '|' . $legacy_action_mark . '|' . $rename_mark;
   }
   return $watermark;
 }
@@ -1301,14 +1307,18 @@ function build_todays_story($db) {
   // Brand-new lifetime species today (reviewed false positives never make news)
   $fp_excl = and_review_exclusion($db);
   $new_species = [];
-  $res = db_query_safe($db, "SELECT Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl AND Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date < DATE('now','localtime')) GROUP BY Sci_Name LIMIT 3", 'story new species');
+  $new_confirmed = [];
+  $confirmed_today = array_column(review_confirmed_presence($db, date('Y-m-d')), null, 'sci_name');
+  $res = db_query_safe($db, "SELECT Sci_Name,Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl AND Sci_Name NOT IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date < DATE('now','localtime')) GROUP BY Sci_Name LIMIT 3", 'story new species');
   while ($row = db_fetch_assoc_safe($res)) {
-    $new_species[] = $row['Com_Name'];
+    if (isset($confirmed_today[$row['Sci_Name']])) $new_confirmed[] = $row['Com_Name'];
+    else $new_species[] = $row['Com_Name'];
   }
+  if ($new_confirmed) $lines[] = ['icon' => 'bird', 'text' => 'New species with human-confirmed presence today: ' . implode(', ', $new_confirmed) . '.'];
   if (!empty($new_species)) {
     $lines[] = ['icon' => 'bird', 'text' => count($new_species) === 1
-      ? 'A brand new species for your station: ' . $new_species[0] . '!'
-      : 'New species for your station today: ' . implode(', ', $new_species) . '!'];
+      ? 'Possible new species for your station: ' . $new_species[0] . ' — check its identification in Review.'
+      : 'Possible new species for your station today: ' . implode(', ', $new_species) . ' — check their identifications in Review.'];
   }
 
   // Species returning after at least two weeks away
@@ -1323,9 +1333,9 @@ function build_todays_story($db) {
 
   // Rare visitors: heard today, five or fewer lifetime detections, not new today
   $rare = [];
-  $res = db_query_safe($db, "SELECT Com_Name, COUNT(*) AS lifetime FROM detections WHERE Sci_Name IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl) GROUP BY Sci_Name HAVING lifetime <= 5 AND MIN(Date) < DATE('now','localtime') LIMIT 3", 'story rare');
+  $res = db_query_safe($db, "SELECT Sci_Name,Com_Name, COUNT(*) AS lifetime FROM detections WHERE Sci_Name IN (SELECT DISTINCT Sci_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl) GROUP BY Sci_Name HAVING lifetime <= 5 AND MIN(Date) < DATE('now','localtime') LIMIT 3", 'story rare');
   while ($row = db_fetch_assoc_safe($res)) {
-    $rare[] = $row['Com_Name'];
+    if (!isset($confirmed_today[$row['Sci_Name']])) $rare[] = $row['Com_Name'];
   }
   if (!empty($rare)) {
     $lines[] = ['icon' => 'search', 'text' => 'Rare visitor' . (count($rare) > 1 ? 's' : '') . ' today: ' . implode(', ', $rare) . ' — worth a listen in Review.'];
@@ -1336,7 +1346,7 @@ function build_todays_story($db) {
     $region_rare = [];
     $res = db_query_safe($db, "SELECT DISTINCT Sci_Name, Com_Name FROM detections WHERE Date = DATE('now','localtime')$fp_excl", 'story region rare');
     while ($row = db_fetch_assoc_safe($res)) {
-      if (is_region_rare($row['Sci_Name'])) {
+      if (is_region_rare($row['Sci_Name']) && !isset($confirmed_today[$row['Sci_Name']])) {
         $region_rare[] = $row['Com_Name'];
         if (count($region_rare) >= 3) {
           break;

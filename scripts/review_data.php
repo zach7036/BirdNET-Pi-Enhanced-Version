@@ -248,3 +248,4 @@ function review_queue_data($db, $options = []) {
 }
 
 require_once __DIR__ . '/review_actions.php';
+require_once __DIR__ . '/review_cases.php';

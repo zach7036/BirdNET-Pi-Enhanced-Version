@@ -148,18 +148,34 @@ quiet when there's nothing notable to say, so when it speaks it's worth reading.
 
 ![Migration insights with plain-English takeaways above new arrivals and gone-quiet lists](docs/migration_takeaways.png)
 
-### Review — verify what you're not sure about
+### Review — a few useful questions, not endless homework
 
-BirdNET reports a confidence score, and scores in the middle of the range are genuinely
-uncertain. The review queue collects those, groups them into **visits** rather than individual
-detections, and gives you comparison clips of the same species from elsewhere in your history so
-you can judge by ear.
+**Recommended** groups related visits into questions: can you confirm a species at your
+station, or check an unusual occurrence? It offers completed recordings, preferring evidence
+from different visits. The Today button counts these questions across all species—not every
+uncertain recording. BirdNET's confidence score is a model score, not a measured probability.
 
-Triage is keyboard-driven — <kbd>Y</kbd> confirm, <kbd>N</kbd> false positive, <kbd>U</kbd>
-unsure, <kbd>H</kbd> hide, <kbd>R</kbd> reassign, <kbd>J</kbd>/<kbd>K</kbd> to move — and your
-verdicts propagate. Detections marked as false positives are excluded from species counts,
-insights, and eBird exports, so a misidentification doesn't quietly pollute your statistics
-forever.
+**Yes, I hear this bird** confirms only the selected recording and establishes presence on
+that date. **Not this bird** rejects only that identification; another recording may still
+establish presence. Other recordings remain unverified. **I can't tell** leaves the question
+unresolved without changing statistics. **Later** postpones it for 24 hours. Undo restores
+decisions and question state; audio is never deleted by these actions.
+
+Try a short session of up to five questions, optionally including a small daily quality
+sample. All review items and History remain available, with a date picker for older evidence.
+A date-based confirmed-species list distinguishes individually checked recordings from
+older or bulk confirmations. Review history helps prioritize checks; it does not retrain BirdNET
+or silently change recording thresholds, exclude species, or verify unheard recordings.
+
+Keys: <kbd>Y</kbd> yes, <kbd>N</kbd> not this bird, <kbd>U</kbd> can't tell,
+<kbd>L</kbd> later, arrows to move, Space to play. Playing a recording selects it for the
+decision. More evidence and actions includes comparison clips, explicit bulk previews,
+Hide, and Reassign. Reassignment is a separate file-rename operation, not part of decision Undo.
+The previous whole-visit tools remain available under Advanced tools.
+
+Rejected/hidden records stay in the raw database but are excluded from review-aware statistics
+and the existing eBird export. Previously uploaded third-party data is not retroactively changed.
+See [Guided Review](docs/GUIDED_REVIEW.md) for the selection rules, compatibility, and testing.
 
 ![The review queue showing an uncertain detection beside comparison recordings of the same species](docs/review_queue.png)
 

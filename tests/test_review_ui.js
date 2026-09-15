@@ -90,8 +90,12 @@ async function fixture(t, count = 2) {
     }
     if (url.pathname.endsWith('/dashboard/now')) {
       state.nowCalls++;
+      const oldCounts = counts(state.visits);
+      const caseCounts = {recommended: oldCounts.ready, all: oldCounts.ready,
+        history: oldCounts.active + oldCounts.unavailable + oldCounts.skipped,
+        active: oldCounts.active, unavailable: oldCounts.unavailable, later: oldCounts.skipped, unresolved: 0};
       const data = {latest_visit: null, today: {detections: 10, species: 1, visits: 2, new_species: 0},
-        review_worthy: state.nowUnknown ? null : counts(state.visits).ready, review_counts: state.nowUnknown ? null : counts(state.visits), story: []};
+        review_worthy: state.nowUnknown ? null : oldCounts.ready, review_counts: state.nowUnknown ? null : caseCounts, story: []};
       if (state.nowHook) await state.nowHook(state.nowCalls);
       return json(data);
     }
@@ -362,7 +366,7 @@ test('Now badge updates across tabs, survives back navigation, and distinguishes
   const now = await context.newPage();
   await now.goto('http://review.test/?view=Now');
   await now.waitForFunction(() => document.getElementById('reviewWorthyCount').textContent === '1');
-  assert.match(await now.locator('#heroReviewLink').textContent(), /Review 1 visit /);
+  assert.match(await now.locator('#heroReviewLink').textContent(), /Review 1 item /);
   await review(page, 'false_positive');
   await ready(page, 0);
   await now.waitForFunction(() => document.getElementById('heroReviewLink').style.display === 'none');

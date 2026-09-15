@@ -130,18 +130,27 @@ the station database or recordings, and do not require the development server:
 ```sh
 php -d extension=sqlite3 -d extension=mbstring tests/test_review_data.php
 php -d extension=sqlite3 -d extension=mbstring tests/test_review_workflow.php
+php -d extension=sqlite3 -d extension=mbstring tests/test_review_cases.php
 python -m pytest tests/test_review_api.py
 BIRDNET_TEST_BROWSER=chrome node --test tests/test_review_ui.js
+BIRDNET_TEST_BROWSER=chrome node --test tests/test_review_guided_ui.js
 ```
 
 The API test needs PHP with SQLite3 and mbstring (`BIRDNET_TEST_PHP` can select
 the executable). The browser test needs Playwright; omit `BIRDNET_TEST_BROWSER`
 to use its bundled Chromium, or select an installed Chrome/Edge browser.
 
-The dashboard's `review_worthy` field and the default Review page count only
-completed, playable visits from the shared selection rules in
-`scripts/review_data.php`. A failed count is `null`, not zero. `review_counts`
-provides the category counts. `GET /api/v1/reviews/queue?group=...` accepts:
+The default Review page now uses guided cases in `scripts/review_cases.php`.
+The dashboard's `review_worthy` is the Recommended **item** count, not a visit
+count. Both use the same selection helper; failures remain `null`, not zero.
+`review_counts` now contains `recommended`, `all`, `history`, `samples`,
+`active`, `unavailable`, `unresolved`, and `later`. See
+[Guided Review](GUIDED_REVIEW.md) for the new endpoints, scoped actions,
+provenance, idempotency, Undo, performance benchmark, and Pi validation.
+
+The following describes the **legacy/advanced visit API**, retained for
+compatibility and linked from Advanced tools. It is not the default dashboard
+selection. `GET /api/v1/reviews/queue?group=...` still accepts:
 
 - `ready` (default): Important and Routine together, important cases first.
 - `important`: first-ever, regionally unusual, rare-visitor or low-precision records.
@@ -203,7 +212,7 @@ an empty view refreshes periodically to discover completed or unskipped visits.
 On a Pi, validate the UI on the development branch: check Important/Routine,
 let an active visit finish, Skip/Resume one known visit, and Undo a deliberate
 test verdict. These operations should change only review metadata. Confirm the
-Now count matches Ready and that existing audio still plays. Local automated
+Legacy Ready count matches its own visit endpoint and that existing audio still plays. Local automated
 checks do not replace measuring queue responsiveness against a large real
 station database.
 
