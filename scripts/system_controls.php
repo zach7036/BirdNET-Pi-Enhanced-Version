@@ -37,44 +37,92 @@ $free_space = disk_free_space("$home/BirdNET-Pi/");
 <br>
 <script>
 var seconds = 0;
+var systemCommandPending = false;
+var systemUpdateTimer = null;
+var systemUpdateMarkup = null;
+var systemDisabledButtons = [];
 function submitSystemButton(button) {
   const form = button.form || button.closest('form');
-  if (!form) return;
-  if (button.name) {
-    const hidden = document.createElement('input');
-    hidden.type = 'hidden';
-    hidden.name = button.name;
-    hidden.value = button.value;
-    form.appendChild(hidden);
+  if (!form) throw new Error('Action form is unavailable.');
+  if (window.BirdNETUI && typeof BirdNETUI.submitButton === 'function') {
+    return BirdNETUI.submitButton(form, button);
   }
-  form.submit();
+  // Also work when ui-helpers.js is unavailable or an older copy is cached.
+  let hidden;
+  try {
+    if (button.name) {
+      hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = button.name;
+      hidden.value = button.value;
+      form.appendChild(hidden);
+    }
+    HTMLFormElement.prototype.submit.call(form);
+  } finally {
+    if (hidden) hidden.remove();
+  }
+}
+function resetSystemCommand() {
+  if (systemUpdateTimer !== null) clearInterval(systemUpdateTimer);
+  systemUpdateTimer = null;
+  if (systemUpdateMarkup !== null) document.getElementById('updatebtn').innerHTML = systemUpdateMarkup;
+  systemUpdateMarkup = null;
+  systemDisabledButtons.forEach(function(saved) { saved.button.disabled = saved.disabled; });
+  systemDisabledButtons = [];
+  systemCommandPending = false;
+}
+function failedSystemCommand() {
+  resetSystemCommand();
+  document.getElementById('systemCommandError').hidden = false;
 }
 function confirmSystemCommand(event, title, message, confirmText, danger, beforeSubmit) {
   event.preventDefault();
+  if (systemCommandPending) return false;
+  systemCommandPending = true;
+  document.getElementById('systemCommandError').hidden = true;
   const button = event.currentTarget;
-  const run = function() {
-    if (typeof beforeSubmit === 'function') beforeSubmit();
-    submitSystemButton(button);
+  const run = function(ok) {
+    if (!ok) { resetSystemCommand(); return; }
+    try {
+      const form = button.form || button.closest('form');
+      if (!form) throw new Error('Action form is unavailable.');
+      systemDisabledButtons = Array.from(form.querySelectorAll('button')).map(function(b) {
+        const saved = {button:b, disabled:b.disabled}; b.disabled = true; return saved;
+      });
+      if (typeof beforeSubmit === 'function') beforeSubmit();
+      submitSystemButton(button);
+    } catch (e) { failedSystemCommand(); }
   };
-  if (window.BirdNETUI) {
-    BirdNETUI.confirmAction({title: title, message: message, confirmText: confirmText, danger: danger}).then(function(ok) {
-      if (ok) run();
-    });
-  } else if (confirm(message)) {
-    run();
-  }
+  try {
+    if (window.BirdNETUI && typeof BirdNETUI.confirmAction === 'function') {
+      BirdNETUI.confirmAction({title: title, message: message, confirmText: confirmText, danger: danger}).then(run).catch(failedSystemCommand);
+    } else run(confirm(message));
+  } catch (e) { failedSystemCommand(); }
   return false;
 }
 function update(event) {
   return confirmSystemCommand(event, 'Update BirdNET-Pi', 'This will pull updates and restart services. The web UI may be unavailable while the update runs.', 'Update', false, function() {
-    setInterval(function(){ seconds += 1; document.getElementById('updatebtn').innerHTML = "Updating: <pre id='timer' class='bash'>"+new Date(seconds * 1000).toISOString().substring(14, 19)+"</pre>"; }, 1000);
+    const button = document.getElementById('updatebtn');
+    systemUpdateMarkup = button.innerHTML;
+    let elapsed = 0;
+    const tick = function() {
+      // This measures waiting for a response, not server-side update progress.
+      button.innerHTML = "Update requested: <pre id='timer' class='bash'>" + new Date(elapsed * 1000).toISOString().substring(14, 19) + "</pre>";
+      elapsed += 1;
+    };
+    tick();
+    systemUpdateTimer = setInterval(tick, 1000);
   });
 }
+window.addEventListener('pageshow', function(event) { if (event.persisted) resetSystemCommand(); });
 </script>
 <div class="systemcontrols">
 <div class="ui-message ui-message-info" style="max-width:720px;margin:0 auto 16px;">
   <strong>Maintenance actions</strong>
   <span>Backup before restore or clear-data operations. Current database: <?php echo round($db_size / 1024 / 1024, 1); ?> MB. Free disk space: <?php echo round($free_space / 1024 / 1024 / 1024, 1); ?> GB.</span>
+</div>
+<div id="systemCommandError" role="alert" hidden>
+  <div class="ui-message ui-message-error">Could not submit this action. Refresh the page and try again.</div>
 </div>
 <form action="views.php" method="GET">
   <div>

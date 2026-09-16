@@ -213,23 +213,54 @@
   }
 
   function submitButton(form, button) {
-    if (button && button.name) {
-      var hidden = document.createElement('input');
-      hidden.type = 'hidden';
-      hidden.name = button.name;
-      hidden.value = button.value;
-      form.appendChild(hidden);
+    if (!form) throw new Error('Action form is unavailable.');
+    var hidden;
+    try {
+      if (button && button.name) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = button.name;
+        hidden.value = button.value;
+        form.appendChild(hidden);
+      }
+      // A control named "submit" masks form.submit. Keep the existing native
+      // submission semantics and include only the confirmed button's value.
+      HTMLFormElement.prototype.submit.call(form);
+    } finally {
+      // Native submit snapshots the fields synchronously. Do not leave an old
+      // command behind if submission fails, is retried, or the user goes Back.
+      if (hidden) hidden.remove();
     }
-    form.submit();
   }
 
   function confirmSubmit(event, options) {
     event.preventDefault();
     var button = event.currentTarget || event.target;
     var form = button.form || button.closest('form');
-    confirmAction(options).then(function (ok) {
-      if (ok && form) submitButton(form, button);
-    });
+    if (!form || form.dataset.uiConfirmPending === 'true') return false;
+    form.dataset.uiConfirmPending = 'true';
+    var previousError = form.querySelector('[data-ui-submit-error]');
+    if (previousError) previousError.remove();
+    var reset = function () {
+      delete form.dataset.uiConfirmPending;
+      window.removeEventListener('pageshow', reset);
+    };
+    window.addEventListener('pageshow', reset);
+    var failed = function () {
+      reset();
+      var error = document.createElement('div');
+      error.className = 'ui-message ui-message-error';
+      error.setAttribute('role', 'alert');
+      error.setAttribute('data-ui-submit-error', 'true');
+      error.textContent = 'Could not submit this action. Refresh the page and try again.';
+      form.appendChild(error);
+    };
+    try {
+      confirmAction(options).then(function (ok) {
+        if (ok) submitButton(form, button);
+        else reset();
+      }).catch(failed);
+    } catch (e) { failed(); }
     return false;
   }
 
@@ -281,6 +312,7 @@
     loadSystemHealth: loadSystemHealth,
     bindSystemHealth: bindSystemHealth,
     confirmAction: confirmAction,
+    submitButton: submitButton,
     confirmSubmit: confirmSubmit,
     confirmLink: confirmLink,
     bindPersistedControls: bindPersistedControls

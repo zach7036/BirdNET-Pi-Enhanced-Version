@@ -216,6 +216,21 @@ Legacy Ready count matches its own visit endpoint and that existing audio still 
 checks do not replace measuring queue responsiveness against a large real
 station database.
 
+## Maintenance-button regression tests
+
+```sh
+BIRDNET_TEST_BROWSER=chrome node --test tests/test_system_controls_ui.js
+```
+
+Requires Playwright (use an installed Chrome/Edge channel or omit the variable
+for bundled Chromium). This suite loads the shipped System Controls/Services
+markup and shared UI helper, strips PHP without executing it, and intercepts
+every request. No updater, reboot, shutdown, restore, clear-data operation, or
+station database is used. It covers confirmed/cancelled actions, exact command
+values, failed submissions, timer cleanup, repeat clicks, Back recovery, Backup,
+RAM-drive controls, and the fallback without the shared helper. Never test Clear
+or Restore on a real station as a substitute for these mocked checks.
+
 ## Notes
 
 - Always lint changed PHP with `php -l` before testing.
