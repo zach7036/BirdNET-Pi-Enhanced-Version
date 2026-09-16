@@ -208,21 +208,6 @@
   color: var(--text-muted);
 }
 
-.kpi-review {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.kpi-review-note {
-  font-size: var(--text-xs, 0.75rem);
-  color: var(--text-muted);
-}
-
-.kpi-review-note:empty { display: none; }
-
 .review-filters, .review-undo {
   display: flex;
   flex-wrap: wrap;

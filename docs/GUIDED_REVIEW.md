@@ -14,6 +14,12 @@ explicit scope warning. Legacy POST and Undo contracts remain supported.
 
 ## Page layout
 
+On Today, **Review station detections** sits beside the Last Heard bird's About button.
+It opens the station-wide Recommended queue, not a filter for that bird. No
+count or caption is added to the card; the Review page provides the counts and
+date range. The link retains its existing visibility rules for pending/history
+items and unavailable counts.
+
 Each question separates the bird and a short explanation from two steps:
 **Listen** and **Decide**. Desktop layouts place those steps side by side;
 phones and narrow content areas stack them. Each card has one audio player.

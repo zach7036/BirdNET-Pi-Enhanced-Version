@@ -46,12 +46,13 @@ async function fixture(t, count = 2) {
   await context.addInitScript({path: path.join(root, 'homepage/static/ui-helpers.js')});
   const state = {visits: Array.from({length: count}, (_, i) => visit(i)), queues: [], posts: [],
     nowCalls: 0, renameCalls: 0, failQueue: false, postFailure: null, waitPost: null,
-    afterPost: null, renameFailureAt: null, nowHook: null, nowUnknown: false, undo: new Map()};
+    afterPost: null, renameFailureAt: null, nowHook: null, nowUnknown: false, latestVisit: null, undo: new Map()};
   await context.route('**/*', async route => {
     const req = route.request();
     const url = new URL(req.url());
     const json = (value, status = 200) => route.fulfill({status, contentType: 'application/json', body: JSON.stringify(value)});
     if (req.isNavigationRequest()) return route.fulfill({contentType: 'text/html', body: markup(url.searchParams.get('view') === 'Now' ? 'scripts/now.php' : 'scripts/review.php')});
+    if (url.pathname.endsWith('/RobotoFlex-Regular.ttf')) return route.fulfill({contentType: 'font/ttf', body: fs.readFileSync(path.join(root, 'homepage/static/RobotoFlex-Regular.ttf'))});
     if (url.pathname.endsWith('/reviews/queue')) {
       state.queues.push(url);
       if (state.failQueue) return json({status: 'error'}, 503);
@@ -94,7 +95,7 @@ async function fixture(t, count = 2) {
       const caseCounts = {recommended: oldCounts.ready, all: oldCounts.ready,
         history: oldCounts.active + oldCounts.unavailable + oldCounts.skipped,
         active: oldCounts.active, unavailable: oldCounts.unavailable, later: oldCounts.skipped, unresolved: 0};
-      const data = {latest_visit: null, today: {detections: 10, species: 1, visits: 2, new_species: 0},
+      const data = {latest_visit: state.latestVisit, today: {detections: 10, species: 1, visits: 2, new_species: 0},
         review_worthy: state.nowUnknown ? null : oldCounts.ready, review_counts: state.nowUnknown ? null : caseCounts, story: []};
       if (state.nowHook) await state.nowHook(state.nowCalls);
       return json(data);
@@ -236,8 +237,8 @@ test('unavailable audio stays separate and cannot be blindly confirmed or reject
   assert.ok(await page.locator('.review-btn.skip').isEnabled());
   const now = await context.newPage();
   await now.goto('http://review.test/?view=Now');
-  await now.waitForFunction(() => document.getElementById('reviewOtherCounts').textContent === '1 without audio');
-  assert.equal(await now.locator('#reviewWorthyCount').textContent(), '0');
+  await now.waitForFunction(() => document.getElementById('kpiDetections').textContent === '10');
+  assert.equal(await now.locator('#heroReviewLink').textContent(), 'Review station detections →');
   assert.ok(await now.locator('#heroReviewLink').isVisible(), 'Other review views remain accessible with zero ready visits');
 });
 
@@ -361,25 +362,26 @@ test('partial reassign is not reported as a fully saved visit', async t => {
   await ready(page, 1);
   assert.equal(state.queues.length, 2);
 });
-test('Now badge updates across tabs, survives back navigation, and distinguishes unavailable', async t => {
+test('Now review link updates across tabs, survives back navigation, and distinguishes unavailable', async t => {
   const {page, context, state} = await fixture(t, 1);
   const now = await context.newPage();
   await now.goto('http://review.test/?view=Now');
-  await now.waitForFunction(() => document.getElementById('reviewWorthyCount').textContent === '1');
-  assert.match(await now.locator('#heroReviewLink').textContent(), /Review 1 item /);
+  await now.waitForFunction(() => document.getElementById('kpiDetections').textContent === '10');
+  assert.equal(await now.locator('#heroReviewLink').textContent(), 'Review station detections →');
+  assert.ok(await now.locator('#heroReviewLink').isVisible());
   await review(page, 'false_positive');
   await ready(page, 0);
   await now.waitForFunction(() => document.getElementById('heroReviewLink').style.display === 'none');
-  assert.ok(await now.locator('#stationReviewActions').isHidden());
+  assert.equal(await now.locator('#stationReviewActions').count(), 0);
   assert.ok(state.nowCalls >= 2);
   state.nowUnknown = true;
   await now.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
   await now.waitForFunction(() => document.getElementById('heroReviewLink').title.startsWith('Review count unavailable'));
   assert.ok(await now.locator('#heroReviewLink').isVisible());
-  assert.ok(await now.locator('#stationReviewActions').isVisible());
-  assert.equal(await now.locator('#reviewWorthyCount').textContent(), '');
+  assert.equal(await now.locator('#heroReviewLink').textContent(), 'Review station detections →');
+  assert.equal(await now.locator('#reviewWorthyCount, #reviewVisitUnit, #reviewOtherCounts').count(), 0);
 });
-test('an older dashboard response cannot overwrite a freshly updated count', async t => {
+test('an older dashboard response cannot overwrite freshly updated review-link visibility', async t => {
   const {context, state} = await fixture(t, 2);
   let release;
   const held = new Promise(resolve => { release = resolve; });
@@ -390,56 +392,66 @@ test('an older dashboard response cannot overwrite a freshly updated count', asy
   await initialRequest;
   state.visits = [];
   await now.evaluate(() => window.dispatchEvent(new StorageEvent('storage', {key: 'birdnet-reviews-changed'})));
-  await now.waitForFunction(() => document.getElementById('reviewWorthyCount').textContent === '0' && document.getElementById('kpiDetections').textContent === '10');
+  await now.waitForFunction(() => document.getElementById('heroReviewLink').style.display === 'none' && document.getElementById('kpiDetections').textContent === '10');
   const oldResponse = now.waitForResponse('**/dashboard/now?*');
   release();
   await oldResponse;
   await now.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  assert.equal(await now.locator('#reviewWorthyCount').textContent(), '0');
+  assert.ok(await now.locator('#heroReviewLink').isHidden());
 });
 
 for (const width of [1440, 1024, 768, 390, 320]) {
-  test('station review button keeps its size below all-species totals at ' + width + 'px', async t => {
-    const {context} = await fixture(t, 165);
+  test('Review station detections sits beside About without counts or captions at ' + width + 'px', async t => {
+    const {context, state} = await fixture(t, 165);
+    state.latestVisit = {...visit(0), species: 'Common Grackle', sci_name: 'Quiscalus quiscula', seconds_ago: 2040, visits_last_7_days: 35};
     const now = await context.newPage();
     await now.setViewportSize({width, height: 1100});
     await now.goto('http://review.test/?view=Now');
-    await now.waitForFunction(() => document.getElementById('reviewWorthyCount').textContent === '165');
+    await now.waitForFunction(() => document.getElementById('kpiDetections').textContent === '10');
     for (const file of ['homepage/style.css', 'homepage/static/css/tokens.css', 'homepage/static/css/pages.css']) {
       await now.addStyleTag({path: path.join(root, file)});
     }
+    await now.evaluate(() => document.fonts.ready);
     const layout = await now.evaluate(() => {
       const button = document.getElementById('heroReviewLink');
-      const footer = document.getElementById('stationReviewActions');
+      const about = document.getElementById('heroDetailLink');
+      const actions = document.querySelector('.hero-actions');
       const totals = document.querySelector('.now-kpis');
       const rect = button.getBoundingClientRect();
-      const bounds = totals.getBoundingClientRect();
-      // Same control, same text, measured in its old parent as a baseline.
-      const originalPosition = button.cloneNode(true);
-      originalPosition.removeAttribute('id');
-      document.querySelector('.hero-actions').appendChild(originalPosition);
-      const originalRect = originalPosition.getBoundingClientRect();
-      const original = {width: originalRect.width, height: originalRect.height};
-      originalPosition.remove();
+      const aboutRect = about.getBoundingClientRect();
+      const bounds = actions.getBoundingClientRect();
+      const hero = document.getElementById('nowHero');
+      const heroHeight = hero.getBoundingClientRect().height;
+      button.style.display = 'none';
+      const heightWithoutButton = hero.getBoundingClientRect().height;
+      button.style.display = '';
       return {
         inTotals: totals.contains(button), inHero: document.getElementById('nowHero').contains(button),
-        followsLifetime: footer.previousElementSibling.classList.contains('kpi-lifetime'),
-        belowLifetime: rect.top >= document.querySelector('.kpi-lifetime').getBoundingClientRect().bottom,
-        width: rect.width, height: rect.height, original,
-        centered: Math.abs((rect.left + rect.right) / 2 - (bounds.left + bounds.right) / 2) < 1,
+        followsAbout: button.previousElementSibling === about && button.parentElement === actions,
+        onlyButtons: actions.children.length === 2 && Array.from(actions.children).every(el => el.matches('a.ui-button-link')),
+        sameRow: Math.abs(rect.top - aboutRect.top) < 1,
+        height: rect.height, aboutHeight: aboutRect.height, heroHeight, heightWithoutButton,
         fits: rect.left >= bounds.left && rect.right <= bounds.right,
-        note: footer.querySelector('.kpi-review-note').textContent,
+        pageFits: document.documentElement.scrollWidth <= innerWidth + 1,
+        text: button.textContent,
         href: button.getAttribute('href'),
       };
     });
-    assert.ok(layout.inTotals && !layout.inHero && layout.followsLifetime && layout.belowLifetime);
-    assert.ok(layout.centered && layout.fits, JSON.stringify(layout));
-    assert.ok(Math.abs(layout.width - layout.original.width) < 1, 'Original button width retained');
-    assert.ok(Math.abs(layout.height - layout.original.height) < 1, 'Original button height retained');
-    assert.match(layout.note, /All species.*Last 7 days/);
+    assert.ok(!layout.inTotals && layout.inHero && layout.followsAbout && layout.onlyButtons);
+    assert.ok(layout.fits && layout.pageFits, JSON.stringify(layout));
+    assert.ok(Math.abs(layout.height - layout.aboutHeight) < 1, 'Existing button height retained');
+    if (width >= 1440) {
+      assert.ok(layout.sameRow, 'Desktop actions stay on one row');
+      assert.ok(Math.abs(layout.heroHeight - layout.heightWithoutButton) < 1, 'No extra desktop card height');
+    }
+    assert.equal(layout.text, 'Review station detections →');
+    assert.equal(await now.locator('#stationReviewActions, .kpi-review-note, #reviewOtherCounts, #reviewWorthyCount, #reviewVisitUnit').count(), 0);
     assert.equal(layout.href, '?view=Review');
     if (process.env.BIRDNET_REVIEW_SCREENSHOT && width === 1440) {
       await now.locator('.now-main').screenshot({path: process.env.BIRDNET_REVIEW_SCREENSHOT});
+    }
+    if (process.env.BIRDNET_REVIEW_PREVIEW_DIR && [1440, 390].includes(width)) {
+      await now.locator('.now-main').screenshot({path: path.join(process.env.BIRDNET_REVIEW_PREVIEW_DIR, `review-all-species-${width}.png`)});
     }
   });
 }
