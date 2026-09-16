@@ -143,13 +143,10 @@ window.addEventListener('pageshow', function(event) { if (event.persisted) reset
 </div>
 <div><a href="scripts/backup.php" download onclick="return window.BirdNETUI ? BirdNETUI.confirmLink(event, {title:'Download backup', message:'This may take a while for large databases. Keep the browser open until the download starts.', confirmText:'Download backup'}) : confirm('Download backup? Note that this could take a long time.')"><button>Backup data</button></a></div>
 <?php
-  $cmd="cd ".$home."/BirdNET-Pi && sudo -u ".$user." git rev-list --max-count=1 HEAD";
-  $curr_hash = shell_exec($cmd);
+  require_once __DIR__ . '/version_info.php';
+  echo render_system_version(system_version_info($home . '/BirdNET-Pi', $user));
 ?>
-  <p style="font-size:11px;text-align:center"></br></br>Running version: </p>
-  <a href="https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/commit/<?php echo $curr_hash; ?>" target="_blank">
-    <p style="font-size:11px;text-align:center;box-sizing: border-box"><?php echo $curr_hash; ?></p>
-  </a>
+  <script src="static/system-version.js?v=<?php echo (int)filemtime(__DIR__ . '/../homepage/static/system-version.js'); ?>" defer></script>
   <pre id="console" style="text-align:center"></pre>
 </div>
 <script type="text/javascript">

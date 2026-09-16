@@ -1524,3 +1524,44 @@ a.tl-label:hover { color: var(--accent); font-weight: 600; }
   color: var(--accent);
   margin-right: 8px;
 }
+
+/* Read-only installed version details in System Controls. */
+.system-version {
+  max-width: 720px;
+  margin: 28px auto 16px;
+  padding: 18px 12px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: .9rem;
+}
+
+.system-version-fields {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 24px;
+  margin: 0;
+}
+.system-version-fields > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 0; }
+.system-version-fields dt { color: var(--text-secondary); font-weight: 400; float: none; clear: none; }
+.system-version-fields dt::after { content: ':'; }
+.system-version-fields dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+.system-version-fields dd::before { content: none; }
+.system-version-details { margin: 8px 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.systemcontrols .system-version button { width: auto; max-width: 100%; margin: 12px auto 4px; padding: 8px 12px; }
+.system-version-status { display: block; min-height: 1.5em; color: var(--text-secondary); }
+.system-version details { margin-top: 4px; }
+.system-version summary { cursor: pointer; color: var(--text-secondary); }
+.system-version-copy-label { display: block; margin: 12px 0 6px; text-align: left; }
+.system-version textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+}

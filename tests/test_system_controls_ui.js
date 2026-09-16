@@ -42,6 +42,7 @@ async function fixture(t, {shared = true, services = false} = {}) {
     if (url.origin === 'https://maintenance.test') {
       if (url.pathname === '/') return route.fulfill({contentType: 'text/html', body: markup});
       if (url.pathname === '/style.css') return route.fulfill({contentType: 'text/css', body: read('homepage/style.css')});
+      if (url.pathname === '/static/system-version.js') return route.fulfill({contentType: 'application/javascript', body: read('homepage/static/system-version.js')});
       if (url.pathname === '/static/RobotoFlex-Regular.ttf') return route.fulfill({contentType: 'font/ttf',
         body: fs.readFileSync(path.join(root, 'homepage/static/RobotoFlex-Regular.ttf'))});
       if (url.pathname === '/views.php' || url.pathname === '/scripts/backup.php') {

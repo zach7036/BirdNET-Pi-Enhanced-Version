@@ -231,6 +231,31 @@ values, failed submissions, timer cleanup, repeat clicks, Back recovery, Backup,
 RAM-drive controls, and the fallback without the shared helper. Never test Clear
 or Restore on a real station as a substitute for these mocked checks.
 
+## Installed version display
+
+System Controls reads local Git metadata only: an exact release tag when
+available, the checked-out branch, and a short linked build hash. Commits after
+a local release tag are labeled Development/Unreleased builds, not that release.
+Missing tags, detached HEAD, and unreadable Git information have explicit
+fallbacks. Tracked-file changes are reported; unrelated untracked files are not.
+These reads do not fetch tags or refresh the index. The existing update-status
+fetch on this page is unchanged.
+
+Copy version info includes the full hash and these version details, not settings,
+paths, credentials, or diagnostic logs. HTTP stations use a legacy clipboard
+fallback; if copying is blocked, selectable text is shown instead. Show version
+info also permits manual copying without JavaScript.
+
+```sh
+python -m pytest tests/test_version_info.py
+BIRDNET_TEST_BROWSER=chrome node --test tests/test_system_version_ui.js
+```
+
+Both use PHP CLI (`BIRDNET_TEST_PHP` can select it); the browser tests also need
+Playwright. Git integration tests create disposable repositories. Clipboard and
+browser network calls are mocked, and no station data or maintenance actions
+are involved.
+
 ## Notes
 
 - Always lint changed PHP with `php -l` before testing.
