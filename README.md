@@ -2,7 +2,6 @@
 > **Update button stuck? Start here.** Some older versions show a counter without
 > starting the update. The fix is included in v2.8.1 and later. You can install
 > it using your browser—SSH is optional. Follow the [one-time recovery instructions](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues/23).
-> Do not use Clear or Restore to fix it.
 
 <div align="center">
 
