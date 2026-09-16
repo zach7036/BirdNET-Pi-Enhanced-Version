@@ -238,8 +238,8 @@ available, the checked-out branch, and a short linked build hash. Commits after
 a local release tag are labeled Development/Unreleased builds, not that release.
 Missing tags, detached HEAD, and unreadable Git information have explicit
 fallbacks. Tracked-file changes are reported; unrelated untracked files are not.
-These reads do not fetch tags or refresh the index. The existing update-status
-fetch on this page is unchanged.
+These reads do not fetch tags or refresh the index. Release notifications use
+the separate asynchronous checker described below.
 
 Copy version info includes the full hash and these version details, not settings,
 paths, credentials, or diagnostic logs. HTTP stations use a legacy clipboard
@@ -256,7 +256,53 @@ Playwright. Git integration tests create disposable repositories. Clipboard and
 browser network calls are mocked, and no station data or maintenance actions
 are involved.
 
-## Notes
+## Release notifications
+
+`scripts/release_updates.php` queries the official repository's published latest
+stable release, resolves its tag (including annotated tags), and compares commit
+ancestry. Tagless/shallow checkouts can use GitHub's comparison API when local
+ancestry is unavailable. Existing/ahead development builds are not called updates;
+diverged or unreadable builds get an explicit unknown/manual-review state.
+
+`GET /api/v1/system/updates` performs a cached automatic check; POST performs an
+explicit check and requires administrator authentication plus the existing CSRF
+header. GET also requires the same-origin AJAX header, but is available to homepage
+visitors without prompting for login. The PHP session lock is released before Git
+or network work so another request from that browser is not held up. Neither path opens a database or executes
+maintenance commands. `homepage/static/release-updates.js` updates all three badges
+consistently after the page loads. Muting hides every badge, not the checks.
+
+A private temp directory keyed by checkout path stores a station-wide JSON cache
+and nonblocking lock. Successful and failed network attempts have a 24-hour
+automatic interval; explicit checks share a 60-second cooldown. An observed HEAD
+change immediately re-evaluates cached release ancestry and starts a quiet day.
+Temporary caches can be lost on reboot. Concurrent requests do not launch parallel
+checks; failed checks retain a clearly labeled previous successful result.
+
+Git reads are bounded and never fetch/reset/switch. HTTPS requests use installed
+curl, verify TLS, prohibit redirects, and have size/time limits and a 12-second
+network budget. Only the public repository, release tags and (when needed) build
+hashes are requested; no configuration, audio, detection data, or credentials are
+sent. GitHub still receives the station's public IP like any outbound HTTPS service.
+The browser request is asynchronous with a timeout; offline checks do not block
+page rendering. Manual Update remains the existing main-branch updater, not a
+tag-pinned install. Keep routine work on development and publish tested releases.
+
+Tests use mocked HTTP, disposable repositories/caches, and intercepted browser
+requests. They must never invoke a real updater, reboot, clear, or restore.
+
+```sh
+python -m pytest tests/test_release_updates.py
+BIRDNET_TEST_BROWSER=chrome node --test tests/test_release_updates_ui.js
+```
+
+When publishing releases while older installations remain affected, keep an
+**Update button stuck? Start here** notice near the top of the release notes,
+linking to [the pinned recovery issue](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues/23)
+or `docs/UPDATE_RECOVERY.md`. Do not imply
+that already-installed older code can display the new warning before updating.
+
+## General development notes
 
 - Always lint changed PHP with `php -l` before testing.
 - The Insights fragment cache writes to `<system temp>/birdnet_cache/`; delete

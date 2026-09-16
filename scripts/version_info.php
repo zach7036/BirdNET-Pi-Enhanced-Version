@@ -1,8 +1,7 @@
 <?php
 // Local, read-only metadata. No fetch, checkout, database, or configuration reads.
-function system_version_info($repo, $user = null, $run = null) {
-  if ($run === null) {
-    $run = function ($args) use ($repo, $user) {
+function system_version_git_runner($repo, $user = null) {
+    return function ($args) use ($repo, $user) {
       if (!function_exists('exec')) return ['code' => 127, 'output' => ''];
       $windows = PHP_OS_FAMILY === 'Windows';
       $prefix = !$windows && is_executable('/usr/bin/timeout') ? '/usr/bin/timeout --kill-after=1s 3s ' : '';
@@ -14,7 +13,10 @@ function system_version_info($repo, $user = null, $run = null) {
       exec($command . ($windows ? ' 2>NUL' : ' 2>/dev/null'), $lines, $code);
       return ['code' => $code, 'output' => implode("\n", $lines)];
     };
-  }
+}
+
+function system_version_info($repo, $user = null, $run = null) {
+  if ($run === null) $run = system_version_git_runner($repo, $user);
   $git = function ($args) use ($run) {
     try {
       $result = $run($args);

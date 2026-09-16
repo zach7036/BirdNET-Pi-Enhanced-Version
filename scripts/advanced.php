@@ -468,7 +468,7 @@ foreach($formats as $format){
 		  
       <label for="silence_update_indicator">Silence Update Indicator: </label>
       <input type="checkbox" name="silence_update_indicator" <?php if($newconfig['SILENCE_UPDATE_INDICATOR'] == 1) { echo "checked"; };?> >
-      <p>This allows you to quiet the display of how many commits your installation is behind by relative to the Github repo. This number appears next to "Tools" when you're 50 or more commits behind.</p><br>
+      <p>Hide the update badges beside Settings, System Controls, and Update. Release information and manual checks remain available in System Controls. Automatic release checks run at most once a day; this option hides notifications, not network checks.</p><br>
 		  
       <label for="automatic_update">Automatic Update: </label>
       <input type="checkbox" name="automatic_update" <?php if($newconfig['AUTOMATIC_UPDATE'] == 1) { echo "checked"; };?> >

@@ -20,27 +20,6 @@ if(isset($_GET['view']) && $_GET['view'] == "Species" && (isset($_GET['ajax_spec
 
 $restore = "cat $home/BirdSongs/restore.log";
 
-if(is_authenticated()
-    && (!isset($_GET['view']) || $_GET['view'] !== 'System Controls')
-    && (!isset($_SESSION['behind']) || !isset($_SESSION['behind_time']) || time() > $_SESSION['behind_time'] + 86400)) {
-  $num_commits_behind = '0';
-  // Keep the daily status check from lingering indefinitely on offline stations.
-  shell_exec("sudo -n -u".$user." /usr/bin/timeout --kill-after=2s 15s git -C ".$home."/BirdNET-Pi fetch > /dev/null 2>/dev/null &");
-  $str = trim(shell_exec("sudo -u".$user." git -C ".$home."/BirdNET-Pi status"));
-  if (preg_match("/behind '.*?' by (\d+) commit(s?)\b/", $str, $matches)) {
-    $num_commits_behind = $matches[1];
-  }
-  if (preg_match('/\b(\d+)\b and \b(\d+)\b different commits each/', $str, $matches)) {
-    $num1 = (int) $matches[1];
-    $num2 = (int) $matches[2];
-    $num_commits_behind = $num1 + $num2;
-  }
-  if (stripos($str, "Your branch is up to date") !== false) {
-    $num_commits_behind = '0';
-  }
-  $_SESSION['behind'] = $num_commits_behind;
-  $_SESSION['behind_time'] = time();
-}
 $site_name = get_sitename();
 $current_view = isset($_GET['view']) ? $_GET['view'] : 'Now';
 $current_subview = isset($_GET['subview']) ? $_GET['subview'] : '';
@@ -49,10 +28,7 @@ if (is_protected_view($current_view)) {
 }
 $page_title = $current_view === 'Now' ? $site_name : $current_view . ' · ' . $site_name;
 
-$updatediv = "";
-if (isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 50 && (($config['SILENCE_UPDATE_INDICATOR'] ?? '') != 1)) {
-  $updatediv = ' <div class="updatenumber">'.$_SESSION["behind"].'</div>';
-}
+$updatediv = ' <span class="updatenumber release-update-badge" hidden aria-label="An update is available" title="An update is available">1</span>';
 
 function nav_icon($name) {
   return '<svg class="nav-icon" aria-hidden="true" focusable="false"><use href="static/icons.svg#' . $name . '"></use></svg>';
@@ -110,13 +86,7 @@ function nav_icon($name) {
   <link rel="stylesheet" type="text/css" href="static/dialog-polyfill.css">
   <script src="static/ui-helpers.js?v=<?php echo (int)@filemtime('static/ui-helpers.js'); ?>" defer></script>
   <script src="static/palette.js?v=<?php echo filemtime('static/palette.js'); ?>" defer></script>
-  <?php if (isset($_SESSION['behind']) && intval($_SESSION['behind']) >= 99) { ?>
-  <style>
-    .updatenumber {
-      width: 30px !important;
-    }
-  </style>
-  <?php } ?>
+  <script id="releaseUpdatesScript" src="static/release-updates.js?v=<?php echo (int)filemtime('static/release-updates.js'); ?>" data-silenced="<?php echo (($config['SILENCE_UPDATE_INDICATOR'] ?? '') == 1) ? '1' : '0'; ?>" defer></script>
 </head>
 <body>
 <div id="live-audio-panel">

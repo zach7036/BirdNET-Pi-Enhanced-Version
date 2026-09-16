@@ -7,24 +7,7 @@ require_once "scripts/common.php";
 $user = get_user();
 $home = get_home();
 
-$num_commits_behind = $_SESSION['behind'] ?? '0';
-// This is only a status refresh. A slow or unavailable network must not leave
-// the System Controls page waiting on Git's much longer connection timeout.
-$fetch = shell_exec("sudo -n -u".$user." /usr/bin/timeout --kill-after=2s 15s git -C ".$home."/BirdNET-Pi fetch 2>&1");
-$str = trim(shell_exec("sudo -u".$user." git -C ".$home."/BirdNET-Pi status"));
-if (preg_match("/behind '.*?' by (\d+) commit(s?)\b/", $str, $matches)) {
-  $num_commits_behind = $matches[1];
-}
-if (preg_match('/\b(\d+)\b and \b(\d+)\b different commits each/', $str, $matches)) {
-    $num1 = (int) $matches[1];
-    $num2 = (int) $matches[2];
-    $num_commits_behind = $num1 + $num2;
-}
-if (stripos($str, "Your branch is up to date") !== false) {
-  $num_commits_behind = '0';
-}
-$_SESSION['behind'] = $num_commits_behind;
-$_SESSION['behind_time'] = time();
+require_once __DIR__ . '/release_updates.php';
 
 $restore = "cat $home/BirdSongs/restore.log";
 $max_upload_size = floor(disk_free_space("$home/BirdNET-Pi/") / 1.001);
@@ -129,7 +112,7 @@ window.addEventListener('pageshow', function(event) { if (event.persisted) reset
     <button type="submit" name="submit" value="sudo reboot" onclick="return confirmSystemCommand(event, 'Reboot BirdNET-Pi', 'This will restart the Raspberry Pi and temporarily stop detection.', 'Reboot', true)">Reboot</button>
   </div>
   <div>
-    <button type="submit" name="submit" id="updatebtn" value="update_birdnet.sh" onclick="return update(event);">Update <?php if(isset($_SESSION['behind']) && $_SESSION['behind'] != "0" && $_SESSION['behind'] != "with"){?><div class="updatenumber"><?php echo $_SESSION['behind']; ?></div><?php } ?></button>
+    <button type="submit" name="submit" id="updatebtn" value="update_birdnet.sh" onclick="return update(event);">Update <span class="updatenumber release-update-badge" hidden aria-label="An update is available" title="An update is available">1</span></button>
   </div>
   <div>
     <button type="submit" name="submit" value="sudo shutdown now" onclick="return confirmSystemCommand(event, 'Shutdown BirdNET-Pi', 'This will power down the Raspberry Pi. You will need physical access or power cycling to start it again.', 'Shutdown', true)">Shutdown</button>
@@ -143,6 +126,7 @@ window.addEventListener('pageshow', function(event) { if (event.persisted) reset
 </div>
 <div><a href="scripts/backup.php" download onclick="return window.BirdNETUI ? BirdNETUI.confirmLink(event, {title:'Download backup', message:'This may take a while for large databases. Keep the browser open until the download starts.', confirmText:'Download backup'}) : confirm('Download backup? Note that this could take a long time.')"><button>Backup data</button></a></div>
 <?php
+  echo render_release_update_panel();
   require_once __DIR__ . '/version_info.php';
   echo render_system_version(system_version_info($home . '/BirdNET-Pi', $user));
 ?>

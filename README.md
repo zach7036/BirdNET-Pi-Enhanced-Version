@@ -1,3 +1,9 @@
+> [!IMPORTANT]
+> **Update button stuck? Start here.** Some older versions show a counter without
+> starting the update. The fix is included in v2.8.1 and later. You can install
+> it using your browser—SSH is optional. Follow the [one-time recovery instructions](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/issues/23).
+> Do not use Clear or Restore to fix it.
+
 <div align="center">
 
 # BirdNET-Pi Enhanced Version
@@ -26,6 +32,7 @@ birds by sound in real time and turns every detection into something you can act
 ---
 
 ## More Than Bird Identification
+
 
 Connect a USB microphone to your Raspberry Pi, and BirdNET-Pi Enhanced will continuously listen
 for birds, identify species using the BirdNET machine learning framework, save the best
@@ -366,6 +373,23 @@ Species lists — custom, excluded, and whitelisted — are under *Settings* in 
 ## Updating
 
 From the web interface: **Settings → System Controls → Update**.
+
+The quiet **1** badge beside Settings, System Controls, and Update means a newer
+stable release is available—not that you are a certain number of commits behind.
+Release checks run in the background at most once every 24 hours, with one cache
+shared across browsers. **Check for updates** in System Controls refreshes release
+information without installing anything (repeated manual checks share a short cooldown).
+Release notes show what changed. Development pushes and prereleases do not trigger
+these notifications, and builds already containing the released code are not prompted.
+You can hide badges with **Settings → Advanced Settings → Silence Update Indicator**;
+the setting hides badges, not network checks or the release information.
+
+Notifications do not change the updater: Update still installs the current `main`
+branch, which can include changes beyond a published release, and restarts services.
+Save custom source-code edits first; the updater resets tracked-file changes.
+
+**Counter runs but the update never starts?** See [Update button stuck? Start here](docs/UPDATE_RECOVERY.md)
+for the browser-link and terminal workarounds for older versions.
 
 Releases are published on the [releases page](https://github.com/zach7036/BirdNET-Pi-Enhanced-Version/releases)
 with notes on what changed. If an update seems not to have applied, save the output and open an issue.

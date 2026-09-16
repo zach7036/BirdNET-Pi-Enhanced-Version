@@ -35,13 +35,14 @@ async function fixture(t, {shared = true, services = false} = {}) {
       'value="sudo systemctl ' + action + ' test-recordings.mount &amp;&amp; sudo reboot"');
   }
   markup = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/style.css"></head><body>' +
-    markup.replace(/<\?php[\s\S]*?\?>/g, '') + '</body></html>';
+    '<link rel="stylesheet" href="/static/css/pages.css">' + markup.replace(/<\?php[\s\S]*?\?>/g, '') + '</body></html>';
   await context.route('**/*', async route => {
     const req = route.request();
     const url = new URL(req.url());
     if (url.origin === 'https://maintenance.test') {
       if (url.pathname === '/') return route.fulfill({contentType: 'text/html', body: markup});
       if (url.pathname === '/style.css') return route.fulfill({contentType: 'text/css', body: read('homepage/style.css')});
+      if (url.pathname === '/static/css/pages.css') return route.fulfill({contentType: 'text/css', body: read('homepage/static/css/pages.css')});
       if (url.pathname === '/static/system-version.js') return route.fulfill({contentType: 'application/javascript', body: read('homepage/static/system-version.js')});
       if (url.pathname === '/static/RobotoFlex-Regular.ttf') return route.fulfill({contentType: 'font/ttf',
         body: fs.readFileSync(path.join(root, 'homepage/static/RobotoFlex-Regular.ttf'))});

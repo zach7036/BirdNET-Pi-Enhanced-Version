@@ -300,9 +300,8 @@ DATABASE_LANG=en
 
 HEARTBEAT_URL=
 
-## SILENCE_UPDATE_INDICATOR is for quieting the display of how many commits
-## your installation is behind by, relative to the Github repo. This number
-## appears next to "Tools" when you're 50 or more commits behind.
+## SILENCE_UPDATE_INDICATOR hides stable-release update badges in the web UI.
+## Release information and daily/manual checks remain available.
 
 SILENCE_UPDATE_INDICATOR=0
 

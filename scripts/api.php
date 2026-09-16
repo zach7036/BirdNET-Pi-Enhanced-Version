@@ -10,7 +10,7 @@ set_timezone();
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 
-$post_routes = ['#^/api/v1/reviews$#', '#^/api/v1/reviews/case-actions$#', '#^/api/v1/species/prefs$#', '#^/api/v1/notes$#'];
+$post_routes = ['#^/api/v1/reviews$#', '#^/api/v1/reviews/case-actions$#', '#^/api/v1/species/prefs$#', '#^/api/v1/notes$#', '#^/api/v1/system/updates$#'];
 $is_post_route = false;
 foreach ($post_routes as $post_pattern) {
   if (preg_match($post_pattern, $requestUri)) {
@@ -20,6 +20,23 @@ foreach ($post_routes as $post_pattern) {
 }
 if ($requestMethod !== 'GET' && !($requestMethod === 'POST' && $is_post_route)) {
   sendResponse405();
+}
+
+// Read-only release checks must work without opening the station database.
+if ($requestUri === '/api/v1/system/updates') {
+  header('Cache-Control: no-store');
+  if ($requestMethod === 'POST') api_require_auth();
+  elseif (strcasecmp($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '', 'XMLHttpRequest') !== 0) {
+    api_error('Missing X-Requested-With: XMLHttpRequest header', 403);
+  }
+  require_once __DIR__ . '/release_updates.php';
+  $repo = get_home() . '/BirdNET-Pi';
+  $release_user = get_user();
+  // Do not let a background network check hold up other requests in this session.
+  if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+  $cache_dir = sys_get_temp_dir() . '/birdnet-release-' . substr(hash('sha256', $repo), 0, 16);
+  api_json(release_update_status($repo, $release_user, $cache_dir, $requestMethod === 'POST'));
+  exit;
 }
 
 $db = new SQLite3(__ROOT__ . '/scripts/birds.db', SQLITE3_OPEN_READONLY);

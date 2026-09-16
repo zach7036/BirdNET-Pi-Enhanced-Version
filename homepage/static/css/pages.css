@@ -1525,6 +1525,17 @@ a.tl-label:hover { color: var(--accent); font-weight: 600; }
   margin-right: 8px;
 }
 
+/* Quiet, asynchronous release notifications. */
+.release-update-badge[hidden] { display: none !important; }
+.sidebar.collapsed .sidebar-nav a { position: relative; }
+.sidebar.collapsed .sidebar-nav a .release-update-badge:not([hidden]) { display: inline-block; position: absolute; top: 4px; right: 4px; width: 16px; line-height: 16px; font-size: 11px; margin: 0; }
+.system-release-update { max-width: 720px; margin: 24px auto 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; text-align: center; }
+.system-release-update p { margin: 0 0 10px; }
+.system-release-update .system-release-detail { font-size: 0.85rem; color: var(--text-secondary, #64748b); }
+.system-release-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin: 10px 0; }
+.systemcontrols .system-release-actions button { width: auto; margin: 0; padding: 8px 12px; font-size: 0.9rem; }
+.system-release-actions a { overflow-wrap: anywhere; }
+
 /* Read-only installed version details in System Controls. */
 .system-version {
   max-width: 720px;
