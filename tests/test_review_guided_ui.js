@@ -76,6 +76,73 @@ test('one selected recording is confirmed, with scoped message and Undo',async t
 });
 test('reject offers other evidence instead of rejecting the species/day',async t=>{
   const {page,state}=await fixture(t,1);await action(page,'reject');await ready(page,1);assert.equal(state.cases[0].evidence.length,2);assert.equal(state.cases[0].ready,true);
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/Marked “Not this bird”/);
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/12:00:00/);
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/Now showing another recording/);
+  assert.equal(await page.locator('.case-recording-time').textContent(),'12:10:00');
+  assert.ok(await page.locator('.case-next-recording').isVisible());
+  assert.ok(await page.locator('.case-card').evaluate(el=>el.classList.contains('case-recording-changed')));
+  assert.equal(await page.locator('.case-rejection-notice').getAttribute('role'),'status');
+});
+
+test('same bird stays in place with a clear six-to-five recording acknowledgement and local Undo',async t=>{
+  const {page,state}=await fixture(t,2);
+  state.cases[1].evidence.push(...[3,4,5].map(j=>({...state.cases[1].evidence[0],file_name:`bird-1-${j}.wav`,file_revision:'revision-'+j,clip_path:`day/Test_Bird/bird-1-${j}.wav`,time:`13:${j}0:00`})));
+  await page.locator('#caseRefresh').click();await ready(page,2);
+  const species=await page.locator('#case-1 h3').textContent();
+  await page.locator('#case-1 [data-action="reject"]').click();await ready(page,2);
+  assert.equal(await page.locator('.case-card').count(),2);assert.equal(await page.locator('#case-1 h3').textContent(),species);
+  assert.match(await page.locator('#case-1 .case-recordings summary').textContent(),/5 available/);
+  assert.ok(await page.locator('#case-1 .case-rejection-notice').isVisible());assert.ok(await page.locator('#case-0 .case-rejection-notice').isHidden());
+  assert.match(await page.locator('#case-1 .case-player').getAttribute('src'),/bird-1-1.wav$/);
+  assert.ok(await page.locator('#case-1 .case-rejection-notice').evaluate(el=>document.activeElement===el));
+  await page.locator('#case-1 [data-rejection-control="undo"]').click();await ready(page,2);
+  assert.equal(state.posts[1].action,'undo');assert.match(await page.locator('#case-1 .case-recordings summary').textContent(),/6 available/);
+  assert.match(await page.locator('#case-1 .case-player').getAttribute('src'),/bird-1-0.wav$/);assert.ok(await page.locator('#case-1 .case-rejection-notice').isHidden());
+});
+
+test('consecutive rejections update the previous timestamp and keep acknowledgement until the next action',async t=>{
+  const {page}=await fixture(t,1);await action(page,'reject');await ready(page,1);
+  await page.locator('.case-player').dispatchEvent('play');
+  assert.ok(await page.locator('.case-next-recording').isHidden());assert.ok(await page.locator('.case-rejection-notice').isVisible());
+  await action(page,'reject');await ready(page,1);
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/12:10:00/);assert.equal(await page.locator('.case-recording-time').textContent(),'12:20:00');
+  assert.ok(await page.locator('.case-next-recording').isVisible());
+});
+
+test('saving and failure do not claim a recording was rejected or advanced',async t=>{
+  const {page,state}=await fixture(t,1);let release;state.wait=new Promise(r=>release=r);
+  await action(page,'reject');assert.match(await page.locator('.case-rejection-notice').textContent(),/Saving/);
+  assert.ok(await page.locator('.case-next-recording').isHidden());assert.equal(await page.locator('.case-recording-time').textContent(),'12:00:00');
+  state.failure=409;release();await page.waitForFunction(()=>document.getElementById('caseError').textContent.includes('conflict'));
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/Save not confirmed/);
+  assert.ok(await page.locator('.case-next-recording').isHidden());assert.equal(state.saves,0);
+});
+
+test('saved rejection with failed refresh blocks stale evidence until an in-card refresh succeeds',async t=>{
+  const {page,state}=await fixture(t,1);state.queueFailure=true;await action(page,'reject');
+  await page.waitForFunction(()=>document.getElementById('caseError').textContent.includes('Could not load'));
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/Marked “Not this bird”/);
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/Refresh to load/);
+  assert.ok(await page.locator('.case-next-recording').isHidden());assert.ok(await page.locator('[data-action="reject"]').isDisabled());
+  await page.locator('.case-card').focus();await page.keyboard.press('n');assert.equal(state.posts.length,1);
+  state.queueFailure=false;await page.locator('[data-rejection-control="refresh"]').click();await ready(page,1);
+  assert.ok(await page.locator('.case-next-recording').isVisible());assert.equal(await page.locator('.case-recording-time').textContent(),'12:10:00');
+});
+
+test('unacknowledged rejection can be retried from the same card without a duplicate save',async t=>{
+  const {page,state}=await fixture(t,1);state.lose=true;await action(page,'reject');await page.locator('[data-rejection-control="retry"]').waitFor();
+  assert.match(await page.locator('.case-rejection-notice').textContent(),/Save not confirmed/);assert.ok(await page.locator('.case-next-recording').isHidden());
+  await page.locator('[data-rejection-control="retry"]').click();await ready(page,1);
+  assert.equal(state.saves,1);assert.equal(state.posts[0].request_id,state.posts[1].request_id);assert.ok(await page.locator('.case-next-recording').isVisible());
+});
+
+for(const width of [1200,320])test('rejection feedback fits and respects reduced motion at '+width+'px',async t=>{
+  const {page}=await fixture(t,1);await page.setViewportSize({width,height:950});await page.emulateMedia({reducedMotion:'reduce'});
+  await action(page,'reject');await ready(page,1);
+  assert.equal(await page.locator('.case-recording-meta').evaluate(el=>getComputedStyle(el).animationName),'none');
+  assert.ok(await page.locator('.case-next-recording').isVisible());assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  if(process.env.BIRDNET_GUIDED_PREVIEW_DIR)await page.screenshot({path:path.join(process.env.BIRDNET_GUIDED_PREVIEW_DIR,`review-rejection-${width}.png`),fullPage:true});
 });
 test('cannot tell and Later are different, and History permits reopening',async t=>{
   const {page,state}=await fixture(t,1);await action(page,'uncertain');await ready(page,0);

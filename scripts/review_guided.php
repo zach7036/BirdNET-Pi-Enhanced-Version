@@ -42,6 +42,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
   var cases = [], view = 'recommended', offset = 0, total = 0, busy = false, active = 0, selected = {}, expanded = {}, session = null, pending = null, undo = [], customDates = false;
+  var rejectionNotice = null;
   function read(key, fallback) { try { return JSON.parse(sessionStorage.getItem(key)) || fallback; } catch (e) { return fallback; } }
   function store(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
   var storedUndo = read('birdnet-guided-undo', []);
@@ -68,6 +69,46 @@
       var c = cases[Number(b.dataset.i)]; var clip = c && c.evidence[selected[c.key] || 0];
       if (!clip || clip.audio_available === false) b.disabled = true;
     });
+    showRejectionNotice();
+  }
+  // Keep acknowledgement beside the evidence, not only at the page's top.
+  // The next-recording cue requires BOTH a confirmed save and a fresh queue.
+  function showRejectionNotice() {
+    cases.forEach(function (c, i) {
+      var card = $('case-' + i); if (!card) return;
+      var box = card.querySelector('.case-rejection-notice'), badge = card.querySelector('.case-next-recording');
+      var note = rejectionNotice && rejectionNotice.key === c.key ? rejectionNotice : null;
+      box.hidden = !note;
+      var clip = c.evidence[selected[c.key] || 0];
+      var advanced = note && note.phase === 'saved' && note.refreshed && !c.evidence.some(function (e) { return note.files.indexOf(e.file_name) >= 0; });
+      var next = advanced && c.state === 'open' && clip && clip.audio_available !== false;
+      badge.hidden = !next || note.seen;
+      card.classList.toggle('case-recording-changed', !!next && !note.seen);
+      if (!note) return;
+      var title, message, control = '';
+      if (note.phase === 'saving') {
+        title = 'Saving “Not this bird”…'; message = 'Please wait before reviewing another recording.';
+      } else if (note.phase === 'failed') {
+        title = 'Save not confirmed'; message = pending ? 'Retry the same decision to safely check whether it was saved.' : 'Refresh the recordings before trying again.';
+        control = pending ? 'retry' : 'refresh';
+      } else {
+        title = note.files.length === 1 ? 'Marked “Not this bird”' : note.files.length + ' identifications rejected';
+        message = (note.previous ? note.previous + '. ' : '') + 'Audio kept. ' + (next ? 'Now showing another recording for this bird.' : advanced ? 'No new recording is ready here.' : 'Refresh to load the remaining recordings.');
+        control = advanced ? 'undo' : 'refresh';
+      }
+      var lastUndo = undo[undo.length - 1];
+      if (control === 'undo' && (!lastUndo || lastUndo.token !== note.token)) control = '';
+      var disabled = busy || !!pending && control !== 'retry';
+      var html = '<div><strong>' + esc(title) + '</strong><p>' + esc(message) + '</p></div>' + (control ? '<button class="ui-button-link" data-rejection-control="' + control + '"' + (disabled ? ' disabled' : '') + '>' + ({undo:'Undo',retry:'Retry save',refresh:'Refresh recordings'}[control]) + '</button>' : '');
+      if (box._noticeHtml !== html) { box.innerHTML = html; box._noticeHtml = html; }
+      // Never let a failed refresh expose the already-rejected clip as new work.
+      if (note.phase === 'saved' && !advanced) card.querySelectorAll('[data-action]').forEach(function (b) { b.disabled = true; });
+      if (note.phase === 'saved' && note.refreshed && note.focus) {
+        note.focus = false; active = i; box.focus({preventScroll:true});
+        var rect = box.getBoundingClientRect();
+        if (rect.top < 0 || rect.bottom > innerHeight) box.scrollIntoView({block:'nearest',behavior:'instant'});
+      }
+    });
   }
   function query(which, extra) {
     var p = new URLSearchParams({view: which, limit: '25', offset: String(offset)});
@@ -82,6 +123,7 @@
   function chooseClip(i, j) {
     var c = cases[i], e = c && c.evidence[j], card = $('case-' + i);
     if (!e || !card) return;
+    if (rejectionNotice && rejectionNotice.key === c.key) rejectionNotice.seen = true;
     selected[c.key] = j; active = i;
     var audio = card.querySelector('.case-player');
     if (audio.dataset.clip !== String(j)) { audio.pause(); audio.dataset.clip = String(j); audio.src = url(e.clip_path); }
@@ -111,7 +153,8 @@
       }).join('');
       return '<article class="ui-card review-card case-card" id="case-' + i + '" tabindex="0" data-card="' + i + '" aria-labelledby="case-title-' + i + '">' +
         '<header class="case-card-heading"><div><div class="case-kind">' + esc(kindLabel) + '</div><h3 id="case-title-' + i + '"><a href="?view=Bird&amp;sci_name=' + encodeURIComponent(c.sci_name) + '">' + esc(c.species) + '</a></h3><p class="case-why">' + esc(why) + '</p></div>' + (stateLabel ? '<span class="case-state">' + stateLabel + '</span>' : '') + '</header>' +
-        '<div class="case-workspace"><section class="case-listen" aria-label="Recording evidence"><h4 class="case-step">1 · Listen</h4>' +
+        '<div class="case-rejection-notice" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></div>' +
+        '<div class="case-workspace"><section class="case-listen" aria-label="Recording evidence"><div class="case-listen-heading"><h4 class="case-step">1 · Listen</h4><span class="case-next-recording" hidden>Next recording</span></div>' +
         (clip ? '<div class="case-recording-meta"><div><span class="case-recording-date">' + esc(dateLabel(clip.date)) + '</span><span class="case-recording-time">' + esc(clip.time) + '</span></div><span class="case-score" title="BirdNET model score, not a guarantee of a correct identification">Model score <strong class="case-score-value">' + pct(clip.score) + '</strong></span></div>' +
           '<audio class="case-player" controls preload="none" data-case="' + i + '" data-clip="' + choice + '" src="' + url(clip.clip_path) + '" aria-label="' + esc(c.species + ', ' + clip.date + ' ' + clip.time) + '"' + (clip.audio_available === false ? ' hidden' : '') + '></audio><p class="case-audio-warning review-media-warning"' + (clip.audio_available === false ? '' : ' hidden') + '>This recording could not be played. Choose another recording or refresh.</p>' +
           '<details class="case-recordings" data-expand="recordings"' + (saved.recordings ? ' open' : '') + '><summary>Choose a recording <span>' + c.evidence.length + ' available</span></summary><fieldset><legend class="case-sr-only">Recording to listen to and review</legend>' + clips + '</fieldset>' + button(i,'evidence','Load more recordings') + '</details>' : '<p class="case-no-audio">No completed, unreviewed audio is available here. No verdict has been inferred.</p>') +
@@ -129,6 +172,7 @@
       audio.addEventListener('play', function () {
         var i = Number(audio.dataset.case), j = Number(audio.dataset.clip), c = cases[i];
         if (!c) return; active = i; selected[c.key] = j;
+        if (rejectionNotice && rejectionNotice.key === c.key) rejectionNotice.seen = true;
         pauseAudio(audio);
         controls();
       });
@@ -159,16 +203,27 @@
         cases = cases.filter(function (c) { return session.keys.indexOf(c.key) >= 0 && c.ready; });
         $('caseProgress').textContent = 'Session: ' + (session.keys.length - cases.length) + ' of ' + session.keys.length + ' questions finished. ' + total + ' items remain in the selected view.';
       } else $('caseProgress').textContent = '';
+      if (rejectionNotice && rejectionNotice.phase === 'saved') rejectionNotice.refreshed = true;
       active = 0; render();
       $('casePrevious').hidden = !offset || !!session; $('caseNext').hidden = offset + 25 >= total || !!session;
     }).catch(function (e) { $('caseError').textContent = e.message; }).finally(function () { busy = false; controls(); });
   }
   function spec(c) { return {key:c.key,version:c.version,date:c.date,end_date:c.end_date,sci_name:c.sci_name}; }
   function send(body) {
-    if (busy) return; pending = body; store('birdnet-guided-pending', pending); busy = true; controls(); $('caseError').textContent = ''; $('caseStatus').textContent = 'Saving…';
+    if (busy) return;
+    if (body.action === 'reject' && body.case && body.files) {
+      if (!rejectionNotice || rejectionNotice.requestId !== body.request_id) {
+        var c = cases.find(function (item) { return item.key === body.case.key; });
+        var prior = c && c.evidence.find(function (e) { return body.files.length === 1 && e.file_name === body.files[0].file_name; });
+        rejectionNotice = {requestId:body.request_id,key:body.case.key,files:body.files.map(function (f) { return f.file_name; }),previous:prior ? 'Previous recording: ' + dateLabel(prior.date) + ' · ' + prior.time : '',refreshed:false,seen:false,focus:true};
+      }
+      rejectionNotice.phase = 'saving'; pauseAudio();
+    } else rejectionNotice = null;
+    pending = body; store('birdnet-guided-pending', pending); busy = true; controls(); $('caseError').textContent = ''; $('caseStatus').textContent = 'Saving…';
     fetch('api/v1/reviews/case-actions', {method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body:JSON.stringify(body)})
       .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.status !== 'ok') { var e = new Error(j.message || 'Could not save.'); e.definitive = r.status >= 400 && r.status < 500; throw e; } return j; }); })
       .then(function (j) {
+        if (body.action === 'reject' && rejectionNotice) { rejectionNotice.phase = 'saved'; rejectionNotice.token = j.undo_token; }
         if (body.action === 'undo') undo.pop();
         else if (j.undo_token) undo.push({token:j.undo_token,label:j.message});
         undo = undo.slice(-20); store('birdnet-guided-undo', undo); pending = null; store('birdnet-guided-pending', null);
@@ -178,6 +233,7 @@
         }
         $('caseStatus').textContent = j.message; wake(); offset = 0; busy = false; return load();
       }).catch(function (e) {
+        if (body.action === 'reject' && rejectionNotice) rejectionNotice.phase = 'failed';
         if (e.definitive) { pending = null; store('birdnet-guided-pending', null); }
         $('caseStatus').textContent = ''; $('caseError').textContent = e.message + (pending ? ' Retry the same decision; its request ID prevents duplicate saves.' : ' Refresh before deciding again.');
         busy = false; controls();
@@ -186,6 +242,7 @@
   function act(i, action, files, bulk) {
     if (busy || pending) return;
     var c = cases[i]; if (!c) return;
+    if (rejectionNotice && rejectionNotice.key === c.key && rejectionNotice.phase === 'saved' && (!rejectionNotice.refreshed || c.evidence.some(function (e) { return rejectionNotice.files.indexOf(e.file_name) >= 0; }))) return;
     var clip = c.evidence[selected[c.key] || 0];
     if (!files && ['confirm','reject','hide'].indexOf(action) >= 0 && (!clip || clip.audio_available === false)) return;
     var body = {request_id:id(),action:action,case:spec(c),source:view === 'samples' || session && session.samples && c.sample ? 'sample' : 'targeted'};
@@ -196,6 +253,14 @@
   $('caseQueue').addEventListener('change', function (e) { if (e.target.matches('input[type="radio"]')) chooseClip(Number(e.target.dataset.case), Number(e.target.value)); });
   $('caseQueue').addEventListener('click', function (event) {
     var card = event.target.closest('[data-card]'); if (card) active = Number(card.dataset.card);
+    var feedbackButton = event.target.closest('[data-rejection-control]');
+    if (feedbackButton) {
+      if (feedbackButton.disabled || busy) return;
+      if (feedbackButton.dataset.rejectionControl === 'retry' && pending) send(pending);
+      else if (feedbackButton.dataset.rejectionControl === 'refresh' && !pending) load();
+      else if (feedbackButton.dataset.rejectionControl === 'undo' && !pending && rejectionNotice && undo.length && undo[undo.length - 1].token === rejectionNotice.token) $('caseUndo').click();
+      return;
+    }
     var b = event.target.closest('[data-action]'); if (!b || b.disabled || busy || pending) return;
     var i = Number(b.dataset.i), c = cases[i], action = b.dataset.action, clip = c.evidence[selected[c.key] || 0], detail = card.querySelector('.case-detail');
     if (action === 'evidence') {

@@ -26,6 +26,13 @@ their separate selection preview. Light and dark themes, keyboard controls,
 Undo, and the existing save/retry safeguards work with the simplified layout.
 This presentation change does not alter queue rules or stored review decisions.
 
+After “Not this bird,” the same card acknowledges the saved rejection, identifies
+the previous recording, and marks the replacement as “Next recording.” A brief
+highlight respects reduced-motion settings; the written acknowledgement remains
+until the next decision, with a local Undo button. The next-recording cue appears
+only after a successful save and queue refresh. Failed saves or refreshes show
+recovery instructions instead. Rejecting an identification does not delete audio.
+
 ## Selection rules (version 1)
 
 - The default interval is today and six preceding local calendar dates. Date

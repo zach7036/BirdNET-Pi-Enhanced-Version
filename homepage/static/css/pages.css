@@ -788,6 +788,18 @@ a.species-card-photo:hover img {
 .case-score { display: inline-flex; align-items: center; gap: 7px; background: var(--bg-secondary); border-radius: 8px; padding: 5px 8px; font-size: .72rem; color: var(--text-secondary); }
 .case-score strong { font-size: .85rem; font-weight: 600; color: var(--text-primary); }
 .case-player { display: block; width: 100%; height: 42px; margin: 0 0 6px; }
+.case-rejection-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin: 0 20px 16px; padding: 12px 14px; border-left: 3px solid var(--accent); border-radius: 8px; background: var(--accent-subtle); }
+.case-rejection-notice > div { flex: 1 1 220px; }
+.case-rejection-notice strong { display: block; font-size: .85rem; color: var(--text-heading); }
+.case-rejection-notice p { font-size: .8rem; margin: 4px 0 0; color: var(--text-primary); }
+.case-rejection-notice .ui-button-link { font-size: .8rem; }
+.case-rejection-notice:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.case-listen-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.guided-review .case-listen-heading .case-step { margin: 0; }
+.case-next-recording { font-size: .7rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--accent-subtle); color: var(--accent); }
+.case-recording-changed .case-recording-meta { animation: case-next-recording 1.5s ease-out; border-radius: 8px; }
+@keyframes case-next-recording { from { background: var(--accent-light); box-shadow: 0 0 0 6px var(--accent-light); } to { background: transparent; box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .case-recording-changed .case-recording-meta { animation: none; } }
 [data-theme="dark"] .case-player, [data-theme="dark"] .case-detail audio { color-scheme: dark; }
 .guided-review .case-recordings summary { padding: 10px 0 4px; color: var(--accent); }
 .case-recordings fieldset { padding: 0; border: 0; margin: 8px 0; display: grid; gap: 6px; max-height: 280px; overflow: auto; }
