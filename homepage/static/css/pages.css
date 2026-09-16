@@ -824,18 +824,15 @@ a.species-card-photo:hover img {
 .case-tools-content .review-explanations li { font-size: .85rem; }
 .case-tools-content .review-card-actions { margin: 16px 0 8px; }
 .case-tools-content .review-btn { font-size: .8rem; border-radius: 8px; }
-.case-bulk { border-top: 1px solid var(--border-light); margin-top: 12px; }
-.case-bulk p { font-size: .8rem; color: var(--text-secondary); }
-.case-bulk-list { display: grid; gap: 8px; max-height: 280px; overflow: auto; margin-bottom: 12px; }
-.case-bulk-list label { display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 6px; }
-.case-bulk-list span { font-size: .8rem; }
-.case-bulk-list span:last-child { margin-left: auto; }
 .case-detail { overflow-wrap: anywhere; font-size: .85rem; }
 .case-detail:not(:empty) { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
 .case-detail p, .case-detail li { font-size: .85rem; }
 .case-detail select { display: block; width: 100%; margin: 8px 0; }
 .case-detail audio { display: block; width: 100%; max-width: 600px; height: 42px; margin: 8px 0 16px; }
-.case-pagination { display: flex; justify-content: space-between; gap: 12px; margin: 16px 0; }
+.case-pagination { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 20px 0; text-align: center; }
+.case-pagination p { margin: 0; font-size: .8rem; color: var(--text-muted); }
+.case-pagination p:empty { display: none; }
+.case-pagination .review-error { color: var(--danger); }
 .case-footer-panel { border-top: 1px solid var(--border); padding: 4px 0; }
 .case-footer-panel > summary { color: var(--text-secondary); }
 .case-empty { padding: 36px 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); text-align: center; }

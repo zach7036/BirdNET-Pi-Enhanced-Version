@@ -25,9 +25,19 @@ recordings.” The total refreshes after decisions and Undo, even when the
 three-recording preview refills. It counts unreviewed records, not guaranteed
 playable audio; some files may be unavailable. Queue selection is unchanged.
 
-Dates and session options, detailed reasons, comparison/reassignment tools, and
-explicit bulk selection are collapsed until needed. Bulk decisions still require
-their separate selection preview. Light and dark themes, keyboard controls,
+The queue initially loads 25 questions. **Load more** appends the next batch
+below the existing cards without replacing them, closing recording pickers,
+interrupting audio, or moving the scroll position. Loading failures leave the
+current cards intact and can be retried at the same position. Refresh, decisions,
+and Undo reload the loaded window from the beginning so queue changes do not
+skip questions; changing views or dates starts a fresh list. Short review
+sessions remain limited to their selected questions.
+
+Dates and session options, detailed reasons, and comparison/reassignment tools
+are collapsed until needed. Guided Review has no multi-recording selection or
+bulk-action controls; new verdicts apply only to the chosen recording. Existing
+bulk reviews, Undo history, and retries of previously submitted requests remain
+supported for compatibility. Light and dark themes, keyboard controls,
 Undo, and the existing save/retry safeguards work with the simplified layout.
 This presentation change does not alter queue rules or stored review decisions.
 
@@ -64,7 +74,7 @@ recovery instructions instead. Rejecting an identification does not delete audio
   marked resolved. Acted-on state remains in History beyond the date window.
 - Up to three available clips are initially offered, preferring different
   completed visits, then filling remaining slots within a visit. More evidence
-  loads at most 100 candidates; explicit bulk decisions are bounded to 100.
+  loads at most 100 candidates for individual selection.
   Scores and dates are shown per recording. Playing a clip selects it for action.
   Comparison references exclude the selected visit and label prior/bulk versus
   individually checked confirmations; unverified model matches are not truth.
@@ -130,9 +140,11 @@ responses are definitive; network/5xx failures retain the retry option.
 The transaction validates the case version and each explicitly selected file's
 identity/review version, saves only those selected files, updates case state,
 and writes the Undo journal together. Any failure rolls everything back. A new
-detection arriving outside that selection is never included. Bulk requires an
-explicit preview acknowledgement. Missing/unreadable evidence cannot be confirmed
-or rejected through the guided action endpoint.
+detection arriving outside that selection is never included. The retained API
+bulk contract accepts at most 100 explicitly selected files and still requires
+`bulk_confirmed:true`; the current Guided Review interface creates only single-file
+verdicts. Missing/unreadable evidence cannot be confirmed or rejected through
+the guided action endpoint.
 
 Undo restores previous reviews, deferrals, provenance and case state. It checks
 every affected entity before changing any, rejects newer decisions/renames,

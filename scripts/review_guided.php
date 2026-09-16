@@ -25,7 +25,7 @@
     <div id="caseRecovery" hidden><button class="ui-button-link" id="caseRetry" hidden>Retry the same decision</button><button class="ui-button-link" id="caseUndo" hidden>Undo last decision</button><span id="caseUndoLabel" class="case-sr-only"></span></div>
   </div>
   <div id="caseQueue" class="review-queue" aria-busy="true"></div>
-  <div class="case-pagination"><button class="ui-button-link" id="casePrevious" hidden>Previous items</button><button class="ui-button-link" id="caseNext" hidden>More items</button></div>
+  <div class="case-pagination" id="casePagination" hidden><p id="caseLoadStatus" role="status" aria-live="polite" aria-atomic="true"></p><p id="caseLoadError" class="review-error" role="alert"></p><button class="ui-button-link" id="caseNext" aria-controls="caseQueue" hidden>Load more</button></div>
   <details id="confirmedPanel" class="case-footer-panel"><summary>Confirmed species by date</summary>
     <p>This list includes prior whole-visit confirmations, identified separately. Machine detection totals remain unchanged unless individual records are rejected or hidden.</p>
     <label>Date <input type="date" id="confirmedDate"></label> <button class="ui-button-link" id="confirmedLoad">Show species</button>
@@ -41,7 +41,8 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
-  var cases = [], view = 'recommended', offset = 0, total = 0, busy = false, active = 0, selected = {}, expanded = {}, session = null, pending = null, undo = [], customDates = false;
+  var cases = [], view = 'recommended', offset = 0, loadedLimit = 25, total = 0, busy = false, loadingMore = false, active = 0, selected = {}, expanded = {}, session = null, pending = null, undo = [], customDates = false;
+  var appliedStart = '', appliedEnd = '';
   var rejectionNotice = null;
   function read(key, fallback) { try { return JSON.parse(sessionStorage.getItem(key)) || fallback; } catch (e) { return fallback; } }
   function store(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
@@ -63,6 +64,9 @@
     $('caseRecovery').hidden = !pending && !undo.length;
     $('caseStop').hidden = !session;
     $('caseSession').hidden = !!session;
+    $('casePagination').hidden = !!session || !cases.length;
+    $('caseNext').hidden = !!session || offset >= total;
+    $('caseNext').textContent = loadingMore ? 'Loading…' : 'Load more';
     $('caseQueue').querySelectorAll('input').forEach(function (input) { input.disabled = busy || !!pending; });
     $('caseQueue').setAttribute('aria-busy', busy ? 'true' : 'false');
     document.querySelectorAll('[data-needs-audio]').forEach(function (b) {
@@ -111,7 +115,7 @@
     });
   }
   function query(which, extra) {
-    var p = new URLSearchParams({view: which, limit: '25', offset: String(offset)});
+    var p = new URLSearchParams({view: which, limit: '25', offset: '0'});
     if (customDates && $('caseStart').value) p.set('start', $('caseStart').value);
     if (customDates && $('caseEnd').value) p.set('end', $('caseEnd').value);
     Object.keys(extra || {}).forEach(function (k) { p.set(k, extra[k]); });
@@ -139,9 +143,11 @@
     });
     controls();
   }
-  function render() {
-    pauseAudio();
-    $('caseQueue').innerHTML = cases.map(function (c, i) {
+  function render(start) {
+    var append = Number.isInteger(start); start = append ? start : 0;
+    if (!append) pauseAudio();
+    var html = cases.slice(start).map(function (c, i) {
+      i += start;
       var choice = Math.min(selected[c.key] || 0, Math.max(0, c.evidence.length - 1)); selected[c.key] = choice;
       var clip = c.evidence[choice], open = c.state === 'open', stateLabel = {resolved:'Completed',unresolved:'Unresolved',later:'Postponed',archived:'Older question'}[c.state];
       var kindLabel = c.kind === 'discovery' ? 'Confirm presence' : c.kind === 'occurrence' ? 'Unusual occurrence' : c.sample ? 'Quality check' : 'Identification check';
@@ -170,36 +176,64 @@
         '<p class="case-context-note">' + esc(dateLabel(c.date) + (c.date !== c.end_date ? ' – ' + dateLabel(c.end_date) : '')) + '. One confirmed clip can establish presence, but other recordings remain unverified. “I can’t tell” leaves statistics unchanged.</p>' +
         (c.reopened_reason ? '<p>' + esc(c.reopened_reason) + '</p>' : '') +
         '<div class="review-card-actions">' + button(i,'compare','Compare reference clips',true) + button(i,'hide','Hide selected recording',true) + button(i,'reassign','Reassign selected recording',true) + '</div>' +
-        '<details class="case-bulk" data-expand="bulk"' + (saved.bulk ? ' open' : '') + '><summary>Review multiple recordings</summary><p>Choose only recordings you have checked. You will preview the selection before saving.</p><div class="case-bulk-list">' + c.evidence.map(function (e,j) { return '<label><input type="checkbox" data-bulk="' + i + '" value="' + j + '"><span>' + esc(dateLabel(e.date) + ' · ' + e.time) + '</span><span>' + pct(e.score) + '</span></label>'; }).join('') + '</div>' + button(i,'bulk','Preview selected recordings') + '</details><div class="case-detail" role="status"></div></div></details></article>';
+        '<div class="case-detail" role="status"></div></div></details></article>';
     }).join('');
+    if (append) $('caseQueue').insertAdjacentHTML('beforeend', html);
+    else $('caseQueue').innerHTML = html;
     if (!cases.length) $('caseQueue').innerHTML = '<div class="case-empty"><h3>' + (session ? 'Session complete' : 'No questions in this view') + '</h3><p>' + (session ? 'You can stop here or end the session to see any remaining recommended questions.' : 'Other views or older dates may contain additional evidence. This does not mean every detection is verified.') + '</p></div>';
-    $('caseQueue').querySelectorAll('audio').forEach(function (audio) {
-      audio.addEventListener('play', function () {
-        var i = Number(audio.dataset.case), j = Number(audio.dataset.clip), c = cases[i];
-        if (!c) return; active = i; selected[c.key] = j;
-        if (rejectionNotice && rejectionNotice.key === c.key) rejectionNotice.seen = true;
-        pauseAudio(audio);
-        controls();
+    Array.from($('caseQueue').querySelectorAll('.case-card')).slice(start).forEach(function (card) {
+      card.querySelectorAll('audio').forEach(function (audio) {
+        audio.addEventListener('play', function () {
+          var i = Number(audio.dataset.case), j = Number(audio.dataset.clip), c = cases[i];
+          if (!c) return; active = i; selected[c.key] = j;
+          if (rejectionNotice && rejectionNotice.key === c.key) rejectionNotice.seen = true;
+          pauseAudio(audio);
+          controls();
+        });
+        audio.addEventListener('error', function () {
+          var c = cases[Number(audio.dataset.case)], e = c && c.evidence[Number(audio.dataset.clip)];
+          if (!e) return; e.audio_available = false; chooseClip(Number(audio.dataset.case), Number(audio.dataset.clip));
+        });
       });
-      audio.addEventListener('error', function () {
-        var c = cases[Number(audio.dataset.case)], e = c && c.evidence[Number(audio.dataset.clip)];
-        if (!e) return; e.audio_available = false; chooseClip(Number(audio.dataset.case), Number(audio.dataset.clip));
+      card.querySelectorAll('[data-expand]').forEach(function (details) {
+        details.addEventListener('toggle', function () { var c = cases[Number(details.closest('[data-card]').dataset.card)]; if (c) { expanded[c.key] = expanded[c.key] || {}; expanded[c.key][details.dataset.expand] = details.open; } });
       });
-    });
-    $('caseQueue').querySelectorAll('[data-expand]').forEach(function (details) {
-      details.addEventListener('toggle', function () { var c = cases[Number(details.closest('[data-card]').dataset.card)]; if (c) { expanded[c.key] = expanded[c.key] || {}; expanded[c.key][details.dataset.expand] = details.open; } });
     });
     controls();
   }
+  function validate(data) {
+    if (!Array.isArray(data.cases) || !data.counts || !Number.isInteger(data.total) || data.total < 0) throw new Error('Invalid review response.');
+    return data;
+  }
+  function updateCounts(data) {
+    total = data.total;
+    document.querySelectorAll('.case-view').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false'); b.querySelector('span').textContent = data.counts[b.dataset.view]; });
+    $('caseCount').textContent = total + ' item' + (total === 1 ? '' : 's') + ' in this view';
+  }
+  // Refresh the loaded window from the beginning after decisions/Undo. Reusing
+  // an old offset after a question leaves the queue would skip unseen items.
+  function loadWindow() {
+    var collected = [], next = 0, first;
+    function batch() {
+      var extra = {offset:next,limit:Math.min(100, loadedLimit - next)};
+      if (first) { extra.start = first.start; extra.end = first.end; }
+      return get(query(view, extra)).then(validate).then(function (data) {
+        if (!first) first = data;
+        collected = collected.concat(data.cases); next += data.cases.length;
+        if (data.cases.length && next < loadedLimit && next < data.total) return batch();
+        var seen = new Set();
+        return Object.assign({}, data, {start:first.start,end:first.end,nextOffset:next,cases:collected.filter(function (c) { if (seen.has(c.key)) return false; seen.add(c.key); return true; })});
+      });
+    }
+    return batch();
+  }
   function load() {
-    if (busy) return Promise.resolve(); busy = true; controls(); $('caseError').textContent = '';
-    return get(query(view)).then(function (data) {
-      if (!Array.isArray(data.cases) || !data.counts || !Number.isInteger(data.total)) throw new Error('Invalid review response.');
-      total = data.total; $('caseStart').value = data.start; $('caseEnd').value = data.end;
+    if (busy) return Promise.resolve(); busy = true; controls(); $('caseError').textContent = ''; $('caseLoadError').textContent = '';
+    return loadWindow().then(function (data) {
+      updateCounts(data); offset = data.nextOffset; appliedStart = data.start; appliedEnd = data.end;
+      $('caseStart').value = data.start; $('caseEnd').value = data.end;
       $('caseRange').textContent = customDates ? dateLabel(data.start) + ' – ' + dateLabel(data.end) : 'Last 7 days';
       if (!$('confirmedDate').value) $('confirmedDate').value = data.end;
-      document.querySelectorAll('.case-view').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false'); b.querySelector('span').textContent = data.counts[b.dataset.view]; });
-      $('caseCount').textContent = total + ' item' + (total === 1 ? '' : 's') + ' in this view';
       $('caseHelp').textContent = {recommended:'Discoveries and unusual matches worth a closer listen.',all:'Recommended questions plus optional routine checks.',history:'Completed, unresolved, postponed, or waiting for audio.',samples:'Up to two optional spot checks from yesterday—not an accuracy estimate.'}[view];
       cases = data.cases;
       if (session && session.samples) return get(query('samples', {offset:0})).then(function (sampleData) { cases = cases.concat(sampleData.cases.filter(function (c) { return !cases.some(function (x) { return x.key === c.key; }); })); });
@@ -210,8 +244,27 @@
       } else $('caseProgress').textContent = '';
       if (rejectionNotice && rejectionNotice.phase === 'saved') rejectionNotice.refreshed = true;
       active = 0; render();
-      $('casePrevious').hidden = !offset || !!session; $('caseNext').hidden = offset + 25 >= total || !!session;
+      $('caseLoadStatus').textContent = cases.length + ' item' + (cases.length === 1 ? '' : 's') + ' loaded';
     }).catch(function (e) { $('caseError').textContent = e.message; }).finally(function () { busy = false; controls(); });
+  }
+  function loadMore() {
+    if (busy || pending || session || offset >= total) return;
+    busy = true; loadingMore = true; controls(); $('caseLoadError').textContent = '';
+    return get(query(view, {offset:offset,start:appliedStart,end:appliedEnd})).then(validate).then(function (data) {
+      var start = cases.length, seen = new Set(cases.map(function (c) { return c.key; }));
+      var added = data.cases.filter(function (c) { if (seen.has(c.key)) return false; seen.add(c.key); return true; });
+      // Advance only after a successful response, including duplicate rows.
+      offset += data.cases.length;
+      if (!data.cases.length) offset = Math.max(offset, data.total);
+      loadedLimit = Math.max(loadedLimit, offset); updateCounts(data);
+      cases = cases.concat(added); render(start);
+      $('caseLoadStatus').textContent = (added.length ? added.length + ' more item' + (added.length === 1 ? '' : 's') + ' loaded. ' : 'No additional items in this batch. ') + cases.length + ' item' + (cases.length === 1 ? '' : 's') + ' on this page.';
+      // Leave existing cards, audio, and scroll position untouched. Keyboard
+      // navigation continues at the first new card, not below the new batch.
+      if (added.length) { active = start; $('case-' + start).focus({preventScroll:true}); }
+    }).catch(function () {
+      $('caseLoadError').textContent = 'Could not load more items. Your current cards are unchanged. Try Load more again.';
+    }).finally(function () { busy = false; loadingMore = false; controls(); });
   }
   function spec(c) { return {key:c.key,version:c.version,date:c.date,end_date:c.end_date,sci_name:c.sci_name}; }
   function send(body) {
@@ -233,10 +286,10 @@
         else if (j.undo_token) undo.push({token:j.undo_token,label:j.message});
         undo = undo.slice(-20); store('birdnet-guided-undo', undo); pending = null; store('birdnet-guided-pending', null);
         if (body.action === 'resume' && body.case) {
-          view = 'all';
+          view = 'all'; loadedLimit = 25;
           if (body.case.date < $('caseStart').value || body.case.end_date > $('caseEnd').value) { customDates = true; $('caseStart').value = body.case.date; $('caseEnd').value = body.case.end_date; }
         }
-        $('caseStatus').textContent = j.message; wake(); offset = 0; busy = false; return load();
+        $('caseStatus').textContent = j.message; wake(); busy = false; return load();
       }).catch(function (e) {
         if (body.action === 'reject' && rejectionNotice) rejectionNotice.phase = 'failed';
         if (e.definitive) { pending = null; store('birdnet-guided-pending', null); }
@@ -244,15 +297,14 @@
         busy = false; controls();
       });
   }
-  function act(i, action, files, bulk) {
+  function act(i, action) {
     if (busy || pending) return;
     var c = cases[i]; if (!c) return;
     if (rejectionNotice && rejectionNotice.key === c.key && rejectionNotice.phase === 'saved' && (!rejectionNotice.refreshed || c.evidence.some(function (e) { return rejectionNotice.files.indexOf(e.file_name) >= 0; }))) return;
     var clip = c.evidence[selected[c.key] || 0];
-    if (!files && ['confirm','reject','hide'].indexOf(action) >= 0 && (!clip || clip.audio_available === false)) return;
+    if (['confirm','reject','hide'].indexOf(action) >= 0 && (!clip || clip.audio_available === false)) return;
     var body = {request_id:id(),action:action,case:spec(c),source:view === 'samples' || session && session.samples && c.sample ? 'sample' : 'targeted'};
-    if (files) { body.files = files; body.bulk_confirmed = bulk === true; }
-    else if (clip) body.files = [{file_name:clip.file_name,file_revision:clip.file_revision}];
+    if (clip) body.files = [{file_name:clip.file_name,file_revision:clip.file_revision}];
     send(body);
   }
   $('caseQueue').addEventListener('change', function (e) { if (e.target.matches('input[type="radio"]')) chooseClip(Number(e.target.dataset.case), Number(e.target.value)); });
@@ -282,12 +334,6 @@
         detail.querySelectorAll('audio').forEach(function (audio) { audio.addEventListener('play', function () { pauseAudio(audio); }); });
       }).catch(function (e) { detail.textContent = e.message; }); return;
     }
-    if (action === 'bulk') {
-      var chosen = Array.from(card.querySelectorAll('[data-bulk]:checked')).map(function (box) { return c.evidence[Number(box.value)]; }).filter(function (e) { return e.audio_available !== false; });
-      if (!chosen.length) { detail.textContent = 'Check the individual recordings you intend to review first.'; return; }
-      detail.innerHTML = '<p>This changes ONLY these ' + chosen.length + ' selected recordings. New or unselected detections are excluded:</p><ul>' + chosen.map(function (e) { return '<li>' + esc(e.date + ' ' + e.time + ' — ' + e.file_name) + '</li>'; }).join('') + '</ul><button class="ui-button-link" data-bulk-confirm="confirm">Confirm selected</button> <button class="ui-button-link" data-bulk-confirm="reject">Reject selected</button>';
-      detail.querySelectorAll('[data-bulk-confirm]').forEach(function (button) { button.addEventListener('click', function () { act(i,button.dataset.bulkConfirm,chosen.map(function (e) { return {file_name:e.file_name,file_revision:e.file_revision}; }),true); }); }); return;
-    }
     if (action === 'reassign') {
       busy = true; controls(); get('play.php?getlabels=true').then(function (labels) {
         detail.innerHTML = '<p>Reassignment renames this selected recording using the existing workflow. Decision Undo does not reverse it. Its old identification review will be archived.</p><label>Filter species <input class="case-label-filter"></label><select class="case-labels" size="6"></select><button class="ui-button-link case-rename">Reassign this recording</button>';
@@ -301,18 +347,17 @@
     }
     act(i,action);
   });
-  document.querySelectorAll('.case-view').forEach(function (b) { b.onclick=function () { if(busy || pending)return; view=b.dataset.view; offset=0;session=null;load(); }; });
+  document.querySelectorAll('.case-view').forEach(function (b) { b.onclick=function () { if(busy || pending)return; view=b.dataset.view; loadedLimit=25;session=null;load(); }; });
   $('caseRefresh').onclick=load;
-  $('caseDates').onclick=function () { customDates=true;offset=0;session=null;load(); };
-  $('caseRecent').onclick=function () { customDates=false;offset=0;session=null;load(); };
-  $('casePrevious').onclick=function () { offset=Math.max(0,offset-25);load(); };
-  $('caseNext').onclick=function () { offset+=25;load(); };
+  $('caseDates').onclick=function () { customDates=true;loadedLimit=25;session=null;load(); };
+  $('caseRecent').onclick=function () { customDates=false;loadedLimit=25;session=null;load(); };
+  $('caseNext').onclick=loadMore;
   $('caseRetry').onclick=function () { if(pending)send(pending); };
   $('caseUndo').onclick=function () { if(undo.length)send({request_id:id(),action:'undo',undo_token:undo[undo.length-1].token}); };
-  $('caseStop').onclick=function () { session=null;offset=0;load(); };
+  $('caseStop').onclick=function () { session=null;loadedLimit=25;load(); };
   $('caseSamples').onchange=function () { store('birdnet-guided-samples',this.checked); };
   $('caseSession').onclick=function () {
-    if(busy || pending)return; view='recommended';offset=0;
+    if(busy || pending)return; view='recommended';loadedLimit=25;
     load().then(function () { if ($('caseError').textContent) return; var base=cases.slice(0,5), withSamples=$('caseSamples').checked;
       var supplement=withSamples && base.length<5 ? get(query('samples',{offset:0})).then(function (d) { return d.cases; }) : Promise.resolve([]);
       busy=true;controls(); supplement.then(function (extra) { extra.forEach(function (c) { if(base.length<5 && !base.some(function(x){return x.key===c.key;}))base.push(c); }); session={keys:base.map(function(c){return c.key;}),samples:withSamples}; cases=base; $('caseProgress').textContent='Session: up to '+base.length+' questions. Stop whenever you like.';render(); }).catch(function(e){$('caseError').textContent=e.message;}).finally(function(){busy=false;controls();});

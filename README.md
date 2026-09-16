@@ -169,8 +169,10 @@ or silently change recording thresholds, exclude species, or verify unheard reco
 
 Keys: <kbd>Y</kbd> yes, <kbd>N</kbd> not this bird, <kbd>U</kbd> can't tell,
 <kbd>L</kbd> later, arrows to move, Space to play. Playing a recording selects it for the
-decision. More evidence and actions includes comparison clips, explicit bulk previews,
-Hide, and Reassign. Reassignment is a separate file-rename operation, not part of decision Undo.
+decision. Choose a recording / Load more recordings provides additional choices;
+each new verdict applies to just the selected recording. Details & advanced tools
+includes comparison clips, Hide, and Reassign. Reassignment is a separate file-rename
+operation, not part of decision Undo.
 The previous whole-visit tools remain available under Advanced tools.
 
 Rejected/hidden records stay in the raw database but are excluded from review-aware statistics

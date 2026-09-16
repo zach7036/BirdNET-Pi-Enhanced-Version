@@ -17,7 +17,7 @@ function item(i) {
 async function fixture(t, n=2) {
   const context=await browser.newContext({viewport:{width:1200,height:950}}); t.after(()=>context.close());
   const errors=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message))); t.after(()=>assert.deepEqual(errors,[]));
-  const state={cases:Array.from({length:n},(_,i)=>item(i)),posts:[],saves:0,responses:new Map(),undo:new Map(),failure:null,lose:false,queueFailure:false,renames:[],wait:null};
+  const state={cases:Array.from({length:n},(_,i)=>item(i)),posts:[],reads:[],saves:0,responses:new Map(),undo:new Map(),failure:null,lose:false,queueFailure:false,queueInvalid:false,queueWait:null,renames:[],wait:null};
   const styles=['homepage/style.css','homepage/static/css/tokens.css','homepage/static/css/pages.css'].map(p=>'<style>'+fs.readFileSync(path.join(root,p),'utf8')+'</style>').join('');
   const markup='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'+styles+'</head><body>'+fs.readFileSync(path.join(root,'scripts/review_guided.php'),'utf8').replace(/<\?php[\s\S]*?\?>/g,'')+'</body></html>';
   await context.route('**/*',async route=>{
@@ -26,16 +26,20 @@ async function fixture(t, n=2) {
     if(req.isNavigationRequest())return route.fulfill({contentType:'text/html',body:markup});
     if(u.pathname.endsWith('/RobotoFlex-Regular.ttf'))return route.fulfill({contentType:'font/ttf',body:fs.readFileSync(path.join(root,'homepage/static/RobotoFlex-Regular.ttf'))});
     if(u.pathname.endsWith('/cases')){
+      state.reads.push(u);
+      if(state.queueWait)await state.queueWait;
       if(state.queueFailure)return json({message:'offline'},503);
+      if(state.queueInvalid)return json({cases:null,total:60,counts:{}});
       const counts={recommended:0,all:0,history:0,samples:0};
       state.cases.forEach(c=>{if(c.ready){counts.all++;if(c.recommended)counts.recommended++;if(c.sample)counts.samples++;}else counts.history++;});
       const view=u.searchParams.get('view')||'recommended';
       let selected=state.cases.filter(c=>view==='history'?!c.ready:view==='all'?c.ready:view==='samples'?c.ready&&c.sample:c.ready&&c.recommended);
       if(u.searchParams.has('key'))selected=state.cases.filter(c=>c.key===u.searchParams.get('key'));
       const offset=Number(u.searchParams.get('offset')||0);
+      const limit=Math.min(100,Number(u.searchParams.get('limit')||25));
       // Model the real API: a total across the pool, but only 3 initial choices.
-      const data=selected.slice(offset,offset+25).map(c=>({...c,candidate_count:c.candidate_count??c.evidence.length,evidence:c.evidence.slice(0,u.searchParams.get('details')==='1'?100:3)}));
-      return json({cases:data,counts,total:selected.length,start:'2026-09-09',end:'2026-09-15'});
+      const data=selected.slice(offset,offset+limit).map(c=>({...c,candidate_count:c.candidate_count??c.evidence.length,evidence:c.evidence.slice(0,u.searchParams.get('details')==='1'?100:3)}));
+      return json({cases:data,counts,total:selected.length,start:u.searchParams.get('start')||'2026-09-09',end:u.searchParams.get('end')||'2026-09-15'});
     }
     if(u.pathname.endsWith('/case-actions')){
       const b=req.postDataJSON();state.posts.push(b);assert.equal(req.headers()['x-requested-with'],'XMLHttpRequest');
@@ -70,6 +74,7 @@ async function fixture(t, n=2) {
 }
 async function ready(page,n) {await page.waitForFunction(n=>document.getElementById('caseCount').textContent.startsWith(n+' item')&&!document.getElementById('caseRefresh').disabled,n);}
 async function action(page,name) {await page.locator(`[data-action="${name}"]`).first().click();}
+async function more(page,n) {await page.locator('#caseNext').click();await page.waitForFunction(n=>document.querySelectorAll('.case-card').length===n&&!document.getElementById('caseRefresh').disabled,n);}
 test('one selected recording is confirmed, with scoped message and Undo',async t=>{
   const {page,state}=await fixture(t);await page.locator('#case-0 .case-recordings summary').click();await page.locator('input[name="clip-0"][value="1"]').check();await action(page,'confirm');await ready(page,1);
   assert.deepEqual(state.posts[0].files,[{file_name:'bird-0-1.wav',file_revision:'revision-1'}]);
@@ -227,11 +232,25 @@ test('optional samples are distinct from recommended and record their source',as
   await page.locator('#caseRefresh').click();await ready(page,1);assert.equal(await page.locator('[data-view="samples"] span').textContent(),'1');
   await page.locator('[data-view="samples"]').click();await ready(page,1);await action(page,'confirm');await ready(page,0);assert.equal(state.posts[0].source,'sample');
 });
-test('bulk preview names exactly selected recordings and requires a second action',async t=>{
-  const {page,state}=await fixture(t,1);await page.locator('.case-tools > summary').click();await page.locator('.case-bulk > summary').click();await page.locator('[data-bulk="0"][value="0"]').check();await page.locator('[data-bulk="0"][value="2"]').check();
-  await action(page,'bulk');assert.equal(state.posts.length,0);
-  assert.match(await page.locator('.case-detail').textContent(),/bird-0-0.wav/);assert.match(await page.locator('.case-detail').textContent(),/bird-0-2.wav/);
-  await page.locator('[data-bulk-confirm="confirm"]').click();await ready(page,0);assert.equal(state.posts[0].bulk_confirmed,true);assert.equal(state.posts[0].files.length,2);
+test('advanced tools have no bulk option; loading choices still reviews just one recording',async t=>{
+  const {page,state}=await fixture(t,1);await page.locator('.case-tools > summary').click();
+  assert.equal(await page.locator('.case-bulk, [data-bulk], [data-action="bulk"], [data-bulk-confirm]').count(),0);
+  assert.doesNotMatch(await page.locator('.case-tools').textContent(),/Review multiple recordings|Preview selected recordings/);
+  await page.locator('.case-recordings summary').click();await action(page,'evidence');await ready(page,1);
+  assert.equal(await page.locator('.case-recording-choice').count(),3);
+  assert.equal(await page.locator('.case-card input[type="checkbox"]').count(),0);
+  await page.locator('input[type="radio"][value="2"]').check();await action(page,'confirm');await ready(page,0);
+  assert.deepEqual(state.posts[0].files,[{file_name:'bird-0-2.wav',file_revision:'revision-2'}]);assert.equal(state.posts[0].bulk_confirmed,undefined);
+});
+
+test('removing bulk controls preserves retry and Undo for an older pending bulk request',async t=>{
+  const {page,state}=await fixture(t,1),c=state.cases[0];
+  const prior={request_id:'b'.repeat(32),action:'confirm',case:{key:c.key,version:c.version,date:c.date,end_date:c.end_date,sci_name:c.sci_name},files:c.evidence.slice(0,2).map(e=>({file_name:e.file_name,file_revision:e.file_revision})),bulk_confirmed:true,source:'targeted'};
+  await page.evaluate(body=>sessionStorage.setItem('birdnet-guided-pending',JSON.stringify(body)),prior);
+  await page.reload();await page.locator('#caseRetry').click();await ready(page,0);
+  assert.deepEqual(state.posts[0],prior);assert.equal(state.saves,1);
+  await page.locator('#caseUndo').click();await ready(page,1);assert.equal(state.posts[1].action,'undo');
+  assert.equal(await page.locator('.case-bulk, [data-bulk]').count(),0);
 });
 test('playing another recording selects it for the decision',async t=>{
   const {page,state}=await fixture(t,1);await page.locator('.case-recordings summary').click();await page.locator('input[name="clip-0"][value="2"]').check();await page.locator('audio[data-clip="2"]').dispatchEvent('play');
@@ -246,8 +265,119 @@ test('duplicate inputs cannot save during a request',async t=>{
   const {page,state}=await fixture(t,2);let release;state.wait=new Promise(r=>release=r);await action(page,'confirm');await page.keyboard.press('y');
   assert.equal(state.posts.length,1);release();await ready(page,1);
 });
-test('more than 25 questions remain accessible and writes reset no skipping offset',async t=>{
-  const {page}=await fixture(t,30);assert.equal(await page.locator('.case-card').count(),25);await page.locator('#caseNext').click();await ready(page,30);assert.equal(await page.locator('.case-card').count(),5);
+for(const width of [1200,390,320])test('Load more appends cards without resetting audio, open tools, selection, or scroll at '+width+'px',async t=>{
+  const {page,state}=await fixture(t,60);await page.setViewportSize({width,height:950});
+  assert.equal(await page.locator('#caseNext').textContent(),'Load more');assert.equal(await page.locator('#casePrevious').count(),0);
+  await page.locator('#case-0 .case-recordings summary').click();await page.locator('#case-0 input[value="1"]').check();
+  await page.locator('#case-0 .case-tools summary').click();await page.locator('#case-0 [data-action="reassign"]').click();
+  await page.locator('#case-0 .case-label-filter').fill('Correct');
+  await page.evaluate(()=>{window.originalCard=document.getElementById('case-0');window.originalPlayer=originalCard.querySelector('audio');window.pauseCalls=0;originalPlayer.pause=()=>window.pauseCalls++;});
+  await page.locator('#caseNext').scrollIntoViewIfNeeded();const y=await page.evaluate(()=>scrollY);
+  if(process.env.BIRDNET_LOAD_MORE_PREVIEW_DIR)await page.screenshot({path:path.join(process.env.BIRDNET_LOAD_MORE_PREVIEW_DIR,`review-load-more-before-${width}.png`)});
+  await more(page,50);
+  assert.ok(await page.evaluate(()=>document.getElementById('case-0')===window.originalCard&&document.querySelector('#case-0 audio')===window.originalPlayer));
+  assert.equal(await page.evaluate(()=>window.pauseCalls),0);
+  assert.ok(await page.locator('#case-0 input[value="1"]').isChecked());
+  assert.ok(await page.locator('#case-0 .case-recordings').evaluate(el=>el.open));assert.ok(await page.locator('#case-0 .case-tools').evaluate(el=>el.open));
+  assert.equal(await page.locator('#case-0 .case-label-filter').inputValue(),'Correct');
+  assert.ok(Math.abs(await page.evaluate(()=>scrollY)-y)<2,'Appending preserves the current scroll position');
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'case-25');
+  assert.equal(await page.locator('#case-25 h3').textContent(),'Test Bird 25');
+  assert.match(await page.locator('#caseLoadStatus').textContent(),/25 more items loaded/);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  if(process.env.BIRDNET_LOAD_MORE_PREVIEW_DIR)await page.screenshot({path:path.join(process.env.BIRDNET_LOAD_MORE_PREVIEW_DIR,`review-load-more-after-${width}.png`)});
+  await more(page,60);assert.ok(await page.locator('#caseNext').isHidden());
+  assert.match(await page.locator('#caseLoadStatus').textContent(),/10 more items loaded/);
+  assert.equal(new Set(await page.locator('.case-card h3').allTextContents()).size,60);
+  assert.equal(page.url(),'http://guided.test/');assert.equal(state.posts.length,0);
+});
+
+for(const failure of ['queueFailure','queueInvalid'])test('failed Load more keeps the list and retries the same batch: '+failure,async t=>{
+  const {page,state}=await fixture(t,60);state[failure]=true;await page.locator('#caseNext').click();
+  await page.waitForFunction(()=>document.getElementById('caseLoadError').textContent.includes('Could not load more')&&!document.getElementById('caseNext').disabled);
+  assert.equal(await page.locator('.case-card').count(),25);assert.equal(await page.locator('#case-0 h3').textContent(),'Test Bird 0');
+  assert.ok(await page.locator('#caseLoadError').isVisible());assert.equal(await page.locator('#caseNext').textContent(),'Load more');
+  state[failure]=false;await more(page,50);
+  assert.deepEqual(state.reads.slice(-2).map(u=>u.searchParams.get('offset')),['25','25']);
+  assert.equal(await page.locator('#caseLoadError').textContent(),'');
+});
+
+test('Load more has a busy state and ignores duplicate clicks',async t=>{
+  const {page,state}=await fixture(t,60);let release;state.queueWait=new Promise(r=>release=r);t.after(()=>release());
+  await page.locator('#caseNext').click();await page.waitForFunction(()=>document.getElementById('caseNext').textContent==='Loading…');
+  assert.ok(await page.locator('#caseNext').isDisabled());assert.ok(await page.locator('#caseRefresh').isDisabled());
+  await page.locator('#caseNext').evaluate(b=>b.click());assert.equal(state.reads.length,2);
+  release();await page.waitForFunction(()=>document.querySelectorAll('.case-card').length===50&&!document.getElementById('caseNext').disabled);
+  assert.equal(state.reads.length,2);assert.equal(await page.locator('#caseNext').textContent(),'Load more');
+});
+
+test('overlapping pages do not duplicate cards and advance by fetched rows',async t=>{
+  const {page,state}=await fixture(t,60);state.cases.unshift(item(99));
+  await more(page,49);assert.equal(new Set(await page.locator('.case-card h3').allTextContents()).size,49);
+  await more(page,60);assert.ok(await page.locator('#caseNext').isHidden());
+  assert.deepEqual(state.reads.slice(-2).map(u=>u.searchParams.get('offset')),['25','50']);
+  await page.locator('#caseRefresh').click();await ready(page,61);assert.equal(await page.locator('.case-card').count(),61);
+  assert.equal(await page.locator('#case-0 h3').textContent(),'Test Bird 99');
+});
+
+test('decisions and Undo refresh the loaded window without skipping unseen questions',async t=>{
+  const {page,state}=await fixture(t,80);await more(page,50);
+  await page.locator('#case-49 .case-recordings summary').click();await page.locator('#case-49 input[value="2"]').check();
+  await page.locator('#case-49 [data-action="confirm"]').click();await ready(page,79);
+  assert.equal(state.posts[0].files[0].file_name,'bird-49-2.wav');assert.equal(await page.locator('.case-card').count(),50);
+  assert.equal(await page.locator('#case-49 h3').textContent(),'Test Bird 50');
+  await more(page,75);assert.equal(await page.locator('#case-50 h3').textContent(),'Test Bird 51');
+  await page.locator('#caseUndo').click();await ready(page,80);assert.equal(await page.locator('.case-card').count(),75);
+  assert.equal(await page.locator('#case-49 h3').textContent(),'Test Bird 49');
+  await more(page,80);assert.equal(new Set(await page.locator('.case-card h3').allTextContents()).size,80);
+});
+
+test('appended cards load recording choices and show same-card rejection feedback with Undo',async t=>{
+  const {page,state}=await fixture(t,60);await more(page,50);
+  await page.locator('#case-49 .case-recordings summary').click();await page.locator('#case-49 [data-action="evidence"]').click();await ready(page,60);
+  assert.equal(state.reads.at(-1).searchParams.get('offset'),'0');assert.equal(await page.locator('.case-card').count(),50);
+  await page.locator('#case-49 [data-action="reject"]').click();await ready(page,60);
+  assert.equal(state.posts[0].files[0].file_name,'bird-49-0.wav');assert.equal(await page.locator('.case-card').count(),50);
+  assert.equal(await page.locator('#case-49 h3').textContent(),'Test Bird 49');assert.ok(await page.locator('#case-49 .case-next-recording').isVisible());
+  assert.match(await page.locator('#case-49 .case-recordings summary').textContent(),/2 unreviewed/);
+  await page.locator('#case-49 [data-rejection-control="undo"]').click();await ready(page,60);
+  assert.match(await page.locator('#case-49 .case-recordings summary').textContent(),/3 unreviewed/);
+  await more(page,60);assert.equal(await page.locator('#case-50 h3').textContent(),'Test Bird 50');
+});
+
+test('refresh preserves a loaded window larger than the API page limit',async t=>{
+  const {page,state}=await fixture(t,130);for(const n of [50,75,100,125])await more(page,n);
+  const before=state.reads.length;await page.locator('#caseRefresh').click();await ready(page,130);
+  assert.equal(await page.locator('.case-card').count(),125);
+  assert.deepEqual(state.reads.slice(before).map(u=>[u.searchParams.get('offset'),u.searchParams.get('limit')]),[['0','100'],['100','25']]);
+  await more(page,130);assert.ok(await page.locator('#caseNext').isHidden());
+});
+
+test('view, date, and session changes start fresh lists rather than appending',async t=>{
+  const {page,state}=await fixture(t,60);await more(page,50);
+  await page.locator('[data-view="all"]').click();await ready(page,60);assert.equal(await page.locator('.case-card').count(),25);
+  await more(page,50);await page.locator('.case-options summary').click();
+  await page.locator('#caseStart').fill('2026-09-01');await page.locator('#caseEnd').fill('2026-09-07');await page.locator('#caseDates').click();await ready(page,60);
+  assert.equal(await page.locator('.case-card').count(),25);await more(page,50);
+  assert.equal(state.reads.at(-1).searchParams.get('start'),'2026-09-01');assert.equal(state.reads.at(-1).searchParams.get('end'),'2026-09-07');
+  await page.locator('#caseRecent').click();await ready(page,60);assert.equal(await page.locator('.case-card').count(),25);
+  await more(page,50);await page.locator('#caseSession').click();await page.waitForFunction(()=>document.getElementById('caseProgress').textContent.includes('up to 5'));
+  assert.equal(await page.locator('.case-card').count(),5);assert.ok(await page.locator('#casePagination').isHidden());
+  await page.locator('#caseStop').click();await ready(page,60);assert.equal(await page.locator('.case-card').count(),25);assert.ok(await page.locator('#caseNext').isVisible());
+});
+
+test('Load more does not submit unapplied edits to the date fields',async t=>{
+  const {page,state}=await fixture(t,60);await page.locator('.case-options summary').click();
+  await page.locator('#caseStart').fill('2026-09-01');await page.locator('#caseEnd').fill('2026-09-07');await page.locator('#caseDates').click();await ready(page,60);
+  await page.locator('#caseStart').fill('2026-09-02');await more(page,50);
+  assert.equal(state.reads.at(-1).searchParams.get('start'),'2026-09-01');
+});
+
+test('a queue that shrinks before Load more keeps the current cards until refresh',async t=>{
+  const {page,state}=await fixture(t,30);state.cases=state.cases.slice(0,10);await page.locator('#caseNext').click();await ready(page,10);
+  assert.equal(await page.locator('.case-card').count(),25);assert.ok(await page.locator('#caseNext').isHidden());
+  assert.match(await page.locator('#caseLoadStatus').textContent(),/No additional items/);
+  await page.locator('#caseRefresh').click();await ready(page,10);assert.equal(await page.locator('.case-card').count(),10);
 });
 test('confirmed species describe legacy support and unavailable audio',async t=>{
   const {page}=await fixture(t);await page.locator('#confirmedPanel summary').click();await page.locator('#confirmedLoad').click();await page.waitForFunction(()=>document.getElementById('confirmedList').textContent.includes('history retained'));
@@ -264,7 +394,7 @@ test('one player per card, concise context, and collapsed secondary controls',as
   assert.equal(await page.locator('.case-card audio:visible').count(),2);
   assert.ok(await page.locator('#case-0 [data-action="confirm"]').isVisible());
   assert.ok(await page.locator('#case-0 [data-action="reassign"]').isHidden());
-  assert.ok(await page.locator('#case-0 [data-bulk]').first().isHidden());
+  assert.equal(await page.locator('#case-0 [data-bulk]').count(),0);
   assert.ok(await page.locator('#case-0 .review-explanations').isHidden());
   assert.ok(await page.locator('#caseSamples').isHidden());
   const box=await page.locator('#case-0').boundingBox();assert.ok(box.height<500,'A desktop question should fit without scrolling past stacked players');
@@ -313,9 +443,11 @@ for(const theme of ['light','dark'])for(const width of [1440,768,390,320])test(t
   if(width>760)assert.equal(dimensions.ly,dimensions.dy,'Desktop places listening alongside the decision');else assert.ok(dimensions.dy>dimensions.ly,'Phones stack the decision below listening');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   if(process.env.BIRDNET_GUIDED_PREVIEW_DIR)await page.screenshot({path:path.join(process.env.BIRDNET_GUIDED_PREVIEW_DIR,`guided-review-${theme}-${width}.png`),fullPage:true});
-  await page.locator('#case-0 .case-recordings > summary').click();await page.locator('#case-0 .case-tools > summary').click();await page.locator('#case-0 .case-bulk > summary').click();await page.locator('.case-options > summary').click();
+  await page.locator('#case-0 .case-recordings > summary').click();await page.locator('#case-0 .case-tools > summary').click();await page.locator('.case-options > summary').click();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Expanded controls fit too');
-  await page.locator('#case-0 [data-bulk][value="1"]').check();await action(page,'bulk');assert.ok(await page.locator('[data-bulk-confirm="confirm"]').isVisible());
+  assert.equal(await page.locator('.case-bulk, [data-bulk], [data-action="bulk"]').count(),0);
+  assert.ok(await page.locator('#case-0 [data-action="evidence"]').isVisible());assert.ok(await page.locator('#case-0 [data-action="reassign"]').isVisible());
+  if(process.env.BIRDNET_GUIDED_PREVIEW_DIR&&theme==='light'&&width===390)await page.screenshot({path:path.join(process.env.BIRDNET_GUIDED_PREVIEW_DIR,'review-without-bulk-390.png'),fullPage:true});
 });
 
 test('desktop sidebar-sized content stacks without overflow',async t=>{
