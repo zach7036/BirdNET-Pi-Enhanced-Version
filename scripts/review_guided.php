@@ -1,43 +1,47 @@
 <?php // Included by review.php; all data comes from the read-only case endpoints. ?>
 <div class="review-page guided-review">
-  <div class="ui-section-header"><h3>Review</h3><span id="caseCount" class="ui-meta">Loading…</span></div>
-  <p>Check an interesting discovery or a possible mistake. One clear recording can confirm a bird's presence; it does not verify every recording.</p>
-  <div class="review-filters" role="group" aria-label="Review views">
+  <header class="case-page-heading">
+    <div><h2>Review</h2><p>A closer listen to discoveries and uncertain matches.</p></div>
+    <div class="case-session-start"><button class="ui-button-link case-primary" id="caseSession">Review up to 5</button><button class="ui-button-link" id="caseStop" hidden>End session</button><span>A few recordings is enough. No need to clear the list.</span></div>
+  </header>
+  <section class="case-navigation" aria-label="Review navigation">
+  <div class="case-tabs" role="group" aria-label="Review views">
     <button class="ui-button-link case-view" data-view="recommended" aria-pressed="true">Recommended <span>0</span></button>
-    <button class="ui-button-link case-view" data-view="all" aria-pressed="false">All review items <span>0</span></button>
+    <button class="ui-button-link case-view" data-view="all" aria-pressed="false">All items <span>0</span></button>
     <button class="ui-button-link case-view" data-view="history" aria-pressed="false">History <span>0</span></button>
-    <button class="ui-button-link case-view" data-view="samples" aria-pressed="false">Optional quality checks <span>0</span></button>
+    <button class="ui-button-link case-view" data-view="samples" aria-pressed="false">Quality checks <span>0</span></button>
   </div>
-  <p id="caseHelp" class="ui-meta"></p>
-  <div class="review-toolbar">
-    <button class="ui-button-link" id="caseSession">Review a few recordings</button>
-    <label><input type="checkbox" id="caseSamples"> Include optional quality checks in my session</label>
-    <button class="ui-button-link" id="caseRefresh">Refresh</button>
-    <button class="ui-button-link" id="caseStop" hidden>End session</button>
-  </div>
-  <p id="caseProgress" role="status"></p>
-  <details><summary>Date range and advanced tools</summary>
-    <div class="review-toolbar"><label>From <input type="date" id="caseStart"></label><label>Through <input type="date" id="caseEnd"></label><button class="ui-button-link" id="caseDates">Apply dates</button><button class="ui-button-link" id="caseRecent">Last 7 days</button></div>
-    <p>Browse older questions by date (up to 31 days at a time). Acted-on questions remain in History beyond this window. <a href="?view=Review&amp;visit_tools=1">Advanced whole-visit tools</a> apply decisions to all recordings in a visit.</p>
+  <div class="case-view-description"><p id="caseHelp"></p><button class="case-text-button" id="caseRefresh">Refresh</button></div>
+  <details class="case-options"><summary>Dates &amp; options <span id="caseRange">Last 7 days</span></summary>
+    <div class="case-option-fields"><label>From <input type="date" id="caseStart"></label><label>Through <input type="date" id="caseEnd"></label><button class="ui-button-link" id="caseDates">Apply dates</button><button class="case-text-button" id="caseRecent">Last 7 days</button></div>
+    <label class="case-sample-option"><input type="checkbox" id="caseSamples"> Include optional quality checks in short sessions</label>
+    <p>Browse up to 31 days at a time. Questions you've acted on stay in History. <a href="?view=Review&amp;visit_tools=1">Advanced whole-visit tools</a> apply decisions to every recording in a visit.</p>
   </details>
-  <div id="caseStatus" role="status" aria-live="polite"></div>
-  <div id="caseError" class="review-error" role="alert"></div>
-  <div class="review-toolbar"><button class="ui-button-link" id="caseRetry" hidden>Retry the same decision</button><button class="ui-button-link" id="caseUndo" hidden>Undo last decision</button><span id="caseUndoLabel"></span></div>
+  </section>
+  <div class="case-queue-heading"><span id="caseCount">Loading…</span><p id="caseProgress" role="status"></p></div>
+  <div class="case-feedback">
+    <div id="caseStatus" role="status" aria-live="polite"></div>
+    <div id="caseError" class="review-error" role="alert"></div>
+    <div id="caseRecovery" hidden><button class="ui-button-link" id="caseRetry" hidden>Retry the same decision</button><button class="ui-button-link" id="caseUndo" hidden>Undo last decision</button><span id="caseUndoLabel" class="case-sr-only"></span></div>
+  </div>
   <div id="caseQueue" class="review-queue" aria-busy="true"></div>
-  <div class="review-toolbar"><button class="ui-button-link" id="casePrevious" hidden>Previous items</button><button class="ui-button-link" id="caseNext" hidden>More items</button></div>
-  <details id="confirmedPanel"><summary>Human-confirmed species by date</summary>
+  <div class="case-pagination"><button class="ui-button-link" id="casePrevious" hidden>Previous items</button><button class="ui-button-link" id="caseNext" hidden>More items</button></div>
+  <details id="confirmedPanel" class="case-footer-panel"><summary>Confirmed species by date</summary>
     <p>This list includes prior whole-visit confirmations, identified separately. Machine detection totals remain unchanged unless individual records are rejected or hidden.</p>
     <label>Date <input type="date" id="confirmedDate"></label> <button class="ui-button-link" id="confirmedLoad">Show species</button>
     <div id="confirmedList" role="status"></div>
   </details>
-  <p class="ui-meta">Keys: ↑/↓ choose a question · Space plays its selected recording · Y yes · N not this bird · U can't tell · L later. Undo restores review decisions, not species-reassignment file renames.</p>
+  <details class="case-footer-panel"><summary>Review tips &amp; keyboard shortcuts</summary>
+    <p>One clear recording can confirm a bird's presence. It does not verify every detection. “I can't tell” leaves the question unresolved; Later postpones it for 24 hours.</p>
+    <p>↑/↓ choose a question · Space plays the selected recording · Y yes · N not this bird · U can't tell · L later. Undo restores decisions, not species-reassignment file renames.</p>
+  </details>
 </div>
 <script>
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var esc = window.BirdNETUI ? BirdNETUI.escapeHtml : function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
-  var cases = [], view = 'recommended', offset = 0, total = 0, busy = false, active = 0, selected = {}, session = null, pending = null, undo = [], customDates = false;
+  var cases = [], view = 'recommended', offset = 0, total = 0, busy = false, active = 0, selected = {}, expanded = {}, session = null, pending = null, undo = [], customDates = false;
   function read(key, fallback) { try { return JSON.parse(sessionStorage.getItem(key)) || fallback; } catch (e) { return fallback; } }
   function store(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
   var storedUndo = read('birdnet-guided-undo', []);
@@ -46,6 +50,7 @@
   if (pending && (!/^[a-f0-9]{32,64}$/.test(pending.request_id) || typeof pending.action !== 'string')) pending = null;
   $('caseSamples').checked = read('birdnet-guided-samples', false) === true;
   function pct(n) { return (Number(n) * 100).toFixed(2).replace(/\.?0+$/, '') + '%'; }
+  function dateLabel(value) { var d = new Date(value + 'T12:00:00'); return isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}); }
   function url(path) { return '/By_Date/' + path.split('/').map(encodeURIComponent).join('/'); }
   function id() { var b = new Uint8Array(16); crypto.getRandomValues(b); return Array.from(b, function (n) { return n.toString(16).padStart(2, '0'); }).join(''); }
   function wake() { try { localStorage.setItem('birdnet-reviews-changed', Date.now() + ':' + Math.random()); } catch (e) {} }
@@ -53,7 +58,11 @@
     document.querySelectorAll('.guided-review button').forEach(function (b) { b.disabled = busy || !!pending; });
     $('caseRetry').hidden = !pending; $('caseRetry').disabled = busy;
     $('caseUndo').hidden = !undo.length; $('caseUndoLabel').textContent = undo.length ? undo[undo.length - 1].label : '';
+    $('caseUndo').setAttribute('aria-describedby', 'caseUndoLabel');
+    $('caseRecovery').hidden = !pending && !undo.length;
     $('caseStop').hidden = !session;
+    $('caseSession').hidden = !!session;
+    $('caseQueue').querySelectorAll('input').forEach(function (input) { input.disabled = busy || !!pending; });
     $('caseQueue').setAttribute('aria-busy', busy ? 'true' : 'false');
     document.querySelectorAll('[data-needs-audio]').forEach(function (b) {
       var c = cases[Number(b.dataset.i)]; var clip = c && c.evidence[selected[c.key] || 0];
@@ -68,46 +77,68 @@
     return 'api/v1/reviews/cases?' + p.toString();
   }
   function get(path) { return fetch(path, {headers: {'Accept':'application/json'}}).then(function (r) { if (!r.ok) throw new Error('Could not load review data. Refresh to retry.'); return r.json(); }); }
-  function button(i, action, label, audio) { return '<button class="review-btn" data-i="' + i + '" data-action="' + action + '"' + (audio ? ' data-needs-audio="1"' : '') + '>' + label + '</button>'; }
+  function button(i, action, label, audio) { return '<button class="review-btn case-action-' + action + '" data-i="' + i + '" data-action="' + action + '"' + (audio ? ' data-needs-audio="1"' : '') + '>' + label + '</button>'; }
+  function pauseAudio(except) { document.querySelectorAll('.guided-review audio').forEach(function (audio) { if (audio !== except) audio.pause(); }); }
+  function chooseClip(i, j) {
+    var c = cases[i], e = c && c.evidence[j], card = $('case-' + i);
+    if (!e || !card) return;
+    selected[c.key] = j; active = i;
+    var audio = card.querySelector('.case-player');
+    if (audio.dataset.clip !== String(j)) { audio.pause(); audio.dataset.clip = String(j); audio.src = url(e.clip_path); }
+    audio.hidden = e.audio_available === false;
+    audio.setAttribute('aria-label', c.species + ', ' + e.date + ' ' + e.time);
+    card.querySelector('.case-audio-warning').hidden = e.audio_available !== false;
+    card.querySelector('.case-recording-date').textContent = dateLabel(e.date);
+    card.querySelector('.case-recording-time').textContent = e.time;
+    card.querySelector('.case-score-value').textContent = pct(e.score);
+    card.querySelectorAll('[data-recording-choice]').forEach(function (row) {
+      var chosen = Number(row.dataset.recordingChoice) === j;
+      row.classList.toggle('is-selected', chosen); row.querySelector('input').checked = chosen;
+    });
+    controls();
+  }
   function render() {
+    pauseAudio();
     $('caseQueue').innerHTML = cases.map(function (c, i) {
       var choice = Math.min(selected[c.key] || 0, Math.max(0, c.evidence.length - 1)); selected[c.key] = choice;
+      var clip = c.evidence[choice], open = c.state === 'open', stateLabel = {resolved:'Completed',unresolved:'Unresolved',later:'Postponed',archived:'Older question'}[c.state];
+      var kindLabel = c.kind === 'discovery' ? 'Confirm presence' : c.kind === 'occurrence' ? 'Unusual occurrence' : c.sample ? 'Quality check' : 'Identification check';
+      var why = c.kind === 'discovery' ? 'Not yet confirmed at your station. One clear recording can establish presence.' : c.kind === 'occurrence' ? 'Unusual for this location and season. Listen to check the identification.' : c.sample ? 'An optional spot check of an established species.' : c.priority === 'important' ? 'Recent checks raised doubts about this identification.' : 'An optional check of an uncertain model match.';
+      if (c.state === 'resolved') why = 'This review question is complete. Other recordings remain unverified.';
+      var saved = expanded[c.key] || {};
       var clips = c.evidence.map(function (e, j) {
-        return '<div class="case-evidence"><label><input type="radio" name="clip-' + i + '" data-case="' + i + '" value="' + j + '"' + (choice === j ? ' checked' : '') + '> ' + esc(e.date + ' ' + e.time) + ' · model score ' + pct(e.score) + '</label>' +
-          '<audio controls preload="none" data-case="' + i + '" data-clip="' + j + '" src="' + url(e.clip_path) + '"></audio>' +
-          '<label class="case-bulk-choice"><input type="checkbox" data-bulk="' + i + '" value="' + j + '"> Include in an explicit bulk decision</label></div>';
+        return '<label class="case-recording-choice' + (choice === j ? ' is-selected' : '') + '" data-recording-choice="' + j + '"><input type="radio" name="clip-' + i + '" data-case="' + i + '" value="' + j + '"' + (choice === j ? ' checked' : '') + '><span>' + esc(dateLabel(e.date)) + '<small>' + esc(e.time) + '</small></span><span class="case-choice-score">' + pct(e.score) + '</span></label>';
       }).join('');
-      var open = c.state === 'open';
-      return '<article class="ui-card review-card case-card" id="case-' + i + '" tabindex="0" data-card="' + i + '"><div class="review-card-body">' +
-        '<h4><a href="?view=Bird&amp;sci_name=' + encodeURIComponent(c.sci_name) + '">' + esc(c.species) + '</a> — ' + esc(c.title) + '</h4>' +
-        '<p class="ui-meta">' + esc(c.date + (c.date !== c.end_date ? ' – ' + c.end_date : '')) + ' · ' + c.visits + ' visits · ' + c.detections + ' detections · ' + esc(c.state) + '</p>' +
-        '<ul class="review-explanations">' + c.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' +
+      return '<article class="ui-card review-card case-card" id="case-' + i + '" tabindex="0" data-card="' + i + '" aria-labelledby="case-title-' + i + '">' +
+        '<header class="case-card-heading"><div><div class="case-kind">' + esc(kindLabel) + '</div><h3 id="case-title-' + i + '"><a href="?view=Bird&amp;sci_name=' + encodeURIComponent(c.sci_name) + '">' + esc(c.species) + '</a></h3><p class="case-why">' + esc(why) + '</p></div>' + (stateLabel ? '<span class="case-state">' + stateLabel + '</span>' : '') + '</header>' +
+        '<div class="case-workspace"><section class="case-listen" aria-label="Recording evidence"><h4 class="case-step">1 · Listen</h4>' +
+        (clip ? '<div class="case-recording-meta"><div><span class="case-recording-date">' + esc(dateLabel(clip.date)) + '</span><span class="case-recording-time">' + esc(clip.time) + '</span></div><span class="case-score" title="BirdNET model score, not a guarantee of a correct identification">Model score <strong class="case-score-value">' + pct(clip.score) + '</strong></span></div>' +
+          '<audio class="case-player" controls preload="none" data-case="' + i + '" data-clip="' + choice + '" src="' + url(clip.clip_path) + '" aria-label="' + esc(c.species + ', ' + clip.date + ' ' + clip.time) + '"' + (clip.audio_available === false ? ' hidden' : '') + '></audio><p class="case-audio-warning review-media-warning"' + (clip.audio_available === false ? '' : ' hidden') + '>This recording could not be played. Choose another recording or refresh.</p>' +
+          '<details class="case-recordings" data-expand="recordings"' + (saved.recordings ? ' open' : '') + '><summary>Choose a recording <span>' + c.evidence.length + ' available</span></summary><fieldset><legend class="case-sr-only">Recording to listen to and review</legend>' + clips + '</fieldset>' + button(i,'evidence','Load more recordings') + '</details>' : '<p class="case-no-audio">No completed, unreviewed audio is available here. No verdict has been inferred.</p>') +
+        (c.active ? '<p class="case-context-note">A visit is still active; only completed recordings are offered.</p>' : '') + '</section>' +
+        '<section class="case-decision" aria-label="Review decision"><h4 class="case-step">2 · Decide</h4>' +
+        (open ? '<p class="case-question">Do you hear this bird?</p><div class="case-verdicts">' + button(i,'confirm','Yes, I hear this bird',true) + button(i,'reject','Not this bird',true) + '</div><div class="case-secondary-decisions">' + button(i,'uncertain',"I can’t tell") + button(i,'later','Later') + '</div><p class="case-scope">Only the selected recording is reviewed.</p>' : '<p class="case-closed-note">' + (c.state === 'resolved' ? 'Use Undo for a recent decision, or advanced tools to change an older verdict.' : c.until_at && c.state === 'later' ? 'Postponed until ' + esc(new Date(c.until_at * 1000).toLocaleString()) + '.' : 'No new identification verdict is needed until you reopen this question.') + '</p>' + (c.state === 'resolved' ? '' : button(i,'resume','Reopen question'))) + '</section></div>' +
+        '<details class="case-tools" data-expand="tools"' + (saved.tools ? ' open' : '') + '><summary>Details &amp; advanced tools <span>' + c.visits + ' visits · ' + c.detections + ' detections</span></summary><div class="case-tools-content"><h4>Why this is here</h4><ul class="review-explanations">' + c.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' +
+        '<p class="case-context-note">' + esc(dateLabel(c.date) + (c.date !== c.end_date ? ' – ' + dateLabel(c.end_date) : '')) + '. One confirmed clip can establish presence, but other recordings remain unverified. “I can’t tell” leaves statistics unchanged.</p>' +
         (c.reopened_reason ? '<p>' + esc(c.reopened_reason) + '</p>' : '') +
-        (c.active ? '<p class="ui-meta">A visit is still active. Only completed evidence is offered here.</p>' : '') +
-        (c.until_at && c.state === 'later' ? '<p>Postponed until ' + esc(new Date(c.until_at * 1000).toLocaleString()) + '.</p>' : '') +
-        (clips || '<p>No completed, unreviewed audio is available in this view. No verdict has been inferred.</p>') +
-        '<div class="review-card-actions">' + (open ? button(i,'confirm','Yes, I hear this bird',true) + button(i,'reject','Not this bird',true) + button(i,'uncertain',"I can’t tell") + button(i,'later','Later') : (c.state === 'resolved' ? '<span>Completed. Use Undo for a recent decision or the advanced tools to change an older verdict.</span>' : button(i,'resume','Reopen question'))) + '</div>' +
-        '<p class="review-action-help">Yes / Not this bird apply only to the selected recording. Other recordings remain unverified. “Can’t tell” does not affect statistics.</p>' +
-        '<details><summary>More evidence and actions</summary><div class="review-card-actions">' + button(i,'evidence','Load more recordings') + button(i,'compare','Compare with reference clips',true) + button(i,'hide','Hide selected recording',true) + button(i,'reassign','Reassign selected recording',true) + button(i,'bulk','Review checked recordings') + '</div><div class="case-detail"></div></details>' +
-        '<div class="case-result" role="status"></div></div></article>';
+        '<div class="review-card-actions">' + button(i,'compare','Compare reference clips',true) + button(i,'hide','Hide selected recording',true) + button(i,'reassign','Reassign selected recording',true) + '</div>' +
+        '<details class="case-bulk" data-expand="bulk"' + (saved.bulk ? ' open' : '') + '><summary>Review multiple recordings</summary><p>Choose only recordings you have checked. You will preview the selection before saving.</p><div class="case-bulk-list">' + c.evidence.map(function (e,j) { return '<label><input type="checkbox" data-bulk="' + i + '" value="' + j + '"><span>' + esc(dateLabel(e.date) + ' · ' + e.time) + '</span><span>' + pct(e.score) + '</span></label>'; }).join('') + '</div>' + button(i,'bulk','Preview selected recordings') + '</details><div class="case-detail" role="status"></div></div></details></article>';
     }).join('');
-    if (!cases.length) $('caseQueue').innerHTML = '<div class="ui-message"><strong>' + (session ? 'Session complete' : 'No questions in this view') + '</strong><span>' + (session ? 'You can stop here or end the session to see any remaining recommended questions.' : 'Other views or older dates may contain additional evidence. This does not mean every detection is verified.') + '</span></div>';
+    if (!cases.length) $('caseQueue').innerHTML = '<div class="case-empty"><h3>' + (session ? 'Session complete' : 'No questions in this view') + '</h3><p>' + (session ? 'You can stop here or end the session to see any remaining recommended questions.' : 'Other views or older dates may contain additional evidence. This does not mean every detection is verified.') + '</p></div>';
     $('caseQueue').querySelectorAll('audio').forEach(function (audio) {
       audio.addEventListener('play', function () {
         var i = Number(audio.dataset.case), j = Number(audio.dataset.clip), c = cases[i];
         if (!c) return; active = i; selected[c.key] = j;
-        var radio = $('case-' + i).querySelector('input[type="radio"][value="' + j + '"]'); if (radio) radio.checked = true;
-        $('caseQueue').querySelectorAll('audio').forEach(function (other) { if (other !== audio) other.pause(); });
+        pauseAudio(audio);
         controls();
       });
       audio.addEventListener('error', function () {
         var c = cases[Number(audio.dataset.case)], e = c && c.evidence[Number(audio.dataset.clip)];
-        if (!e) return; e.audio_available = false;
-        var note = document.createElement('p'); note.className = 'review-media-warning'; note.textContent = 'This recording could not be played. Refresh to look for other evidence.'; audio.replaceWith(note); controls();
+        if (!e) return; e.audio_available = false; chooseClip(Number(audio.dataset.case), Number(audio.dataset.clip));
       });
     });
-    $('caseQueue').querySelectorAll('.case-card details').forEach(function (details) {
-      details.addEventListener('toggle', function () { details.closest('.case-card').classList.toggle('case-advanced', details.open); });
+    $('caseQueue').querySelectorAll('[data-expand]').forEach(function (details) {
+      details.addEventListener('toggle', function () { var c = cases[Number(details.closest('[data-card]').dataset.card)]; if (c) { expanded[c.key] = expanded[c.key] || {}; expanded[c.key][details.dataset.expand] = details.open; } });
     });
     controls();
   }
@@ -116,10 +147,11 @@
     return get(query(view)).then(function (data) {
       if (!Array.isArray(data.cases) || !data.counts || !Number.isInteger(data.total)) throw new Error('Invalid review response.');
       total = data.total; $('caseStart').value = data.start; $('caseEnd').value = data.end;
+      $('caseRange').textContent = customDates ? dateLabel(data.start) + ' – ' + dateLabel(data.end) : 'Last 7 days';
       if (!$('confirmedDate').value) $('confirmedDate').value = data.end;
       document.querySelectorAll('.case-view').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false'); b.querySelector('span').textContent = data.counts[b.dataset.view]; });
       $('caseCount').textContent = total + ' item' + (total === 1 ? '' : 's') + ' in this view';
-      $('caseHelp').textContent = {recommended:'Important questions with completed audio. This count matches Today for the default last-seven-days window.',all:'Includes optional routine checks. You do not need to clear this list.',history:'Completed, unresolved, postponed, active and unavailable questions. Choose older dates to browse untouched older questions.',samples:'Up to two optional checks from yesterday, across different species when possible. These are not a calibrated accuracy estimate.'}[view];
+      $('caseHelp').textContent = {recommended:'Discoveries and unusual matches worth a closer listen.',all:'Recommended questions plus optional routine checks.',history:'Completed, unresolved, postponed, or waiting for audio.',samples:'Up to two optional spot checks from yesterday—not an accuracy estimate.'}[view];
       cases = data.cases;
       if (session && session.samples) return get(query('samples', {offset:0})).then(function (sampleData) { cases = cases.concat(sampleData.cases.filter(function (c) { return !cases.some(function (x) { return x.key === c.key; }); })); });
     }).then(function () {
@@ -161,17 +193,23 @@
     else if (clip) body.files = [{file_name:clip.file_name,file_revision:clip.file_revision}];
     send(body);
   }
-  $('caseQueue').addEventListener('change', function (e) { if (e.target.matches('input[type="radio"]')) { var c = cases[Number(e.target.dataset.case)]; selected[c.key] = Number(e.target.value); active = Number(e.target.dataset.case); controls(); } });
+  $('caseQueue').addEventListener('change', function (e) { if (e.target.matches('input[type="radio"]')) chooseClip(Number(e.target.dataset.case), Number(e.target.value)); });
   $('caseQueue').addEventListener('click', function (event) {
     var card = event.target.closest('[data-card]'); if (card) active = Number(card.dataset.card);
     var b = event.target.closest('[data-action]'); if (!b || b.disabled || busy || pending) return;
     var i = Number(b.dataset.i), c = cases[i], action = b.dataset.action, clip = c.evidence[selected[c.key] || 0], detail = card.querySelector('.case-detail');
     if (action === 'evidence') {
-      busy = true; controls(); get(query('all', {key:c.key,start:c.date,end:c.end_date,details:1})).then(function (d) { if (!d.cases.length) throw new Error('Question changed. Refresh.'); cases[i] = d.cases[0]; render(); }).catch(function (e) { $('caseError').textContent = e.message; }).finally(function () { busy = false; controls(); }); return;
+      busy = true; controls(); get(query('all', {key:c.key,start:c.date,end:c.end_date,details:1})).then(function (d) {
+        if (!d.cases.length) throw new Error('Question changed. Refresh.');
+        cases[i] = d.cases[0]; selected[c.key] = Math.max(0, cases[i].evidence.findIndex(function (e) { return clip && e.file_name === clip.file_name; }));
+        expanded[c.key] = expanded[c.key] || {}; expanded[c.key].recordings = true; render();
+        var picker = $('case-' + i).querySelector('.case-recordings summary'); if (picker) picker.focus();
+      }).catch(function (e) { $('caseError').textContent = e.message; }).finally(function () { busy = false; controls(); }); return;
     }
     if (action === 'compare') {
       get('api/v1/reviews/examples?sci_name=' + encodeURIComponent(c.sci_name) + '&exclude=' + encodeURIComponent(clip.file_name) + '&exclude_date=' + encodeURIComponent(clip.date) + '&exclude_from=' + encodeURIComponent(clip.from_time || clip.time) + '&exclude_to=' + encodeURIComponent(clip.to_time || clip.time)).then(function (d) {
         detail.innerHTML = '<p>References: human-confirmed where labeled; other clips are model matches, not verified truth.</p>' + (d.examples || []).map(function (e) { return '<p>' + (e.source === 'confirmed' ? (e.verification === 'individual' ? 'Individually checked' : 'Prior or bulk confirmation') : 'Unverified model match') + ' · ' + pct(e.confidence) + '</p><audio controls preload="none" src="' + url(e.clip_path) + '"></audio>'; }).join('');
+        detail.querySelectorAll('audio').forEach(function (audio) { audio.addEventListener('play', function () { pauseAudio(audio); }); });
       }).catch(function (e) { detail.textContent = e.message; }); return;
     }
     if (action === 'bulk') {
@@ -216,7 +254,7 @@
     }).catch(function(e){$('confirmedList').textContent=e.message;});
   };
   document.addEventListener('keydown',function(e){
-    if(e.repeat || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT|BUTTON|A|AUDIO/.test(e.target.tagName) || busy || pending || !cases.length)return;
+    if(e.repeat || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT|BUTTON|A|AUDIO|SUMMARY)$/.test(e.target.tagName) || busy || pending || !cases.length)return;
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){active=Math.max(0,Math.min(cases.length-1,active+(e.key==='ArrowDown'?1:-1)));$('case-'+active).focus();e.preventDefault();}
     if(e.key===' '){var aud=$('case-'+active).querySelector('audio[data-clip="'+(selected[cases[active].key]||0)+'"]');if(aud){aud.paused?aud.play().catch(function(){}):aud.pause();}e.preventDefault();}
     var action={y:'confirm',n:'reject',u:'uncertain',l:'later'}[e.key.toLowerCase()];if(action && cases[active].state==='open')act(active,action);

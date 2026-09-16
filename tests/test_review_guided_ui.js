@@ -18,11 +18,13 @@ async function fixture(t, n=2) {
   const context=await browser.newContext({viewport:{width:1200,height:950}}); t.after(()=>context.close());
   const errors=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message))); t.after(()=>assert.deepEqual(errors,[]));
   const state={cases:Array.from({length:n},(_,i)=>item(i)),posts:[],saves:0,responses:new Map(),undo:new Map(),failure:null,lose:false,queueFailure:false,renames:[],wait:null};
-  const markup='<!doctype html><html><head><meta charset="utf-8"></head><body>'+fs.readFileSync(path.join(root,'scripts/review_guided.php'),'utf8').replace(/<\?php[\s\S]*?\?>/g,'')+'</body></html>';
+  const styles=['homepage/style.css','homepage/static/css/tokens.css','homepage/static/css/pages.css'].map(p=>'<style>'+fs.readFileSync(path.join(root,p),'utf8')+'</style>').join('');
+  const markup='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'+styles+'</head><body>'+fs.readFileSync(path.join(root,'scripts/review_guided.php'),'utf8').replace(/<\?php[\s\S]*?\?>/g,'')+'</body></html>';
   await context.route('**/*',async route=>{
     const req=route.request(),u=new URL(req.url());
     const json=(value,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(value)});
     if(req.isNavigationRequest())return route.fulfill({contentType:'text/html',body:markup});
+    if(u.pathname.endsWith('/RobotoFlex-Regular.ttf'))return route.fulfill({contentType:'font/ttf',body:fs.readFileSync(path.join(root,'homepage/static/RobotoFlex-Regular.ttf'))});
     if(u.pathname.endsWith('/cases')){
       if(state.queueFailure)return json({message:'offline'},503);
       const counts={recommended:0,all:0,history:0,samples:0};
@@ -67,7 +69,7 @@ async function fixture(t, n=2) {
 async function ready(page,n) {await page.waitForFunction(n=>document.getElementById('caseCount').textContent.startsWith(n+' item')&&!document.getElementById('caseRefresh').disabled,n);}
 async function action(page,name) {await page.locator(`[data-action="${name}"]`).first().click();}
 test('one selected recording is confirmed, with scoped message and Undo',async t=>{
-  const {page,state}=await fixture(t);await page.locator('input[name="clip-0"][value="1"]').check();await action(page,'confirm');await ready(page,1);
+  const {page,state}=await fixture(t);await page.locator('#case-0 .case-recordings summary').click();await page.locator('input[name="clip-0"][value="1"]').check();await action(page,'confirm');await ready(page,1);
   assert.deepEqual(state.posts[0].files,[{file_name:'bird-0-1.wav',file_revision:'revision-1'}]);
   assert.equal(state.posts[0].bulk_confirmed,undefined);assert.match(await page.locator('#caseStatus').textContent(),/Other recordings remain unverified/);
   await page.locator('#caseUndo').click();await ready(page,2);assert.equal(state.posts[1].action,'undo');
@@ -104,13 +106,13 @@ test('optional samples are distinct from recommended and record their source',as
   await page.locator('[data-view="samples"]').click();await ready(page,1);await action(page,'confirm');await ready(page,0);assert.equal(state.posts[0].source,'sample');
 });
 test('bulk preview names exactly selected recordings and requires a second action',async t=>{
-  const {page,state}=await fixture(t,1);await page.locator('.case-card summary').click();await page.locator('[data-bulk="0"][value="0"]').check();await page.locator('[data-bulk="0"][value="2"]').check();
+  const {page,state}=await fixture(t,1);await page.locator('.case-tools > summary').click();await page.locator('.case-bulk > summary').click();await page.locator('[data-bulk="0"][value="0"]').check();await page.locator('[data-bulk="0"][value="2"]').check();
   await action(page,'bulk');assert.equal(state.posts.length,0);
   assert.match(await page.locator('.case-detail').textContent(),/bird-0-0.wav/);assert.match(await page.locator('.case-detail').textContent(),/bird-0-2.wav/);
   await page.locator('[data-bulk-confirm="confirm"]').click();await ready(page,0);assert.equal(state.posts[0].bulk_confirmed,true);assert.equal(state.posts[0].files.length,2);
 });
 test('playing another recording selects it for the decision',async t=>{
-  const {page,state}=await fixture(t,1);await page.locator('audio[data-clip="2"]').dispatchEvent('play');
+  const {page,state}=await fixture(t,1);await page.locator('.case-recordings summary').click();await page.locator('input[name="clip-0"][value="2"]').check();await page.locator('audio[data-clip="2"]').dispatchEvent('play');
   assert.ok(await page.locator('input[name="clip-0"][value="2"]').isChecked());await action(page,'confirm');await ready(page,0);
   assert.equal(state.posts[0].files[0].file_name,'bird-0-2.wav');
 });
@@ -131,7 +133,83 @@ test('confirmed species describe legacy support and unavailable audio',async t=>
 });
 for(const width of [1200,390,320])test('guided review fits at '+width+'px',async t=>{
   const {page}=await fixture(t,1);await page.setViewportSize({width,height:1000});
-  for(const css of ['homepage/style.css','homepage/static/css/tokens.css','homepage/static/css/pages.css'])await page.addStyleTag({path:path.join(root,css)});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   if(width===1200&&process.env.BIRDNET_GUIDED_SCREENSHOT)await page.screenshot({path:process.env.BIRDNET_GUIDED_SCREENSHOT,fullPage:true});
+});
+
+test('one player per card, concise context, and collapsed secondary controls',async t=>{
+  const {page}=await fixture(t,2);
+  assert.equal(await page.locator('.case-card audio:visible').count(),2);
+  assert.ok(await page.locator('#case-0 [data-action="confirm"]').isVisible());
+  assert.ok(await page.locator('#case-0 [data-action="reassign"]').isHidden());
+  assert.ok(await page.locator('#case-0 [data-bulk]').first().isHidden());
+  assert.ok(await page.locator('#case-0 .review-explanations').isHidden());
+  assert.ok(await page.locator('#caseSamples').isHidden());
+  const box=await page.locator('#case-0').boundingBox();assert.ok(box.height<500,'A desktop question should fit without scrolling past stacked players');
+});
+
+test('recording choice updates the only player, score, selection, and verdict together',async t=>{
+  const {page,state}=await fixture(t,1);await page.locator('.case-recordings summary').click();await page.locator('input[value="2"][type="radio"]').check();
+  assert.equal(await page.locator('.case-player').count(),1);
+  assert.match(await page.locator('.case-player').getAttribute('src'),/bird-0-2.wav/);
+  assert.equal(await page.locator('.case-score-value').textContent(),'70%');
+  assert.equal(await page.locator('.case-recording-time').textContent(),'12:20:00');
+  assert.equal(await page.locator('.case-recording-choice.is-selected input').inputValue(),'2');
+  await action(page,'reject');await ready(page,1);assert.equal(state.posts[0].files[0].file_name,'bird-0-2.wav');
+});
+
+test('switching away from unavailable audio re-enables only the chosen playable recording',async t=>{
+  const {page,state}=await fixture(t,1);await page.locator('.case-player').dispatchEvent('error');assert.ok(await page.locator('[data-action="confirm"]').isDisabled());
+  await page.locator('.case-recordings summary').click();await page.locator('input[value="1"][type="radio"]').check();
+  assert.ok(await page.locator('.case-player').isVisible());assert.ok(await page.locator('.case-audio-warning').isHidden());assert.ok(await page.locator('[data-action="confirm"]').isEnabled());
+  await action(page,'confirm');await ready(page,0);assert.equal(state.posts[0].files[0].file_name,'bird-0-1.wav');
+});
+
+test('loading more evidence preserves the selected file and leaves its picker open',async t=>{
+  const {page,state}=await fixture(t,1);await page.locator('.case-recordings summary').click();await page.locator('input[value="2"][type="radio"]').check();
+  state.cases[0].evidence.reverse();await action(page,'evidence');await ready(page,1);
+  assert.ok(await page.locator('.case-recordings').evaluate(el=>el.open));assert.match(await page.locator('.case-player').getAttribute('src'),/bird-0-2.wav/);
+  await action(page,'confirm');await ready(page,0);assert.equal(state.posts[0].files[0].file_name,'bird-0-2.wav');
+});
+
+test('keyboard opens a disclosure without accidentally playing or submitting',async t=>{
+  const {page,state}=await fixture(t,1);await page.locator('.case-recordings summary').focus();await page.keyboard.press('Space');
+  assert.ok(await page.locator('.case-recordings').evaluate(el=>el.open));await page.keyboard.press('y');assert.equal(state.posts.length,0);
+});
+
+for(const theme of ['light','dark'])for(const width of [1440,768,390,320])test(theme+' review layout and expanded tools at '+width+'px',async t=>{
+  const {page,state}=await fixture(t,2);await page.setViewportSize({width,height:1000});
+  if(theme==='dark'){
+    // Base CSS is already loaded; skip its import in this isolated fixture.
+    await page.addStyleTag({content:fs.readFileSync(path.join(root,'homepage/static/dark-style.css'),'utf8').replace(/@import[^;]+;/g,'')});
+    await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  }
+  state.cases[0].species='Red-headed Woodpecker';state.cases[0].evidence[0].score=.5696;
+  state.cases[1].species='Blue Jay';state.cases[1].visits=84;state.cases[1].detections=1562;
+  await page.locator('#caseRefresh').click();await ready(page,2);await page.evaluate(()=>document.fonts.ready);
+  const dimensions=await page.locator('#case-0').evaluate(card=>{const listen=card.querySelector('.case-listen').getBoundingClientRect(),decision=card.querySelector('.case-decision').getBoundingClientRect();return {lx:listen.x,ly:listen.y,dx:decision.x,dy:decision.y};});
+  if(width>760)assert.equal(dimensions.ly,dimensions.dy,'Desktop places listening alongside the decision');else assert.ok(dimensions.dy>dimensions.ly,'Phones stack the decision below listening');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  if(process.env.BIRDNET_GUIDED_PREVIEW_DIR)await page.screenshot({path:path.join(process.env.BIRDNET_GUIDED_PREVIEW_DIR,`guided-review-${theme}-${width}.png`),fullPage:true});
+  await page.locator('#case-0 .case-recordings > summary').click();await page.locator('#case-0 .case-tools > summary').click();await page.locator('#case-0 .case-bulk > summary').click();await page.locator('.case-options > summary').click();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Expanded controls fit too');
+  await page.locator('#case-0 [data-bulk][value="1"]').check();await action(page,'bulk');assert.ok(await page.locator('[data-bulk-confirm="confirm"]').isVisible());
+});
+
+test('desktop sidebar-sized content stacks without overflow',async t=>{
+  const {page}=await fixture(t,1);await page.setViewportSize({width:1100,height:900});await page.locator('.guided-review').evaluate(el=>el.style.width='600px');
+  const fits=await page.locator('.guided-review').evaluate(el=>{const a=el.querySelector('.case-listen').getBoundingClientRect(),b=el.querySelector('.case-decision').getBoundingClientRect();return b.y>a.y&&el.scrollWidth<=el.clientWidth+1;});
+  assert.ok(fits,'Layout responds to the actual content width, not only the screen');
+});
+
+test('completed History card does not claim the bird is still unconfirmed',async t=>{
+  const {page}=await fixture(t,1);await action(page,'confirm');await ready(page,0);await page.locator('[data-view="history"]').click();await ready(page,1);
+  assert.match(await page.locator('.case-why').textContent(),/complete/);assert.doesNotMatch(await page.locator('.case-why').textContent(),/Not yet confirmed/);
+});
+
+test('secondary reassignment still targets exactly the selected recording',async t=>{
+  const {page,state}=await fixture(t,1);await page.locator('.case-recordings summary').click();await page.locator('input[type="radio"][value="2"]').check();
+  await page.locator('.case-tools > summary').click();await action(page,'reassign');await page.locator('.case-labels').selectOption('Correctus bird_Correct Bird');await page.locator('.case-rename').click();
+  await page.waitForFunction(()=>document.getElementById('caseStatus').textContent.includes('Recording reassigned'));
+  assert.equal(state.renames.length,1);assert.match(state.renames[0].searchParams.get('changefile'),/bird-0-2.wav$/);assert.equal(state.posts.length,0);
 });

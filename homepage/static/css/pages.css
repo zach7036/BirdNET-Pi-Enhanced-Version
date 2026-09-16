@@ -241,18 +241,6 @@
 .review-explanations { padding-left: 20px; margin: 10px 0; line-height: 1.45; }
 .review-action-help, .review-playback-note { font-size: var(--text-xs, 0.75rem); color: var(--text-secondary); }
 .review-media-warning { font-size: var(--text-sm, 0.85rem); color: var(--text-primary); line-height: 1.45; }
-.guided-review .case-card { display: block; }
-.guided-review .case-card h4 { margin: 0 0 8px; }
-.case-evidence { border-top: 1px solid var(--border); padding: 10px 0; }
-.case-evidence audio, .case-detail audio { display: block; width: 100%; max-width: 600px; margin: 8px 0; }
-.case-bulk-choice { display: none; font-size: var(--text-xs, .75rem); color: var(--text-secondary); }
-.case-advanced .case-bulk-choice { display: block; }
-.guided-review details { padding: 8px 0; }
-.guided-review summary { cursor: pointer; }
-.guided-review input[type="date"], .case-detail input, .case-detail select { max-width: 100%; padding: 6px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; }
-.case-detail select { display: block; width: 100%; margin: 8px 0; }
-.case-detail { overflow-wrap: anywhere; }
-.guided-review [hidden] { display: none !important; }
 
 .visit-empty {
   color: var(--text-secondary);
@@ -737,6 +725,142 @@ a.species-card-photo:hover img {
 /* ============================================================
    Phase 3: Birds detail, Timeline / Day Replay, Review triage
    ============================================================ */
+
+/* Guided Review: navigation, listening, and decisions are separate regions.
+   Scope everything here so the legacy whole-visit tools stay unchanged. */
+.review-page.guided-review { max-width: 1040px; padding: 12px 0 28px; line-height: 1.5; container-type: inline-size; container-name: guided-review; }
+.guided-review [hidden] { display: none !important; }
+.guided-review button { min-height: 40px; }
+.guided-review button:disabled { opacity: .5; cursor: default; }
+.guided-review summary { cursor: pointer; font-size: .85rem; font-weight: 600; padding: 10px 0; }
+.guided-review summary::marker { color: var(--text-secondary); }
+.guided-review summary span { font-size: .78rem; font-weight: 400; color: var(--text-secondary); margin-left: 8px; }
+.guided-review label { font-weight: 400; }
+.guided-review input[type="radio"], .guided-review input[type="checkbox"] { accent-color: var(--accent); flex-shrink: 0; width: 16px; height: 16px; margin: 0; }
+.guided-review input[type="date"], .case-detail input, .case-detail select { max-width: 100%; min-width: 0; padding: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; }
+.guided-review .case-primary, .guided-review .case-action-confirm { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.guided-review .case-primary:hover:not(:disabled), .guided-review .case-action-confirm:hover:not(:disabled) { background: var(--accent-hover); color: #fff; }
+[data-theme="dark"] .guided-review .case-primary, [data-theme="dark"] .guided-review .case-action-confirm { color: var(--bg-primary); }
+.guided-review :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.guided-review .case-text-button { color: var(--accent); font-size: .85rem; padding: 6px 10px; border-radius: 8px; }
+.case-page-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin: 0 0 24px; }
+.case-page-heading h2 { margin: 0; font-size: 1.8rem; font-weight: 750; letter-spacing: -.035em; color: var(--text-heading); }
+.case-page-heading p { margin: 4px 0 0; font-size: .9rem; color: var(--text-secondary); }
+.case-session-start { flex-shrink: 0; text-align: right; }
+.case-session-start > span { display: block; font-size: .72rem; color: var(--text-secondary); margin-top: 6px; }
+.case-navigation { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 20px; }
+.case-tabs { display: flex; gap: 8px; padding: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.guided-review .case-view { justify-content: center; border: 1px solid transparent; border-radius: 8px; font-size: .85rem; padding: 8px 12px; background: transparent; }
+.guided-review .case-view span { font-size: .74rem; font-weight: 600; min-width: 24px; text-align: center; padding: 1px 6px; border-radius: 6px; background: var(--bg-secondary); color: var(--text-secondary); }
+.guided-review .case-view[aria-pressed="true"] { background: var(--accent-subtle); color: var(--accent); font-weight: 600; border-color: var(--accent-light); }
+.guided-review .case-view[aria-pressed="true"] span { color: var(--accent); background: var(--bg-card); }
+.case-view-description { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 16px; }
+.case-view-description p { font-size: .85rem; color: var(--text-secondary); margin: 8px 0; }
+.case-options { padding: 0 16px; border-top: 1px solid var(--border-light); }
+.case-option-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 8px 0 16px; }
+.case-option-fields label { display: grid; gap: 4px; font-size: .8rem; }
+.case-sample-option { display: flex; align-items: center; gap: 10px; font-size: .85rem; }
+.case-options p, .case-footer-panel p, .case-footer-panel li { font-size: .85rem; color: var(--text-secondary); }
+.case-options p a { font-size: inherit; }
+.case-queue-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 10px; }
+#caseCount { font-size: .85rem; font-weight: 600; color: var(--text-secondary); }
+#caseProgress { font-size: .85rem; margin: 0; color: var(--accent); }
+#caseProgress:empty, #caseStatus:empty, #caseError:empty { display: none; }
+#caseStatus, #caseError { padding: 12px 16px; margin-bottom: 10px; border-radius: 10px; background: var(--bg-secondary); font-size: .85rem; }
+#caseError:not(:empty) { border: 1px solid var(--danger); }
+#caseRecovery { display: flex; gap: 8px; margin-bottom: 12px; }
+.guided-review .review-queue { gap: 20px; }
+.guided-review .case-card { display: block; padding: 0; border: 1px solid var(--border); overflow-wrap: anywhere; }
+.case-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 24px 16px; }
+.case-kind { font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.guided-review .case-card h3 { font-size: 1.3rem; margin: 0; line-height: 1.3; font-weight: 700; }
+.case-card-heading h3 a { font-size: inherit; color: var(--text-heading); }
+.case-card-heading h3 a:hover { color: var(--accent); }
+.case-why { margin: 6px 0 0; font-size: .85rem; color: var(--text-secondary); max-width: 70ch; }
+.case-state { border-radius: 6px; padding: 3px 8px; background: var(--bg-secondary); font-size: .75rem; color: var(--text-secondary); flex-shrink: 0; }
+.case-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 270px; border-top: 1px solid var(--border-light); }
+.case-listen { padding: 20px 24px; min-width: 0; }
+.case-decision { padding: 20px; border-left: 1px solid var(--border); background: var(--bg-table-header); min-width: 0; }
+.guided-review .case-step { margin: 0 0 12px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .075em; color: var(--text-secondary); }
+.case-recording-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.case-recording-date { display: block; font-size: .9rem; font-weight: 600; color: var(--text-heading); }
+.case-recording-time { font-size: .8rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.case-score { display: inline-flex; align-items: center; gap: 7px; background: var(--bg-secondary); border-radius: 8px; padding: 5px 8px; font-size: .72rem; color: var(--text-secondary); }
+.case-score strong { font-size: .85rem; font-weight: 600; color: var(--text-primary); }
+.case-player { display: block; width: 100%; height: 42px; margin: 0 0 6px; }
+[data-theme="dark"] .case-player, [data-theme="dark"] .case-detail audio { color-scheme: dark; }
+.guided-review .case-recordings summary { padding: 10px 0 4px; color: var(--accent); }
+.case-recordings fieldset { padding: 0; border: 0; margin: 8px 0; display: grid; gap: 6px; max-height: 280px; overflow: auto; }
+.case-recording-choice { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.case-recording-choice.is-selected { border-color: var(--accent); background: var(--accent-subtle); }
+.case-recording-choice > span { font-size: .8rem; }
+.case-recording-choice small { display: block; font-size: .75rem; color: var(--text-secondary); }
+.case-recording-choice .case-choice-score { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+.case-question { font-size: .95rem; font-weight: 600; color: var(--text-heading); margin: 0 0 12px; }
+.case-verdicts { display: grid; gap: 8px; }
+.case-verdicts .review-btn { width: 100%; border-radius: 8px; font-size: .85rem; }
+.case-secondary-decisions { display: flex; gap: 8px; margin-top: 4px; }
+.case-secondary-decisions .review-btn { flex: 1; padding: 6px; background: transparent; border-color: transparent; font-size: .8rem; }
+.case-scope { font-size: .7rem; color: var(--text-secondary); margin: 4px 0 0; text-align: center; }
+.case-context-note, .case-closed-note, .case-no-audio { font-size: .8rem; color: var(--text-secondary); margin: 8px 0; }
+.case-tools { border-top: 1px solid var(--border); padding: 0 24px; }
+.guided-review .case-tools > summary { font-size: .78rem; color: var(--text-secondary); padding: 12px 0; }
+.case-tools-content { padding: 4px 0 20px; }
+.case-tools-content h4 { font-size: .85rem; margin: 0; color: var(--text-heading); }
+.case-tools-content .review-explanations { margin: 8px 0; }
+.case-tools-content .review-explanations li { font-size: .85rem; }
+.case-tools-content .review-card-actions { margin: 16px 0 8px; }
+.case-tools-content .review-btn { font-size: .8rem; border-radius: 8px; }
+.case-bulk { border-top: 1px solid var(--border-light); margin-top: 12px; }
+.case-bulk p { font-size: .8rem; color: var(--text-secondary); }
+.case-bulk-list { display: grid; gap: 8px; max-height: 280px; overflow: auto; margin-bottom: 12px; }
+.case-bulk-list label { display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 6px; }
+.case-bulk-list span { font-size: .8rem; }
+.case-bulk-list span:last-child { margin-left: auto; }
+.case-detail { overflow-wrap: anywhere; font-size: .85rem; }
+.case-detail:not(:empty) { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+.case-detail p, .case-detail li { font-size: .85rem; }
+.case-detail select { display: block; width: 100%; margin: 8px 0; }
+.case-detail audio { display: block; width: 100%; max-width: 600px; height: 42px; margin: 8px 0 16px; }
+.case-pagination { display: flex; justify-content: space-between; gap: 12px; margin: 16px 0; }
+.case-footer-panel { border-top: 1px solid var(--border); padding: 4px 0; }
+.case-footer-panel > summary { color: var(--text-secondary); }
+.case-empty { padding: 36px 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); text-align: center; }
+.case-empty h3 { font-size: 1.1rem; margin: 0 0 8px; }
+.case-empty p { max-width: 60ch; margin: auto; font-size: .85rem; color: var(--text-secondary); }
+.case-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+/* Respond to the available content width as well as the viewport: a sidebar
+   or browser zoom can leave a narrow reading area on a desktop-sized screen. */
+@container guided-review (max-width: 760px) {
+  .case-page-heading { flex-wrap: wrap; gap: 16px; }
+  .case-session-start { text-align: left; flex-shrink: 1; }
+  .case-workspace { grid-template-columns: minmax(0, 1fr); }
+  .case-decision { border-left: 0; border-top: 1px solid var(--border); }
+  .case-verdicts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .case-secondary-decisions .review-btn { flex: initial; padding: 6px 12px; }
+  .case-scope { text-align: left; }
+}
+@media (max-width: 760px) {
+  .review-page.guided-review { padding: 8px; }
+  .case-page-heading { flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+  .case-session-start { text-align: left; flex-shrink: 1; }
+  .case-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 8px; }
+  .guided-review .case-view { padding: 8px 6px; font-size: .8rem; }
+  .case-workspace { grid-template-columns: minmax(0, 1fr); }
+  .case-card-heading { padding: 16px; flex-wrap: wrap; gap: 8px; }
+  .case-listen { padding: 16px; }
+  .case-decision { padding: 16px; border-left: 0; border-top: 1px solid var(--border); }
+  .case-verdicts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .case-verdicts .review-btn { padding: 8px; }
+  .case-secondary-decisions { justify-content: flex-start; }
+  .case-secondary-decisions .review-btn { flex: initial; padding: 6px 12px; }
+  .case-scope { text-align: left; }
+  .case-tools { padding: 0 16px; }
+  .case-tools > summary span { display: block; margin: 2px 0 0 14px; }
+  .case-queue-heading { flex-wrap: wrap; }
+  .case-option-fields { align-items: stretch; }
+  .case-option-fields label { min-width: 0; max-width: 100%; }
+}
 
 /* ===== Birds detail ===== */
 .bird-page {

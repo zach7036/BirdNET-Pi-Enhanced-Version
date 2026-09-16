@@ -12,6 +12,20 @@ The default page is `scripts/review_guided.php`, included by `review.php`.
 `?view=Review&visit_tools=1` retains the earlier whole-visit interface with an
 explicit scope warning. Legacy POST and Undo contracts remain supported.
 
+## Page layout
+
+Each question separates the bird and a short explanation from two steps:
+**Listen** and **Decide**. Desktop layouts place those steps side by side;
+phones and narrow content areas stack them. Each card has one audio player.
+The collapsed recording picker changes that player's recording, timestamp,
+score, and decision target together. Extra recordings do not add more players.
+
+Dates and session options, detailed reasons, comparison/reassignment tools, and
+explicit bulk selection are collapsed until needed. Bulk decisions still require
+their separate selection preview. Light and dark themes, keyboard controls,
+Undo, and the existing save/retry safeguards work with the simplified layout.
+This presentation change does not alter queue rules or stored review decisions.
+
 ## Selection rules (version 1)
 
 - The default interval is today and six preceding local calendar dates. Date
