@@ -33,7 +33,9 @@ async function fixture(t, n=2) {
       let selected=state.cases.filter(c=>view==='history'?!c.ready:view==='all'?c.ready:view==='samples'?c.ready&&c.sample:c.ready&&c.recommended);
       if(u.searchParams.has('key'))selected=state.cases.filter(c=>c.key===u.searchParams.get('key'));
       const offset=Number(u.searchParams.get('offset')||0);
-      return json({cases:selected.slice(offset,offset+25),counts,total:selected.length,start:'2026-09-09',end:'2026-09-15'});
+      // Model the real API: a total across the pool, but only 3 initial choices.
+      const data=selected.slice(offset,offset+25).map(c=>({...c,candidate_count:c.candidate_count??c.evidence.length,evidence:c.evidence.slice(0,u.searchParams.get('details')==='1'?100:3)}));
+      return json({cases:data,counts,total:selected.length,start:'2026-09-09',end:'2026-09-15'});
     }
     if(u.pathname.endsWith('/case-actions')){
       const b=req.postDataJSON();state.posts.push(b);assert.equal(req.headers()['x-requested-with'],'XMLHttpRequest');
@@ -92,13 +94,66 @@ test('same bird stays in place with a clear six-to-five recording acknowledgemen
   const species=await page.locator('#case-1 h3').textContent();
   await page.locator('#case-1 [data-action="reject"]').click();await ready(page,2);
   assert.equal(await page.locator('.case-card').count(),2);assert.equal(await page.locator('#case-1 h3').textContent(),species);
-  assert.match(await page.locator('#case-1 .case-recordings summary').textContent(),/5 available/);
+  assert.match(await page.locator('#case-1 .case-recordings summary').textContent(),/5 unreviewed/);
   assert.ok(await page.locator('#case-1 .case-rejection-notice').isVisible());assert.ok(await page.locator('#case-0 .case-rejection-notice').isHidden());
   assert.match(await page.locator('#case-1 .case-player').getAttribute('src'),/bird-1-1.wav$/);
   assert.ok(await page.locator('#case-1 .case-rejection-notice').evaluate(el=>document.activeElement===el));
   await page.locator('#case-1 [data-rejection-control="undo"]').click();await ready(page,2);
-  assert.equal(state.posts[1].action,'undo');assert.match(await page.locator('#case-1 .case-recordings summary').textContent(),/6 available/);
+  assert.equal(state.posts[1].action,'undo');assert.match(await page.locator('#case-1 .case-recordings summary').textContent(),/6 unreviewed/);
   assert.match(await page.locator('#case-1 .case-player').getAttribute('src'),/bird-1-0.wav$/);assert.ok(await page.locator('#case-1 .case-rejection-notice').isHidden());
+});
+
+test('full unreviewed total falls while three preview choices refill; preview count is expanded-only',async t=>{
+  const {page,state}=await fixture(t,1), original=state.cases[0].evidence[0];
+  state.cases[0].evidence=Array.from({length:26},(_,j)=>({...original,file_name:`bird-0-${j}.wav`,file_revision:'revision-'+j,clip_path:`day/Test_Bird/bird-0-${j}.wav`,time:`12:${String(j).padStart(2,'0')}:00`}));
+  await page.locator('#caseRefresh').click();await ready(page,1);
+  assert.equal(await page.locator('.case-recordings summary span').textContent(),'26 unreviewed');
+  assert.ok(await page.locator('.case-recording-count').isHidden());assert.equal(await page.locator('.case-recording-choice').count(),3);
+  await page.locator('.case-recordings summary').click();
+  assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 3 of 26 unreviewed recordings');
+  await action(page,'reject');await ready(page,1);
+  assert.equal(await page.locator('.case-recordings summary span').textContent(),'25 unreviewed');
+  assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 3 of 25 unreviewed recordings');
+  assert.equal(await page.locator('.case-recording-choice').count(),3);assert.ok(await page.locator('.case-next-recording').isVisible());
+  assert.match(await page.locator('.case-player').getAttribute('src'),/bird-0-1.wav$/);
+  await page.locator('.case-recordings summary').click();assert.ok(await page.locator('.case-recording-count').isHidden());
+  await page.locator('[data-rejection-control="undo"]').click();await ready(page,1);
+  assert.equal(await page.locator('.case-recordings summary span').textContent(),'26 unreviewed');
+  assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 3 of 26 unreviewed recordings');
+  await page.locator('.case-recordings summary').click();await action(page,'evidence');await ready(page,1);
+  assert.equal(await page.locator('.case-recording-choice').count(),26);
+  assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 26 of 26 unreviewed recordings');
+});
+
+test('total is not advertised as playable audio and handles a single unreviewed recording',async t=>{
+  const {page,state}=await fixture(t,1);
+  state.cases[0].candidate_count=26;state.cases[0].evidence=state.cases[0].evidence.slice(0,2);
+  await page.locator('#caseRefresh').click();await ready(page,1);await page.locator('.case-recordings summary').click();
+  assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 2 of 26 unreviewed recordings');
+  assert.doesNotMatch(await page.locator('.case-recordings summary').textContent(),/available|shown|Showing/);
+  assert.match(await page.locator('.case-recordings summary span').getAttribute('title'),/Some audio may be unavailable/);
+  delete state.cases[0].candidate_count;state.cases[0].evidence=state.cases[0].evidence.slice(0,1);
+  await page.locator('#caseRefresh').click();await ready(page,1);
+  assert.equal(await page.locator('.case-recordings summary span').textContent(),'1 unreviewed');
+  assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 1 of 1 unreviewed recording');
+});
+
+test('an unknown total is not replaced with the preview length',async t=>{
+  const {page,state}=await fixture(t,1);state.cases[0].candidate_count='unknown';
+  await page.locator('#caseRefresh').click();await ready(page,1);
+  assert.equal(await page.locator('.case-recordings summary span').textContent(),'Unreviewed recordings');
+  await page.locator('.case-recordings summary').click();assert.equal(await page.locator('.case-recording-count').textContent(),'Showing 3 loaded recordings');
+});
+
+for(const width of [1200,320])test('unreviewed total and expanded-only preview fit at '+width+'px',async t=>{
+  const {page,state}=await fixture(t,1);await page.setViewportSize({width,height:950});state.cases[0].candidate_count=1250;
+  await page.locator('#caseRefresh').click();await ready(page,1);
+  assert.equal(await page.locator('.case-recordings summary span').textContent(),'1,250 unreviewed');
+  assert.ok(await page.locator('.case-recording-count').isHidden());
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await page.locator('.case-recordings summary').click();assert.ok(await page.locator('.case-recording-count').isVisible());
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  if(process.env.BIRDNET_GUIDED_PREVIEW_DIR)await page.screenshot({path:path.join(process.env.BIRDNET_GUIDED_PREVIEW_DIR,`review-count-${width}.png`),fullPage:true});
 });
 
 test('consecutive rejections update the previous timestamp and keep acknowledgement until the next action',async t=>{

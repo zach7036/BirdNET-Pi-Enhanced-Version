@@ -19,6 +19,11 @@ Each question separates the bird and a short explanation from two steps:
 phones and narrow content areas stack them. Each card has one audio player.
 The collapsed recording picker changes that player's recording, timestamp,
 score, and decision target together. Extra recordings do not add more players.
+The collapsed picker shows the full count for this question, such as
+“26 unreviewed.” Only the expanded list says “Showing 3 of 26 unreviewed
+recordings.” The total refreshes after decisions and Undo, even when the
+three-recording preview refills. It counts unreviewed records, not guaranteed
+playable audio; some files may be unavailable. Queue selection is unchanged.
 
 Dates and session options, detailed reasons, comparison/reassignment tools, and
 explicit bulk selection are collapsed until needed. Bulk decisions still require

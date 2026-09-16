@@ -802,6 +802,7 @@ a.species-card-photo:hover img {
 @media (prefers-reduced-motion: reduce) { .case-recording-changed .case-recording-meta { animation: none; } }
 [data-theme="dark"] .case-player, [data-theme="dark"] .case-detail audio { color-scheme: dark; }
 .guided-review .case-recordings summary { padding: 10px 0 4px; color: var(--accent); }
+.case-recording-count { margin: 8px 0; font-size: .8rem; color: var(--text-secondary); }
 .case-recordings fieldset { padding: 0; border: 0; margin: 8px 0; display: grid; gap: 6px; max-height: 280px; overflow: auto; }
 .case-recording-choice { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
 .case-recording-choice.is-selected { border-color: var(--accent); background: var(--accent-subtle); }
