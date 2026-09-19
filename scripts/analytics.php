@@ -178,7 +178,7 @@
     transition: all 0.2s;
 }
 .btn-reset-chart:hover { background: var(--bg-page); color: var(--text-primary); }
-.chart-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; margin-top: 4px; }
+.analytics-dashboard .chart-sub { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px; margin-top: 4px; }
 
 /* Modal */
 .picker-modal {
@@ -525,6 +525,12 @@ let colorPalette = [
 
 document.addEventListener("DOMContentLoaded", function() {
     initCharts();
+    // Canvas text does not follow CSS automatically. Repaint existing charts,
+    // preserving their data, filters and legend visibility without new requests.
+    new MutationObserver(updateAnalyticsChartTheme).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme']
+    });
     loadAllData();
 });
 
@@ -537,10 +543,34 @@ function resetFilters() {
     loadAllData();
 }
 
+function analyticsChartColors() {
+    const style = getComputedStyle(document.querySelector('.analytics-dashboard'));
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        fontColor: style.getPropertyValue('--text-primary').trim() || (isDark ? '#c9d1d9' : '#334155'),
+        gridColor: style.getPropertyValue('--border').trim() || (isDark ? '#30363d' : '#e2e8f0')
+    };
+}
+
+function updateAnalyticsChartTheme() {
+    const {fontColor, gridColor} = analyticsChartColors();
+    Object.values(charts).forEach(chart => {
+        chart.options.legend.labels.fontColor = fontColor;
+        chart.options.title.fontColor = fontColor;
+        ['xAxes', 'yAxes'].forEach(direction => {
+            chart.options.scales[direction].forEach(axis => {
+                axis.ticks.fontColor = fontColor;
+                axis.scaleLabel.fontColor = fontColor;
+                axis.gridLines.color = gridColor;
+                axis.gridLines.zeroLineColor = gridColor;
+            });
+        });
+        chart.update(0);
+    });
+}
+
 function initCharts() {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const fontColor = isDark ? '#e2e8f0' : '#475569';
-    const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+    const {fontColor, gridColor} = analyticsChartColors();
     
     Chart.defaults.global.defaultFontColor = fontColor;
     Chart.defaults.global.defaultFontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
@@ -624,6 +654,7 @@ function initCharts() {
             }
         }
     });
+    updateAnalyticsChartTheme();
 }
 
 function loadAllData() {

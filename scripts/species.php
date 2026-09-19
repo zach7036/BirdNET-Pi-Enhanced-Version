@@ -179,12 +179,13 @@ if ($is_species_ajax) {
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
-.dashboard-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.species-dashboard .dashboard-header { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.species-dashboard .header-text { flex: 1 1 240px; min-width: 0; }
 .header-text h1 { font-size: 1.8rem; margin: 0; color: var(--text-heading); }
 .header-text p { margin: 4px 0 0 0; color: var(--text-muted, #64748b); }
 
-.kpi-row { display: flex; gap: 20px; align-items: stretch; }
-.kpi-card {
+.species-dashboard .kpi-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1 1 580px; gap: 20px; min-width: 0; }
+.species-dashboard .kpi-card {
     background: var(--bg-card);
     padding: 12px 28px;
     border-radius: 12px;
@@ -192,7 +193,9 @@ if ($is_species_ajax) {
     display: flex;
     align-items: center;
     gap: 16px;
-    min-width: 280px;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .kpi-icon {
@@ -206,7 +209,7 @@ if ($is_species_ajax) {
     font-size: 1.2rem;
     flex-shrink: 0;
 }
-.kpi-info { display: flex; flex-direction: column; }
+.species-dashboard .kpi-info { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .kpi-label { font-size: 0.9rem; font-weight: 600; color: var(--text-heading); }
 .kpi-value { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); line-height: 1; margin: 4px 0; }
 .kpi-sub { font-size: 0.75rem; color: var(--text-muted); }
@@ -219,15 +222,17 @@ if ($is_species_ajax) {
     margin-bottom: 32px;
     border: 1px solid var(--border-light, #f1f5f9);
 }
-.filter-grid {
+.species-dashboard .filter-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
     gap: 24px;
     align-items: end;
 }
-.filter-group { display: flex; flex-direction: column; gap: 8px; }
+.species-dashboard .filter-group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .filter-group label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
-.styled-select, .styled-input {
+.species-dashboard .styled-select, .species-dashboard .styled-input {
+    width: 100%;
+    min-width: 0;
     padding: 10px 12px;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -237,9 +242,10 @@ if ($is_species_ajax) {
     font-size: 0.9rem;
 }
 .search-group { grid-column: 1 / -1; }
-.filter-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+.species-dashboard .filter-footer { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin-top: 20px; }
 .results-count { font-size: 0.85rem; color: var(--text-muted); }
-.filter-actions { display: flex; gap: 12px; align-items: center; }
+.species-dashboard .filter-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.species-dashboard .filter-actions > * { justify-content: center; white-space: nowrap; }
 /* These classes had no styles at all: Apply fell back to the browser's
    default button, Reset was a bare baseline-aligned link (it sat higher),
    and Export CSV compensated with an unreadable inline dark background. */
@@ -273,9 +279,9 @@ if ($is_species_ajax) {
 }
 
 /* Grid */
-.species-grid {
+.species-dashboard .species-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
     gap: 24px;
 }
 .bird-card {
@@ -307,8 +313,8 @@ if ($is_species_ajax) {
     object-fit: contain;
 }
 .card-content { padding: 20px; }
-.bird-name { font-size: 1.1rem; font-weight: 700; color: var(--text-heading); margin-bottom: 2px; }
-.bird-sci { font-size: 0.85rem; font-style: italic; color: var(--text-muted); margin-bottom: 16px; display: block; }
+.species-dashboard .bird-name { font-size: 1.1rem; font-weight: 700; color: var(--text-heading); margin-bottom: 2px; overflow-wrap: anywhere; }
+.species-dashboard .bird-sci { font-size: 0.85rem; font-style: italic; color: var(--text-muted); margin-bottom: 16px; display: block; overflow-wrap: anywhere; }
 .stats-table { width: 100%; font-size: 0.85rem; }
 .stats-table tr td:first-child { color: var(--text-muted); padding-bottom: 4px; }
 .stats-table tr td:last-child { text-align: right; font-weight: 600; color: var(--text-primary); padding-bottom: 4px; }
@@ -339,6 +345,16 @@ if ($is_species_ajax) {
 .species-card-links .mrd-link-pill:hover {
     background: var(--accent);
     color: white;
+}
+
+@media (max-width: 600px) {
+    .species-dashboard { padding: 20px 16px; }
+    .species-dashboard .kpi-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .species-dashboard .kpi-card { padding: 16px; }
+    .species-dashboard .filter-section { padding: 16px; }
+    .species-dashboard .filter-grid { gap: 16px; }
+    .species-dashboard .filter-actions { width: 100%; }
+    .species-dashboard .filter-actions > * { flex: 1 1 auto; }
 }
 
 </style>

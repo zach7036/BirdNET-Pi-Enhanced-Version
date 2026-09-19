@@ -302,6 +302,32 @@ linking to [the pinned recovery issue](https://github.com/zach7036/BirdNET-Pi-En
 or `docs/UPDATE_RECOVERY.md`. Do not imply
 that already-installed older code can display the new warning before updating.
 
+## Species layout and chart themes
+
+The Species page's responsive rules are scoped to `.species-dashboard` so they
+do not change the Today grid or other KPI cards. The header wraps with available
+space, phone summary cards stack, and filters/actions and species cards fit
+without horizontal page scrolling.
+
+Analytics canvas colors come from the app's resolved CSS theme, not the device's
+`prefers-color-scheme`. Changing `data-theme` repaints existing chart instances
+without refetching data or resetting filters and hidden legend series. Keep
+axis labels, legends, and chart descriptions readable in both themes.
+
+```sh
+BIRDNET_TEST_BROWSER=chrome node --test tests/test_species_charts_ui.js
+```
+
+Requires PHP CLI (`BIRDNET_TEST_PHP` can select it) and Playwright. Omit the
+browser variable for bundled Chromium, or set `BIRDNET_TEST_ENGINE=webkit` to
+run with an installed Playwright WebKit runtime. The suite renders the actual
+Species template with synthetic data and exercises the shipped Analytics code
+and Chart.js. All requests are intercepted; no station database, configuration,
+or maintenance commands are used. It covers 320–1440px layouts, both themes,
+filter/load/export controls, mismatched OS/app themes, canvas text contrast, and
+theme switches that preserve chart state. Set `BIRDNET_DISPLAY_SCREENSHOTS=1`
+to save inspection screenshots in the system temporary directory.
+
 ## General development notes
 
 - Always lint changed PHP with `php -l` before testing.
